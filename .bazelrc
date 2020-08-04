@@ -1,0 +1,14 @@
+# TensorFlow Federated Bazel configuration.
+#
+# See https://docs.bazel.build/versions/master/user-manual.html#config for
+# details on the various configuration options.
+
+# Build with optimization enabled.
+build --compilation_mode=opt
+# Enable fast C++ protocol buffers, 10x speedup over pure Python.
+build --define use_fast_cpp_protos=true
+
+# Processor native optimizations (depends on build host capabilities).
+build --copt=-march=native
+build --host_copt=-march=native
+build --copt=-O3
