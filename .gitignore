@@ -1,0 +1,15 @@
+# MacOS
+.DS_Store
+
+# Python
+*.py[cod]
+__pycache__/
+venv/
+
+# Bazel
+/.bazelrc
+/bazel-*
+/bazel_pip
+
+# Notebooks
+.ipynb_checkpoints
