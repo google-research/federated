@@ -18,7 +18,7 @@ used in the
 as follows:
 
 ```
-from tensorflow_federated.python.research.robust_aggregation import build_robust_federated_aggregation_process
+from federated_research.robust_aggregation import build_robust_federated_aggregation_process
 # dataset setup, model setup, etc. from tutorial
 ....
 # change definition of iterative process from

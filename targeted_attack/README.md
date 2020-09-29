@@ -9,7 +9,7 @@ This directory contains source code for
 and defenses considered in
 [Can You Really Back door Federated Learning?](https://arxiv.org/abs/1911.07963)
 The TFF implementation of basic federated learning is based on
-[Simple_Fedavg](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/simple_fedavg/simple_fedavg.py).
+[Simple_Fedavg](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/examples/simple_fedavg).
 The attack model we are considering is primarily based on the model replacement
 attacks proposed in the following two papers:
 

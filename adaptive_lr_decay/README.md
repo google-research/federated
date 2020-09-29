@@ -28,9 +28,9 @@ pip install tensorflow
 ## General description
 
 This example contains two main libraries,
-[adaptive_fed_avg.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/adaptive_fed_avg.py)
+[adaptive_fed_avg.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/adaptive_fed_avg.py)
 and
-[callbacks.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/callbacks.py).
+[callbacks.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/callbacks.py).
 The latter implements learning rate callbacks that adaptively decay learning
 rates based on moving averages of metrics. This is relevant in the federated
 setting, as we may wish to decay learning rates based on the average training
@@ -95,7 +95,7 @@ learning rate from decaying for a number of rounds after it has decayed), or
 configure how many consecutive rounds of plateauing loss must be observed before
 decaying the learning rate (via the `patience` argument). For more details, see
 the documentation for
-[callbacks.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/callbacks.py).
+[callbacks.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/callbacks.py).
 
 ## Benchmarking experiments
 
@@ -107,11 +107,11 @@ of the datasets, models, and tasks are given below.
 
 Dataset        | Model                             | Task Summary              | Binary
 -------------- | --------------------------------- | ------------------------- | ------
-CIFAR-100      | ResNet-18 (with GroupNorm layers) | Image classification      | [run_federated_cifar100.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/run_federated_cifar100.py)
-FEMNIST        | Convolutional Neural Network      | Digit recognition         | [run_federated_emnist.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/run_federated_emnist.py)
-Shakespeare    | RNN with 2 LSTM layers            | Next character prediction | [run_federated_shakespeare.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/run_federated_shakespeare.py)
-Stack Overflow | RNN with 1 LSTM layer             | Next word prediction      | [run_federated_stackoverflow.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/run_federated_stackoverflow.py)
-Stack Overflow | Logistic regression classifier    | Tag prediction            | [run_federated_stackoverflow_lr.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/run_federated_stackoverflow_lr.py)
+CIFAR-100      | ResNet-18 (with GroupNorm layers) | Image classification      | [run_federated_cifar100.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_cifar100.py)
+FEMNIST        | Convolutional Neural Network      | Digit recognition         | [run_federated_emnist.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_emnist.py)
+Shakespeare    | RNN with 2 LSTM layers            | Next character prediction | [run_federated_shakespeare.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_shakespeare.py)
+Stack Overflow | RNN with 1 LSTM layer             | Next word prediction      | [run_federated_stackoverflow.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_stackoverflow.py)
+Stack Overflow | Logistic regression classifier    | Tag prediction            | [run_federated_stackoverflow_lr.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_stackoverflow_lr.py)
 
 To run the corresponding binaries, we require [Bazel](https://www.bazel.build/).
 Instructions for installing Bazel can be found
@@ -132,7 +132,7 @@ the server and client, with 10 clients per round and 1 client epoch per round.
 If instead you wanted each client to perform 10 gradient steps (irrespective of
 the size of their local dataset), you could set `--client_epochs_per_round=-1
 --max_batches_per_client=10`. For more details on these flags, see
-[federated_trainer.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/federated_trainer.py).
+[federated_trainer.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/federated_trainer.py).
 
 In the example above, the client and server both use learning rates of 0.1. By
 default, when the loss plateaus, the iterative process constructed will
@@ -142,4 +142,4 @@ further, one could alter the server learning rate decay factor, the window size
 used to estimate the global loss, the minimum learning rate, and other
 configurations. These are configured via abseil flags. For a list of flags
 configuring the adaptive learning rate decay, see
-[federated_trainer.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/adaptive_lr_decay/federated_trainer.py).
+[federated_trainer.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/federated_trainer.py).

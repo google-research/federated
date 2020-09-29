@@ -8,13 +8,13 @@ This directory provides an end-to-end example of compressed model broadcasts and
 compressed aggregated model updates for federated training (with the Federated
 Averaging algorithm in particular).
 
-*   [run_experiment.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/compression/run_experiment.py)
+*   [run_experiment.py](https://github.com/google-research/federated/blob/master/compression/run_experiment.py)
     demonstrates how encoders implemented in the
     [`tensor_encoding`](https://github.com/tensorflow/model-optimization/tree/master/tensorflow_model_optimization/python/core/internal/tensor_encoding)
     API can be quickly integrated into an existing federated training loop.
 *   If you are interested in implementing your own compression algorithms for
     use in TFF, see
-    [sparsity.py](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/research/compression/sparsity.py)
+    [sparsity.py](https://github.com/google-research/federated/blob/master/compression/sparsity.py)
     for an example of implementing a custom compression algorithm. See also
     [TFF for research](https://github.com/tensorflow/federated/blob/master/docs/tff_for_research.md).
 
