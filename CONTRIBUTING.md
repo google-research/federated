@@ -1,9 +1,13 @@
 # Contributing
 
+We do not currently accept pull request. Please use
+[GitHub issues](https://github.com/google-research/federated/issues) to
+communicate with project owners for requests and bugs.
+
 ## Contributor License Agreements
 
-We'd love to accept your patches! Before we can take them, we have to jump a
-couple of legal hurdles.
+Before we can take your contributions, we have to jump a couple of legal
+hurdles.
 
 Please fill out either the individual or corporate Contributor License Agreement
 (CLA).
@@ -29,17 +33,26 @@ This project follows
 
 ## Code Reviews
 
-All submissions, including submissions by project members, require review. We
-use GitHub pull requests for this purpose. Consult
-[GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
-information on using pull requests.
+All submissions, including submissions by project members, require review.
 
-## Code Style, Guidelines, and Best Practices
+## Guidelines
 
-### General Guidelines
+### General Guidelines and Philosophy
+
+*   Include unit tests when you contribute new features or fix a bug, this:
+
+    *   proves that your code works correctly
+    *   guards against breaking changes
+    *   lowers the maintenance cost
+
+*   Tests should follow the
+    [testing best practices](https://www.tensorflow.org/community/contribute/tests)
+    guide.
 
 *   Python code should adhere to the
     [Google Python Style Guide](http://google.github.io/styleguide/pyguide.html).
+
+### Coding Style
 
 *   Fromat your changes.
 
@@ -49,8 +62,8 @@ information on using pull requests.
 
     ```shell
     git diff --name-only \
-      | sed '/.*\.py/!d' \
-      | xargs yapf --in-place
+        | sed '/.*\.py/!d' \
+        | xargs yapf --in-place
     ```
 
 *   Lint your changes.
@@ -61,17 +74,15 @@ information on using pull requests.
 
     ```shell
     git diff --name-only \
-      | sed '/.*\.py/!d' \
-      | xargs pylint
+        | sed '/.*\.py/!d' \
+        | xargs pylint
     ```
 
-*   Python code must support Python 3 usage.
+### License
 
-*   Include a license at the top of new files.
+Include a license at the top of new files.
 
-    *   [Python license example](https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/__init__.py#L1)
-
-### TensorFlow-specific Guidelines.
+### TensorFlow Guidelines.
 
 *   TensorFlow code should follow the
     [TensorFlow Style Guide](https://www.tensorflow.org/community/style_guide).
@@ -101,9 +112,3 @@ information on using pull requests.
     non-determinism can lead to Checkpoint-incompatible graphs. Furthermore, TFF
     type signatures constructed from unordered dictionaries may also mismatch as
     their entries are permuted.
-
-### TFF-specific Guidelines
-
-*   While not a requirement, in our examples we use the conventions that metrics
-    and counters associated with a `tff.learning.Model` are named using
-    `lower_with_under` style, as with Python identifiers.
