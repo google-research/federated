@@ -19,7 +19,7 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from utils.datasets import stackoverflow_dataset
-from tensorflow_federated.python.common_libs import test
+from tensorflow_federated.python.common_libs import test_utils
 
 
 TEST_DATA = collections.OrderedDict(
@@ -239,7 +239,7 @@ STACKOVERFLOW_MODULE = 'tensorflow_federated.simulation.datasets.stackoverflow'
 
 class ConstructWordLevelDatasetsTest(tf.test.TestCase):
 
-  @test.skip_test_for_gpu
+  @test_utils.skip_test_for_gpu
   @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
   @mock.patch(STACKOVERFLOW_MODULE + '.load_data')
   def test_preprocess_applied(self, mock_load_data, mock_load_word_counts):
@@ -280,7 +280,7 @@ class ConstructWordLevelDatasetsTest(tf.test.TestCase):
     # Assert the word counts were loaded once to apply to each dataset.
     mock_load_word_counts.assert_called_once()
 
-  @test.skip_test_for_gpu
+  @test_utils.skip_test_for_gpu
   @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
   @mock.patch(STACKOVERFLOW_MODULE + '.load_data')
   def test_raises_no_repeat_and_no_take(self, mock_load_data,

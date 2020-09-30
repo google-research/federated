@@ -22,7 +22,7 @@ import tensorflow_privacy
 
 from targeted_attack import attacked_fedavg
 from targeted_attack.attacked_fedavg import build_federated_averaging_process_attacked
-from tensorflow_federated.python.common_libs import test
+from tensorflow_federated.python.common_libs import test_utils
 
 _Batch = collections.namedtuple('Batch', ['x', 'y'])
 
@@ -279,7 +279,7 @@ class ServerTest(tf.test.TestCase):
 class ClientTest(tf.test.TestCase):
 
   # TODO(b/155198591): bring GPU test back after the fix for tf.function.
-  @test.skip_test_for_gpu
+  @test_utils.skip_test_for_gpu
   def test_self_contained_example(self):
     client_data = create_client_data()
     model = MnistModel()

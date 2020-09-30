@@ -16,7 +16,7 @@
 import tensorflow as tf
 
 from utils.datasets import stackoverflow_lr_dataset
-from tensorflow_federated.python.common_libs import test
+from tensorflow_federated.python.common_libs import test_utils
 
 
 TEST_BATCH_SIZE = stackoverflow_lr_dataset.TEST_BATCH_SIZE
@@ -69,7 +69,7 @@ class DatasetTest(tf.test.TestCase):
     self.assertEqual(test_batch[0].shape.as_list(), [500, 100])
     self.assertEqual(test_batch[1].shape.as_list(), [500, 5])
 
-  @test.skip_test_for_gpu
+  @test_utils.skip_test_for_gpu
   def test_take_with_repeat(self):
     so_train, _, _ = stackoverflow_lr_dataset.get_stackoverflow_datasets(
         vocab_tokens_size=1000,
@@ -83,7 +83,7 @@ class DatasetTest(tf.test.TestCase):
       client_ds = so_train.create_tf_dataset_for_client(so_train.client_ids[i])
       self.assertEqual(_compute_length_of_dataset(client_ds), 8)
 
-  @test.skip_test_for_gpu
+  @test_utils.skip_test_for_gpu
   def test_raises_no_repeat_and_no_take(self):
     with self.assertRaisesRegex(
         ValueError, 'Argument client_epochs_per_round is set to -1'):
