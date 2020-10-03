@@ -33,7 +33,8 @@ feature requests or encounter a bug, please file an issue to the project owners.
 ## Issues
 
 Please use [GitHub issues](https://github.com/google-research/federated/issues)
-to communicate with project owners for requests and bugs.
+to communicate with project owners for requests and bugs. Add `[project/folder
+name]` in the issue title so that we can easily find the best person to respond.
 
 ## Questions
 
