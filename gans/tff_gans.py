@@ -127,12 +127,12 @@ class GanFnsAndTypes(object):
         generator_weights=self.generator_weights_type,
         discriminator_weights=self.discriminator_weights_type)
 
-    self.client_gen_input_type = tff.FederatedType(
-        tff.SequenceType(self.gen_input_type), tff.CLIENTS)
-    self.client_real_data_type = tff.FederatedType(
-        tff.SequenceType(self.real_data_type), tff.CLIENTS)
-    self.server_gen_input_type = tff.FederatedType(
-        tff.SequenceType(self.gen_input_type), tff.SERVER)
+    self.client_gen_input_type = tff.type_at_clients(
+        tff.SequenceType(self.gen_input_type))
+    self.client_real_data_type = tff.type_at_clients(
+        tff.SequenceType(self.real_data_type))
+    self.server_gen_input_type = tff.type_at_server(
+        tff.SequenceType(self.gen_input_type))
 
     # Right now, the logic in this library is effectively "if DP use stateful
     # aggregator, else don't use stateful aggregator". An alternative

@@ -52,9 +52,8 @@ def build_stateless_robust_aggregation(model_type,
     return weight / tf.math.maximum(tolerance, tf.math.sqrt(sqnorm))
 
   @tff.federated_computation(
-      tff.FederatedType((), tff.SERVER),
-      tff.FederatedType(model_type, tff.CLIENTS),
-      tff.FederatedType(tf.float32, tff.CLIENTS))
+      tff.type_at_server(()), tff.type_at_clients(model_type),
+      tff.type_at_clients(tf.float32))
   def _robust_aggregation_fn(state, value, weight):
     aggregate = tff.federated_mean(value, weight=weight)
     for _ in range(num_communication_passes - 1):

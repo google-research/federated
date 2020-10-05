@@ -310,8 +310,8 @@ def build_fed_avg_process(
                          client_monitor_value, server_monitor_value)
 
   @tff.federated_computation(
-      tff.FederatedType(server_state_type, tff.SERVER),
-      tff.FederatedType(tf_dataset_type, tff.CLIENTS))
+      tff.type_at_server(server_state_type),
+      tff.type_at_clients(tf_dataset_type))
   def run_one_round(server_state, federated_dataset):
     """Orchestration logic for one round of computation.
 

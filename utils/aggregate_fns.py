@@ -70,9 +70,8 @@ def build_fixed_clip_norm_mean_process(
     return tff.federated_value((), tff.SERVER)
 
   @tff.federated_computation(
-      tff.FederatedType((), tff.SERVER),
-      tff.FederatedType(model_update_type, tff.CLIENTS),
-      tff.FederatedType(tf.float32, tff.CLIENTS))
+      tff.type_at_server(()), tff.type_at_clients(model_update_type),
+      tff.type_at_clients(tf.float32))
   def next_fn(state, deltas, weights):
 
     @tff.tf_computation(model_update_type)

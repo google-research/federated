@@ -192,8 +192,8 @@ class ModelDeltaProcessTest(tf.test.TestCase):
 
   def test_build_with_preprocess_function(self):
     test_dataset = tf.data.Dataset.range(5)
-    client_datasets_type = tff.FederatedType(
-        tff.SequenceType(test_dataset.element_spec), tff.CLIENTS)
+    client_datasets_type = tff.type_at_clients(
+        tff.SequenceType(test_dataset.element_spec))
 
     @tff.tf_computation(tff.SequenceType(test_dataset.element_spec))
     def preprocess_dataset(ds):

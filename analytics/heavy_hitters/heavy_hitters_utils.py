@@ -159,8 +159,7 @@ def get_federated_tokenize_fn(dataset_name, dataset_element_type_structure):
     return dataset
 
   @tff.federated_computation(
-      tff.FederatedType(
-          tff.SequenceType(dataset_element_type_structure), tff.CLIENTS))
+      tff.type_at_clients(tff.SequenceType(dataset_element_type_structure)))
   def tokenize_datasets(datasets):
     """The TFF computation to compute tokenized datasets."""
     tokenized_datasets = tff.federated_map(tokenize_dataset, datasets)
@@ -398,8 +397,7 @@ def compute_lossless_result_per_user(dataset):
   return k_words
 
 
-@tff.federated_computation(
-    tff.FederatedType(tff.SequenceType(tf.string), tff.CLIENTS))
+@tff.federated_computation(tff.type_at_clients(tff.SequenceType(tf.string)))
 def compute_lossless_results_federated(datasets):
   words = tff.federated_map(compute_lossless_result_per_user, datasets)
   return words

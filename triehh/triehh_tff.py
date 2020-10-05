@@ -139,9 +139,8 @@ def build_triehh_process(
                          max_user_contribution,
                          tf.constant(default_terminator, dtype=tf.string))
 
-  federated_server_state_type = tff.FederatedType(server_state_type, tff.SERVER)
-  federated_dataset_type = tff.FederatedType(
-      tf_dataset_type, tff.CLIENTS, all_equal=False)
+  federated_server_state_type = tff.type_at_server(server_state_type)
+  federated_dataset_type = tff.type_at_clients(tf_dataset_type)
 
   @tff.federated_computation(federated_server_state_type,
                              federated_dataset_type)

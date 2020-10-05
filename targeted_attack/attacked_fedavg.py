@@ -368,7 +368,7 @@ def build_run_one_round_fn_attacked(server_update_fn, client_update_fn,
     A `tff.federated_computation` for a round of training.
   """
 
-  federated_bool_type = tff.FederatedType(tf.bool, tff.CLIENTS)
+  federated_bool_type = tff.type_at_clients(tf.bool)
 
   @tff.federated_computation(federated_server_state_type,
                              federated_dataset_type, federated_dataset_type,
@@ -460,9 +460,9 @@ def build_federated_averaging_process_attacked(
                                             client_update_tf, tf_dataset_type,
                                             server_state_type.model)
 
-  federated_server_state_type = tff.FederatedType(server_state_type, tff.SERVER)
+  federated_server_state_type = tff.type_at_server(server_state_type)
 
-  federated_dataset_type = tff.FederatedType(tf_dataset_type, tff.CLIENTS)
+  federated_dataset_type = tff.type_at_clients(tf_dataset_type)
 
   run_one_round_tff = build_run_one_round_fn_attacked(
       server_update_fn, client_update_fn, aggregation_process,
