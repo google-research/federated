@@ -221,5 +221,14 @@ class FileCheckpointManager(CheckpointManager):
 
   def _get_all_checkpoint_paths(self) -> List[str]:
     """Returns all the checkpoint paths managed by the instance."""
-    pattern = os.path.join(self._root_dir, '{}*'.format(self._prefix))
-    return tf.io.gfile.glob(pattern)
+    # Due to tensorflow/issues/19378, we cannot use `tf.io.gfile.glob` here
+    # because it returns directory contents recursively on Windows.
+    if tf.io.gfile.exists(self._root_dir):
+      root_dir_entries = tf.io.gfile.listdir(self._root_dir)
+      return [
+          os.path.join(self._root_dir, e)
+          for e in root_dir_entries
+          if e.startswith(self._prefix)
+      ]
+    else:
+      return []
