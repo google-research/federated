@@ -78,6 +78,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         "//optimization/shared/keras_optimizers:lars",
+        "//optimization/shared/keras_optimizers:shampoo",
         "//optimization/shared/keras_optimizers:yogi",
     ],
 )

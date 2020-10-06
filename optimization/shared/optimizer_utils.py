@@ -23,6 +23,7 @@ import tensorflow as tf
 import tensorflow_addons.optimizers as tfao
 
 from optimization.shared.keras_optimizers import lars
+from optimization.shared.keras_optimizers import shampoo
 from optimization.shared.keras_optimizers import yogi
 
 
@@ -32,11 +33,18 @@ def _optimizer_canonical_name(optimizer_cls):
 
 
 # List of optimizers currently supported.
+_SUPPORTED_OPTIMIZERS_CLS = [
+    tf.keras.optimizers.SGD,
+    tf.keras.optimizers.Adagrad,
+    tf.keras.optimizers.Adam,
+    yogi.Yogi,
+    lars.LARS,
+    tfao.lamb.LAMB,
+    shampoo.Shampoo,
+]
+
 _SUPPORTED_OPTIMIZERS = {
-    _optimizer_canonical_name(cls): cls for cls in [
-        tf.keras.optimizers.SGD, tf.keras.optimizers.Adagrad,
-        tf.keras.optimizers.Adam, yogi.Yogi, lars.LARS, tfao.lamb.LAMB
-    ]
+    _optimizer_canonical_name(cls): cls for cls in _SUPPORTED_OPTIMIZERS_CLS
 }
 
 

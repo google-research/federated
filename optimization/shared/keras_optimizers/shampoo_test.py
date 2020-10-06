@@ -305,6 +305,36 @@ class ShampooTest(tf.test.TestCase):
     self.assertAllCloseAccordingToType(
         block_1_mat_right, expected_block_1_mat_right, atol=1e-1)
 
+  def test_get_config(self):
+    opt = shampoo.Shampoo(
+        learning_rate=1e-4,
+        momentum=0.9,
+        gradient_norm_adjuster='adagrad',
+        initial_accumulator_value=0.0,
+        start_preconditioning_steps=10,
+        statistics_computation_frequency=1,
+        matrix_epsilon=1e-6,
+        second_moment_averaging=1.0,
+        fallback_to_diagonal_dim=4096,
+        max_any_dim=6656,
+        block_size=4096,
+        exponent_multiplier=1.0,
+    )
+
+    config = opt.get_config()
+    self.assertEqual(config['learning_rate'], 1e-4)
+    self.assertEqual(config['first_moment_averaging'], 0.9)
+    self.assertEqual(config['gradient_norm_adjuster'], 'adagrad')
+    self.assertEqual(config['initial_accumulator_value'], 0.0)
+    self.assertEqual(config['start_preconditioning_steps'], 10)
+    self.assertEqual(config['statistics_computation_frequency'], 1)
+    self.assertEqual(config['matrix_epsilon'], 1e-6)
+    self.assertEqual(config['second_moment_averaging'], 1.0)
+    self.assertEqual(config['fallback_to_diagonal_dim'], 4096)
+    self.assertEqual(config['max_any_dim'], 6656)
+    self.assertEqual(config['block_size'], 4096)
+    self.assertEqual(config['exponent_multiplier'], 1.0)
+
 
 class PartitionConfigTest(tf.test.TestCase):
   """Partition config tests."""

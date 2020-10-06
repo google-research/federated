@@ -615,7 +615,7 @@ class Shampoo(tf.keras.optimizers.Optimizer):
         'start_preconditioning_steps':
             self._serialize_hyperparameter('start_preconditioning_steps'),
         'matrix_epsilon':
-            self._serialize_hyperparameter('max_epsilon'),
+            self._serialize_hyperparameter('matrix_epsilon'),
         'max_any_dim':
             self._max_any_dim,
         'block_size':
