@@ -1,10 +1,18 @@
 # Federated Optimization
 
 This directory contains source code for evaluating federated learning with
-different optimizers on various models and tasks. The code was developed for a
-paper, "Adaptive Federated Optimization"
-([arXiv link](https://arxiv.org/abs/2003.00295)). For a more general look at
-using TensorFlow Federated for research, see
+different optimizers on various models and tasks. The code was originally
+developed for a paper, "Adaptive Federated Optimization"
+([arXiv link](https://arxiv.org/abs/2003.00295)), but has since evolved into a
+general library for comparing and benchmarking federated optimization
+algorithms.
+
+[TOC]
+
+## Using this directory
+
+This library uses [TensorFlow Federated](https://www.tensorflow.org/federated).
+For a more general look at using TensorFlow Federated for research, see
 [Using TFF for Federated Learning Research](https://www.tensorflow.org/federated/tff_for_research).
 
 Some pip packages are required by this library, and may need to be installed:
@@ -24,7 +32,7 @@ Please see the guide
 [here](https://docs.bazel.build/versions/master/install.html) for installation
 instructions.
 
-### Directory structure
+## Directory structure
 
 This directory is broken up into six task directories. Each task directory
 contains task-specific libraries (such as libraries for loading the correct
@@ -38,7 +46,7 @@ any of the six task-specific federated training libraries.
 There is also a `shared` directory with utilities specific to these experiments,
 such as implementations of metrics used for evaluation.
 
-### Example usage
+## Example usage
 
 Suppose we wish to train a convolutional network on EMNIST for purposes of
 character recognition (`emnist_cr`), using federated optimization. Various
@@ -63,84 +71,79 @@ Other parameters that can be set include the batch size on the clients, the
 momentum parameters for various optimizers, and the number of total
 communication rounds.
 
-### Task and dataset summary
+## Task and dataset summary
 
 Below we give a summary of the datasets, tasks, and models used in this
 directory.
 
 <!-- mdformat off(This table is sensitive to automatic formatting changes) -->
 
-| Directory        | Dataset        | Model                             | Task Summary              |
-|------------------|----------------|-----------------------------------|---------------------------|
-| cifar100         | [CIFAR-100](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/cifar100/load_data)      | ResNet-18 (with GroupNorm layers) | Image classification      |
-| emnist           | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data)         | CNN (with dropout)                | Digit recognition         |
-| emnist_ae        | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data)         | Bottleneck network                | Autoencoder               |
-| shakespeare      | [Shakespeare](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/shakespeare/load_data)    | RNN with 2 LSTM layers            | Next-character prediction |
-| stackoverflow    | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | RNN with 1 LSTM layer             | Next-word prediction      |
-| stackoverflow_lr | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | Logistic regression classifier    | Tag prediction            |
+Task Name | Directory        | Dataset        | Model                             | Task Summary              |
+----------|------------------|----------------|-----------------------------------|---------------------------|
+CIFAR-100 | cifar100         | [CIFAR-100](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/cifar100/load_data)      | ResNet-18 (with GroupNorm layers) | Image classification      |
+EMNIST AE| emnist_ae        | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data)         | Bottleneck network                | Autoencoder               |
+EMNIST CR | emnist           | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data)         | CNN (with dropout)                | Character recognition         |
+Shakespeare | shakespeare      | [Shakespeare](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/shakespeare/load_data)    | RNN with 2 LSTM layers            | Next-character prediction |
+Stack Overflow LR | stackoverflow_lr | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | Logistic regression classifier    | Tag prediction            |
+Stack Overflow NWP | stackoverflow    | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | RNN with 1 LSTM layer             | Next-word prediction      |
 
 <!-- mdformat on -->
 
+## Configuring the federated training process
+
 ### Using different optimizers
 
-In our work, we compare 5 primary optimization methods: **FedAvg**, **FedAvgM**,
-**FedAdagrad**, **FedAdam**, and **FedYogi**. The first two use SGD on both
-client and server (with **FedAvgM** using server momentum of 0.9) and the last
-three use an adaptive optimizer on the server. To recreate our experimental
-results for each optimizer, use the following optimizer-specific flags:
+In our work, we compare 5 primary server optimization methods: **FedAvg**,
+**FedAvgM**, **FedAdagrad**, **FedAdam**, and **FedYogi**. The first two use SGD
+on the server (with **FedAvgM** using server momentum) and the last three use an
+adaptive optimizer on the server. All five use client SGD.
 
-*   **FedAvg**: `--server_optimizer=sgd --server_sgd_momentum=0.0`
-*   **FedAvgM**: `--server_optimizer=sgd --server_sgd_momentum=0.9`
-*   **FedAdagrad**: `--server_optimizer=adagrad
-    --server_adagrad_initial_accumulator_value=0.0`
+To configure these optimizers, use the following flags:
+
+*   **FedAvg**: `--server_optimizer=sgd`
+*   **FedAvgM**: `--server_optimizer=sgd --server_sgd_momentum={momentum value}`
+*   **FedAdagrad**: `--server_optimizer=adagrad`
 *   **FedAdam**: `--server_optimizer=adam`
-*   **FedYogi**: `--server_optimizer=yogi
-    --server_yogi_initial_accumulator_value=0.0`
+*   **FedYogi**: `--server_optimizer=yogi`
 
-Note that for adaptive optimizers, one should also set the parameter tau in the
-full description of our algorithms (see the accompanying paper). This parameter
-is referred to as epsilon in our code, and can be set via `--server_{adaptive
-optimizer}_epsilon={tau value}`. In general, we recommend a value of at least
-0.001 in most tasks. The best values for each task/optimizer are fully
-documented in the accompanying paper.
+For adaptive optimizers, one should also set the numerical stability constant
+epsilon (tau in Algorithm 2 of
+[Adaptive Federated Optimization](https://arxiv.org/abs/2003.00295)). This
+parameter can be using the flag `server_{adaptive optimizer}_epsilon`. We
+recommend a starting value of 0.001, which worked well across task and
+optimizers. For a more in-depth discussion, see
+[Hyperparameters and Tuning](docs/hyperparameters.md).
 
 For FedAdagrad and FedYogi, we use implementations of Adagrad and Yogi that
 allow one to select the `initial_accumulator_value` (see the Keras documentation
 on
 [Adagrad](https://www.tensorflow.org/api_docs/python/tf/keras/optimizers/Adagrad)).
-For all experiments, we used initial accumulator values of 0 (which is the
-implicit value set by default in the Keras implementation of
+For all experiments, we used initial accumulator values of 0 (the value fixed in
+the Keras implementation of
 [Adam](https://www.tensorflow.org/api_docs/python/tf/keras/optimizers/Adam)).
-While this can be tuned, we recommend first tuning other values, especially the
-`epsilon` value.
+While this can be tuned, we recommend focusing on tuning learning rates,
+momentum parameters, and epsilon values before tuning this value.
 
-In all of the cases above, the `--client_learning_rate` and
-`--server_learning_rate` must be set as well. For a detailed reference of the
-best hyperparameters for each optimizer and task, see the appendix in our
-accompanying paper.
+### Hyperparameters and reproducibility
 
-### Other hyperparameters and reproducibility
+The client learning rate (`client_learning_rate`) and server learning rate
+(`server_learning_rate`), can be vital for good performance on a task, as can
+optimizer-specific hyperparameters. By default, we create flags for each
+optimizer based on its *placement* (client or server) and the Keras argument
+name. For example, if we set `--client_optimizer=sgd`, then there will be a flag
+`client_sgd_momentum` corresponding to the momentum argument in the
+[Keras SGD](https://www.tensorflow.org/api_docs/python/tf/keras/optimizers/SGD).
+In general, we have flags of the form `{placement}_{optimizer}_{arg name}`.
 
-All other hyperparameters are set by default to the values used in the `Constant
-learning rates` experiments of Section 5 in our paper. This includes the batch
-size, the number of clients per round, the number of client epochs, and model
-parameter flags. While they can be set for different behavior (such as varying
-the number of client epochs), they should not be changed if one wishes to
-reproduce the results from our paper. Thus, to recreate our experiments, one can
-use the command
+In addition to the optimizer-specific hyperparameters, there are other
+parameters that can be configured via flags, including the batch size
+(`batch_size`), the number of participating clients per round
+(`clients_per_round`), the number of client epochs (`client_epochs`). We also
+have a `client_datasets_random_seed` flag that seeds a pseudo-random function
+used to sample clients. All results in
+[Adaptive Federated Optimization](https://arxiv.org/abs/2003.00295) used seed of
+1. Changing this may change convergence behavior, as the sampling order of
+clients is important in communication-limited settings.
 
-```
-bazel run main:federated_trainer -- {optimizer flags}
---experiment_name={experiment name}
-```
-
-where the optimizer flags are discussed above. The metrics of the training
-procedure are logged and written to the directory `tmp/fed_opt/{experiment
-name}`.
-
-While we have attempted to make our results as reproducible as possible by even
-setting a seed to recreate which clients were sampled at each round (governed by
-`--client_dataset_seed`), we note that randomness in client sampling and
-heterogeneity across clients can lead to greater variance than in centralized
-machine learning settings. We also note that choices of optimizer
-hyperparameters are often vital.
+For more details on hyperparameters and tuning, see
+[Hyperparameters and Tuning](docs/hyperparameters.md).

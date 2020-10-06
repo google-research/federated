@@ -307,7 +307,7 @@ def create_optimizer_from_flags(
       continue
     # Otherwise the flag has a value set by the user.
     for unused_prefix in unused_flag_prefixes:
-      if flag_name.startswith(unused_prefix):
+      if flag_name.startswith(f'{unused_prefix}_'):
         mistakenly_set_flags.append(flag_name)
         break
   if mistakenly_set_flags:
@@ -324,7 +324,7 @@ def create_optimizer_from_flags(
   if _has_user_value(learning_rate_flag):
     kwargs['learning_rate'] = learning_rate_flag.value
   for flag_name in flags.FLAGS:
-    if not flag_name.startswith(flag_prefix):
+    if not flag_name.startswith(f'{flag_prefix}_'):
       continue
     arg_name = flag_name[prefix_len:]
     kwargs[arg_name] = flags.FLAGS[flag_name].value
@@ -388,9 +388,9 @@ def remove_unused_flags(prefix, hparam_dict):
 
   def _is_used_flag(flag_name):
     # We filter by whether the flag contains an unused optimizer prefix.
-    # This automatically retains any flag not of the form <prefix>_<optimizer>*.
+    # This automatically retains any flag not of the form <prefix>_<optimizer>_.
     for unused_flag_prefix in unused_optimizer_flag_prefixes:
-      if flag_name.startswith(unused_flag_prefix):
+      if flag_name.startswith(f'{unused_flag_prefix}_'):
         return False
     return True
 

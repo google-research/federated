@@ -368,6 +368,17 @@ class RemoveUnusedFlagsTest(tf.test.TestCase):
     self.assertIsNone(relevant_hparam_dict['client_adam_param1'])
     self.assertEqual(relevant_hparam_dict['client_adam_param2'], False)
 
+  def test_remove_flags_with_optimizers_sharing_a_prefix(self):
+    hparam_dict = collections.OrderedDict([('client_optimizer', 'adamW'),
+                                           ('client_adam_momentum', 0.3),
+                                           ('client_adamW_momentum', 0.5)])
+    relevant_hparam_dict = optimizer_utils.remove_unused_flags(
+        'client', hparam_dict)
+    expected_flag_names = ['client_optimizer', 'client_adamW_momentum']
+    self.assertCountEqual(relevant_hparam_dict.keys(), expected_flag_names)
+    self.assertEqual(relevant_hparam_dict['client_optimizer'], 'adamW')
+    self.assertEqual(relevant_hparam_dict['client_adamW_momentum'], 0.5)
+
 
 if __name__ == '__main__':
   tf.test.main()
