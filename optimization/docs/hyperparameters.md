@@ -6,9 +6,7 @@ hyperparameters found in the course of running experiments for
 [Adaptive Federated Optimization](https://arxiv.org/abs/2003.00295). We also
 discuss how we tuned experiments.
 
-[TOC]
-
-## Configuring experiments {#configuring-experiments}
+## Configuring experiments
 
 Before selecting hyperparameters, one must first configure the federated
 training procedure. There are a number of *cross-task* hyperparameters (ie.

@@ -7,8 +7,6 @@ developed for a paper, "Adaptive Federated Optimization"
 general library for comparing and benchmarking federated optimization
 algorithms.
 
-[TOC]
-
 ## Using this directory
 
 This library uses [TensorFlow Federated](https://www.tensorflow.org/federated).
