@@ -19,7 +19,6 @@ import tensorflow_federated as tff
 import tensorflow_privacy
 
 from gans import gan_training_tf_fns
-from tensorflow_federated.python.common_libs import py_typecheck
 
 
 def tensor_spec_for_batch(dummy_batch):
@@ -110,10 +109,14 @@ class GanFnsAndTypes(object):
     # Model-weights based types
     self._generator = self.generator_model_fn()
     _ = self._generator(self.dummy_gen_input)
-    py_typecheck.check_type(self._generator, tf.keras.models.Model)
+    if not isinstance(self._generator, tf.keras.models.Model):
+      raise TypeError('Expected `tf.keras.models.Model`, found {}.'.format(
+          type(self._generator)))
     self._discriminator = self.discriminator_model_fn()
     _ = self._discriminator(self.dummy_real_data)
-    py_typecheck.check_type(self._discriminator, tf.keras.models.Model)
+    if not isinstance(self._discriminator, tf.keras.models.Model):
+      raise TypeError('Expected `tf.keras.models.Model`, found {}.'.format(
+          type(self._discriminator)))
 
     def vars_to_type(var_struct):
       # TODO(b/131681951): read_value() shouldn't be needed

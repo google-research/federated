@@ -19,7 +19,6 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from robust_aggregation import robust_federated_aggregation as rfa
-from tensorflow_federated.python.common_libs import py_typecheck
 from tensorflow_federated.python.tensorflow_libs import tensor_utils
 
 DIM = 500
@@ -70,7 +69,8 @@ class DummyClientComputation(tff.learning.framework.ClientDeltaFn):
     """
     del client_weight_fn
     self._model = tff.learning.framework.enhance(model)
-    py_typecheck.check_type(self._model, tff.learning.framework.EnhancedModel)
+    if not isinstance(self._model, tff.learning.framework.EnhancedModel):
+      raise TypeError('Expected `int`, found {}.'.format(type(self._model)))
     self._client_weight_fn = None
 
   @property

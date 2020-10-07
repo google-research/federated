@@ -16,8 +16,6 @@
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from tensorflow_federated.python.common_libs import py_typecheck
-
 
 def build_stateless_robust_aggregation(model_type,
                                        num_communication_passes=5,
@@ -38,7 +36,9 @@ def build_stateless_robust_aggregation(model_type,
     An instance of `tff.templates.MeasuredProcess` which implements a
   (stateless) robust aggregate.
   """
-  py_typecheck.check_type(num_communication_passes, int)
+  if not isinstance(num_communication_passes, int):
+    raise TypeError('Expected `int`, found {}.'.format(
+        type(num_communication_passes)))
   if num_communication_passes < 1:
     raise ValueError('Aggregation requires num_communication_passes >= 1')
   # client weights have been hardcoded as float32, this needs to be
