@@ -17,6 +17,30 @@ decentralized data. For an overview and introduction to TFF, please see the
 For information on using TFF for research, see
 [TFF for research](https://www.tensorflow.org/federated/tff_for_research).
 
+## Recommended Usage
+
+The main purpose of this repository is for reproducing experimental results in
+related papers. None of the projects (or subfolders) here is intended to be a
+resusable framework or package.
+
+*   The recommended usage for this repository is to `git clone` and follow the
+    instruction in each indedpendent project to run the code, usually with
+    `bazel`.
+
+There is a special module `utils/` that is widely used as a dependency for
+projects in this repository. Some of the functions in `utils/` are in the
+process of upstreaming to the
+[TFF package](https://github.com/google-research/federated). However, `utils/`
+is not promised to be a stable API and the code may change in any time.
+
+*   The recommended usage for `utils/` is to fork the necessary piece of code
+    for your own research projects.
+*   If you find `utils/` and maybe other projects helpful as a module that your
+    projects want to depend on (and you accept the risk of depending on
+    potentially unstable and unsupported code), you can use `git submodule` and
+    add the module to your python path. See
+    [this example](https://github.com/michaelreneer/experiment).
+
 ## Contributing
 
 This repository contains Google-affiliated research projects related to
