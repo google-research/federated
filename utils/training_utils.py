@@ -83,7 +83,7 @@ def build_evaluate_fn(
 ) -> Callable[[tff.learning.ModelWeights], Dict[str, Any]]:
   """Builds an evaluation function for a given model and test dataset.
 
-  The evaluation function takes as input a fed_avg_schedule.ServerState, and
+  The evaluation function takes as input a `tff.learning.ModelWeights`, and
   computes metrics on a keras model with the same weights.
 
   Args:
@@ -117,8 +117,12 @@ def build_evaluate_fn(
       raise TypeError('The reference model used for evaluation must be a'
                       '`tff.learning.ModelWeights` instance.')
 
+    model_weights_as_list = tff.learning.ModelWeights(
+        trainable=list(reference_model.trainable),
+        non_trainable=list(reference_model.non_trainable))
+
     keras_model = compiled_eval_keras_model()
-    reference_model.assign_weights_to(keras_model)
+    model_weights_as_list.assign_weights_to(keras_model)
     logging.info('Evaluating the current model')
     eval_metrics = keras_model.evaluate(eval_tuple_dataset, verbose=0)
     return dict(zip(keras_model.metrics_names, eval_metrics))

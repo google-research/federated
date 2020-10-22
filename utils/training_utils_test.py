@@ -178,7 +178,7 @@ class TrainingUtilsTest(tf.test.TestCase, parameterized.TestCase):
     ]
     self.assertNotAllClose(sample_batches_1, sample_batches_2)
 
-  def test_build_evaluate_fn(self):
+  def test_evaluate_fn_with_list_of_trainable_variables(self):
 
     loss_builder = tf.keras.losses.MeanSquaredError
     metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]
@@ -198,6 +198,34 @@ class TrainingUtilsTest(tf.test.TestCase, parameterized.TestCase):
     reference_model = tff.learning.ModelWeights(
         trainable=list(state.model.trainable),
         non_trainable=list(state.model.non_trainable))
+
+    evaluate_fn = training_utils.build_evaluate_fn(test_dataset, model_builder,
+                                                   loss_builder,
+                                                   metrics_builder)
+
+    test_metrics = evaluate_fn(reference_model)
+    self.assertIn('loss', test_metrics)
+
+  def test_evaluate_fn_with_tuple_of_trainable_variables(self):
+
+    loss_builder = tf.keras.losses.MeanSquaredError
+    metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]
+
+    def tff_model_fn():
+      return tff.learning.from_keras_model(
+          keras_model=model_builder(),
+          input_spec=get_input_spec(),
+          loss=loss_builder(),
+          metrics=metrics_builder())
+
+    iterative_process = tff.learning.build_federated_averaging_process(
+        tff_model_fn, client_optimizer_fn=tf.keras.optimizers.SGD)
+    state = iterative_process.initialize()
+    test_dataset = create_tf_dataset_for_client(1)
+
+    reference_model = tff.learning.ModelWeights(
+        trainable=tuple(state.model.trainable),
+        non_trainable=tuple(state.model.non_trainable))
 
     evaluate_fn = training_utils.build_evaluate_fn(test_dataset, model_builder,
                                                    loss_builder,
