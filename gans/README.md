@@ -44,11 +44,11 @@ network, the pixels of the handwriting images are being 'inverted' (i.e., black
 and white are flipped). Here are example images without the bug (this is Figure
 2a in the paper) ...
 
-![Normal EMNIST Images](experiments/emnist/g3doc/example_images/real_images_no_bug.png "Normal EMNIST Images")
+![Normal EMNIST Images](experiments/emnist/docs/example_images/real_images_no_bug.png "Normal EMNIST Images")
 
 ... and with the bug (this is Figure 2b in the paper) ...
 
-![EMNIST Images with Bug](experiments/emnist/g3doc/example_images/real_images_with_bug.png "EMNIST Images with Bug")
+![EMNIST Images with Bug](experiments/emnist/docs/example_images/real_images_with_bug.png "EMNIST Images with Bug")
 
 This bug affects a fraction of the overall users (i.e., the fraction of the user
 population that has updated the app to latest version). For users that have
@@ -116,12 +116,12 @@ These images are representative output from the generator of a GAN trained on
 the highest accuracy users (i.e., users generally unaffected by bug), after
 training for 1000 rounds...
 
-![Generated Images, High Accuracy Users](experiments/emnist/g3doc/example_images/generated_images_reproducing_no_bug.png "Generated Normal EMNIST Images")
+![Generated Images, High Accuracy Users](experiments/emnist/docs/example_images/generated_images_reproducing_no_bug.png "Generated Normal EMNIST Images")
 
 ... and these images are representative output from the generator of a GAN
 trained on the lowest accuracy users (i.e., users generally affected by the
 bug), after training for 1000 rounds:
 
-![Generated Images, Low Accuracy Users](experiments/emnist/g3doc/example_images/generated_images_reproducing_with_bug.png "Generated EMNIST Images with Bug")
+![Generated Images, Low Accuracy Users](experiments/emnist/docs/example_images/generated_images_reproducing_with_bug.png "Generated EMNIST Images with Bug")
 
 (These images are shown in Figure 3 in the paper.)
