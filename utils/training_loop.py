@@ -27,6 +27,7 @@ import tensorflow_federated as tff
 from utils import checkpoint_manager
 from utils import metrics_manager
 from utils import utils_impl
+from tensorboard.plugins.hparams import api as hp
 
 
 def create_if_not_exists(path):
@@ -65,6 +66,8 @@ def _setup_outputs(root_output_dir,
     hparam_dict['metrics_file'] = metrics_mngr.metrics_filename
     hparams_file = os.path.join(results_dir, 'hparams.csv')
     utils_impl.atomic_write_to_csv(pd.Series(hparam_dict), hparams_file)
+    with summary_writer.as_default():
+      hp.hparams({k: v for k, v in hparam_dict.items() if v is not None})
 
   logging.info('Writing...')
   logging.info('    checkpoints to: %s', checkpoint_dir)
