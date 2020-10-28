@@ -53,10 +53,14 @@ with utils_impl.record_hparam_flags() as optimizer_flags:
 with utils_impl.record_hparam_flags() as shared_flags:
   # Federated training hyperparameters
   flags.DEFINE_integer('client_epochs_per_round', 1,
-                       'Number of epochs in the client to take per round.')
+                       'Number of epochs in the client to take per round. If '
+                       'set to -1, the dataset repeats indefinitely, unless '
+                       'max_batches_per_client is set to some positive value.')
   flags.DEFINE_integer('client_batch_size', 20, 'Batch size on the clients.')
   flags.DEFINE_integer('clients_per_round', 10,
                        'How many clients to sample per round.')
+  flags.DEFINE_integer('max_batches_per_client', -1, 'Maximum number of train '
+                       'steps each client performs per round.')
   flags.DEFINE_integer('client_datasets_random_seed', 1,
                        'Random seed for client sampling.')
   flags.DEFINE_integer('total_rounds', 200, 'Number of total training rounds.')
