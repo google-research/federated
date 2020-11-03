@@ -1,4 +1,4 @@
-# Federated EMNIST and StackOverflow Baseline Experiments with differential privacy.
+# Federated EMNIST and StackOverflow Baseline Experiments with differential privacy
 
 Note: This directory is a work-in-progress.
 
