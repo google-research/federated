@@ -78,7 +78,7 @@ def run(
   if decay_epochs is not None and decay_epochs > 0:
     # Reduce the learning rate after a fixed number of epochs.
     def decay_lr(epoch, learning_rate):
-      if (epoch + 1) % decay_epochs == 0:
+      if epoch != 0 and epoch % decay_epochs == 0:
         return learning_rate * lr_decay
       else:
         return learning_rate
