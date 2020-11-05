@@ -34,6 +34,8 @@ from triehh.triehh_tf import client_update
 from triehh.triehh_tf import server_update
 from triehh.triehh_tf import ServerState
 
+from utils import checkpoint_manager
+
 
 def build_triehh_process(
     possible_prefix_extensions: List[str],
