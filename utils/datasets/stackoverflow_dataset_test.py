@@ -19,7 +19,6 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from utils.datasets import stackoverflow_dataset
-from tensorflow_federated.python.common_libs import test_utils
 
 
 TEST_DATA = collections.OrderedDict(
@@ -239,10 +238,11 @@ STACKOVERFLOW_MODULE = 'tensorflow_federated.simulation.datasets.stackoverflow'
 
 class ConstructWordLevelDatasetsTest(tf.test.TestCase):
 
-  @test_utils.skip_test_for_gpu
   @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
   @mock.patch(STACKOVERFLOW_MODULE + '.load_data')
   def test_preprocess_applied(self, mock_load_data, mock_load_word_counts):
+    if tf.config.list_logical_devices('GPU'):
+      self.skipTest('skip GPU test')
     # Mock out the actual data loading from disk. Assert that the preprocessing
     # function is applied to the client data, and that only the ClientData
     # objects we desired are used.
@@ -280,11 +280,12 @@ class ConstructWordLevelDatasetsTest(tf.test.TestCase):
     # Assert the word counts were loaded once to apply to each dataset.
     mock_load_word_counts.assert_called_once()
 
-  @test_utils.skip_test_for_gpu
   @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
   @mock.patch(STACKOVERFLOW_MODULE + '.load_data')
   def test_raises_no_repeat_and_no_take(self, mock_load_data,
                                         mock_load_word_counts):
+    if tf.config.list_logical_devices('GPU'):
+      self.skipTest('skip GPU test')
     mock_load_data.return_value = (mock.Mock(), mock.Mock(), mock.Mock())
     with self.assertRaisesRegex(
         ValueError, 'Argument client_epochs_per_round is set to -1'):
