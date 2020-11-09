@@ -1,1 +1,4 @@
+attr
+tensorflow
+tensorflow-federated
 tensorflow-text>=2.1.1
