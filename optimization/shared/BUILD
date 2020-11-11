@@ -21,27 +21,6 @@ py_test(
 )
 
 py_library(
-    name = "iterative_process_builder",
-    srcs = ["iterative_process_builder.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":fed_avg_schedule",
-        ":optimizer_utils",
-        "//utils:utils_impl",
-    ],
-)
-
-py_test(
-    name = "iterative_process_builder_test",
-    size = "medium",
-    timeout = "long",
-    srcs = ["iterative_process_builder_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":iterative_process_builder"],
-)
-
-py_library(
     name = "keras_metrics",
     srcs = ["keras_metrics.py"],
     srcs_version = "PY3",
