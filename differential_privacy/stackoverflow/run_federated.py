@@ -73,10 +73,6 @@ with utils_impl.record_new_flags():
   flags.DEFINE_float(
       'clipped_count_budget_allocation', 0.1,
       'Fraction of privacy budget to allocate for clipped counts.')
-  flags.DEFINE_boolean(
-      'per_vector_clipping', False, 'Use per-vector clipping'
-      'to indepednelty clip each weight tensor instead of the'
-      'entire model.')
 
 with utils_impl.record_new_flags() as training_loop_flags:
   flags.DEFINE_integer('total_rounds', 200, 'Number of total training rounds.')
@@ -169,9 +165,7 @@ def main(argv):
         adaptive_clip_learning_rate=FLAGS.adaptive_clip_learning_rate,
         target_unclipped_quantile=FLAGS.target_unclipped_quantile,
         clipped_count_budget_allocation=FLAGS.clipped_count_budget_allocation,
-        expected_clients_per_round=FLAGS.clients_per_round,
-        per_vector_clipping=FLAGS.per_vector_clipping,
-        model=model_fn())
+        expected_clients_per_round=FLAGS.clients_per_round)
 
     weights_type = tff.learning.framework.weights_type_from_model(model_fn)
     aggregation_process = tff.utils.build_dp_aggregate_process(
