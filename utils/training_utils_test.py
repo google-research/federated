@@ -319,27 +319,27 @@ class FederatedEvaluationTest(tf.test.TestCase):
     logging.info('Eval metrics: %s', eval_metrics)
 
     self.assertCountEqual(eval_metrics.keys(),
-                          ['uniform_weighted', 'example_weighted', 'summed'])
+                          ['mean_squared_error', 'num_examples'])
 
     # Testing correctness of sum-based metrics
-    num_examples = 6
-    self.assertCountEqual(eval_metrics['summed'], ['num_examples'])
-    self.assertEqual(eval_metrics['summed']['num_examples'], num_examples)
+    expected_sum_keys = ['summed', 'uniform_weighted', 'quantiles']
+    self.assertCountEqual(eval_metrics['num_examples'].keys(),
+                          expected_sum_keys)
+    self.assertEqual(eval_metrics['num_examples']['summed'], 6)
+    self.assertEqual(eval_metrics['num_examples']['uniform_weighted'], 3.0)
 
     # Testing correctness of mean-based metrics
-    expected_keys = ['mean_squared_error']
-    self.assertCountEqual(eval_metrics['uniform_weighted'].keys(),
-                          expected_keys)
-    self.assertCountEqual(eval_metrics['example_weighted'].keys(),
+    expected_keys = ['example_weighted', 'uniform_weighted', 'quantiles']
+    self.assertCountEqual(eval_metrics['mean_squared_error'].keys(),
                           expected_keys)
 
     expected_mse = 0.875
     self.assertNear(
-        eval_metrics['uniform_weighted']['mean_squared_error'],
+        eval_metrics['mean_squared_error']['uniform_weighted'],
         expected_mse,
         err=1e-6)
     self.assertNear(
-        eval_metrics['example_weighted']['mean_squared_error'],
+        eval_metrics['mean_squared_error']['example_weighted'],
         expected_mse,
         err=1e-6)
 
@@ -352,29 +352,92 @@ class FederatedEvaluationTest(tf.test.TestCase):
     eval_metrics = eval_fn(model_weights, round_num=1)
     logging.info('Eval metrics: %s', eval_metrics)
 
+    self.assertCountEqual(eval_metrics.keys(),
+                          ['mean_squared_error', 'num_examples'])
+
     # Testing correctness of sum-based metrics
-    num_examples = 5
-    self.assertCountEqual(eval_metrics['summed'], ['num_examples'])
-    self.assertEqual(eval_metrics['summed']['num_examples'], num_examples)
+    expected_sum_keys = ['summed', 'uniform_weighted', 'quantiles']
+    self.assertCountEqual(eval_metrics['num_examples'].keys(),
+                          expected_sum_keys)
+    self.assertEqual(eval_metrics['num_examples']['summed'], 5)
+    self.assertEqual(eval_metrics['num_examples']['uniform_weighted'], 2.5)
 
     # Testing correctness of mean-based metrics
-    expected_metrics_keys = ['mean_squared_error']
-    self.assertCountEqual(eval_metrics['uniform_weighted'].keys(),
-                          expected_metrics_keys)
-    self.assertCountEqual(eval_metrics['example_weighted'].keys(),
-                          expected_metrics_keys)
+    expected_keys = ['example_weighted', 'uniform_weighted', 'quantiles']
+    self.assertCountEqual(eval_metrics['mean_squared_error'].keys(),
+                          expected_keys)
 
     expected_uniform_mse = 1.5
     expected_example_mse = 1.8
 
     self.assertNear(
-        eval_metrics['uniform_weighted']['mean_squared_error'],
+        eval_metrics['mean_squared_error']['uniform_weighted'],
         expected_uniform_mse,
         err=1e-6)
     self.assertNear(
-        eval_metrics['example_weighted']['mean_squared_error'],
+        eval_metrics['mean_squared_error']['example_weighted'],
         expected_example_mse,
         err=1e-6)
+
+  def test_quantile_aggregation_for_mse(self):
+    client_ids = [0, 1, 2, 3, 4]
+    quantiles = [0, 0.25, 0.5, 0.75, 1.0]
+
+    def create_single_value_ds(client_id):
+      client_value = [[float(client_id)]]
+      return tf.data.Dataset.from_tensor_slices(
+          collections.OrderedDict(x=client_value, y=client_value)).batch(1)
+
+    client_data = tff.simulation.client_data.ConcreteClientData(
+        client_ids=client_ids,
+        create_tf_dataset_for_client_fn=create_single_value_ds)
+
+    metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]
+    eval_fn = training_utils.build_federated_evaluate_fn(
+        client_data,
+        model_builder,
+        metrics_builder,
+        clients_per_round=5,
+        quantiles=quantiles)
+    model_weights = tff.learning.ModelWeights.from_model(tff_model_fn())
+    eval_metrics = eval_fn(model_weights, round_num=1)
+    logging.info('Eval metrics: %s', eval_metrics)
+
+    mse_quantiles = eval_metrics['mean_squared_error']['quantiles']
+    expected_quantile_values = [0.0, 1.0, 4.0, 9.0, 16.0]
+    expected_quantiles = collections.OrderedDict(
+        zip(quantiles, expected_quantile_values))
+    self.assertEqual(mse_quantiles, expected_quantiles)
+
+  def test_quantile_aggregation_for_num_examples(self):
+    client_ids = [0, 1, 2, 3, 4]
+    quantiles = [0, 0.25, 0.5, 0.75, 1.0]
+
+    def create_single_value_ds(client_id):
+      client_value = [[0.0]] * (client_id + 1)
+      return tf.data.Dataset.from_tensor_slices(
+          collections.OrderedDict(x=client_value, y=client_value)).batch(1)
+
+    client_data = tff.simulation.client_data.ConcreteClientData(
+        client_ids=client_ids,
+        create_tf_dataset_for_client_fn=create_single_value_ds)
+
+    metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]
+    eval_fn = training_utils.build_federated_evaluate_fn(
+        client_data,
+        model_builder,
+        metrics_builder,
+        clients_per_round=5,
+        quantiles=quantiles)
+    model_weights = tff.learning.ModelWeights.from_model(tff_model_fn())
+    eval_metrics = eval_fn(model_weights, round_num=1)
+    logging.info('Eval metrics: %s', eval_metrics)
+
+    num_examples_quantiles = eval_metrics['num_examples']['quantiles']
+    expected_quantile_values = [1.0, 2.0, 3.0, 4.0, 5.0]
+    expected_quantiles = collections.OrderedDict(
+        zip(quantiles, expected_quantile_values))
+    self.assertEqual(num_examples_quantiles, expected_quantiles)
 
 
 if __name__ == '__main__':

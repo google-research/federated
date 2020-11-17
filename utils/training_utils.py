@@ -15,7 +15,7 @@
 
 import collections
 import functools
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Union
 
 from absl import logging
 import numpy as np
@@ -28,6 +28,9 @@ import tensorflow_federated as tff
 #  Ones are Hard to Find' by Park and Miller.
 MLCG_MODULUS = 2**(31) - 1
 MLCG_MULTIPLIER = 16807
+
+# Default quantiles for federated evaluations.
+DEFAULT_QUANTILES = (0.0, 0.25, 0.5, 0.75, 1.0)
 
 
 # TODO(b/143440780): Create more comprehensive tuple conversion by adding an
@@ -186,6 +189,7 @@ def build_federated_evaluate_fn(
     metrics_builder: Callable[[], List[tf.keras.metrics.Metric]],
     clients_per_round: int,
     random_seed: Optional[int] = None,
+    quantiles: Optional[Iterable[float]] = DEFAULT_QUANTILES,
 ) -> Callable[[tff.learning.ModelWeights, int], Dict[str, Any]]:
   """Builds a federated evaluation method for a given model and test dataset.
 
@@ -196,17 +200,24 @@ def build_federated_evaluate_fn(
   and uniform-weighted versions of the metric, while for sum-based metrics
   (such as the number of examples in a client dataset) we compute the sum.
 
-  The resulting nested structure is an ordered dictionary with keys
-  'example_weighted', 'uniform_weighted' and 'summed', each of maps to
-  an ordered dictionary of (metric_name, metric_value) pairs, where the metric
-  value has been aggregated in one of the three ways discussed above.
+  The resulting nested structure is an ordered dictionary with keys given by
+  metric names, and values given by nested structure of the metric value,
+  potentially aggregated in different ways.
 
-  If `metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]`,
+  For example, if `metrics_builder = lambda:
+  [tf.keras.metrics.MeanSquaredError()]`,
   the resulting nested structure will be of the form:
   [
-  ('example_weighted', [('mean_squared_error', ...)]),
-  ('uniform_weighted', [('mean_squared_error', ...)]),
-  ('summed', [('num_examples', ...)])
+  ('mean_squared_error', [
+    ('example_weighted', ...),
+    ('uniform_weighted', ...),
+    ('quantiles', ...)
+  ]),
+  ('num_examples', [
+    ('summed', ...),
+    ('uniform_weighted', ...),
+    ('quantiles', ...)
+  ]),
   ]
 
   Args:
@@ -220,6 +231,8 @@ def build_federated_evaluate_fn(
     clients_per_round: An integer specifying the number of clients to sample
       when performing evaluation.
     random_seed: An integer used to seed the evaluation client selection.
+    quantiles: Which quantiles to compute of mean-based metrics. Must be an
+      iterable of float values between 0 and 1.
 
   Returns:
     A function that take as input a `tff.learning.ModelWeights` and a round
@@ -269,28 +282,40 @@ def build_federated_evaluate_fn(
         sum_metrics_at_clients[metric_name].append(metric_value)
 
     # Aggregate metrics across clients
-    uniform_weighted_metrics = collections.OrderedDict()
-    example_weighted_metrics = collections.OrderedDict()
-    summed_metrics = collections.OrderedDict()
+    aggregate_metrics = collections.OrderedDict()
 
     num_examples_at_clients = tf.cast(
         sum_metrics_at_clients['num_examples'], dtype=tf.float32)
     total_num_examples = tf.reduce_sum(num_examples_at_clients)
+
     for (metric_name, metric_at_clients) in mean_metrics_at_clients.items():
       metric_as_float = tf.cast(metric_at_clients, dtype=tf.float32)
-      uniform_weighted_metrics[metric_name] = tf.reduce_mean(
-          metric_as_float).numpy()
-      example_weighted_metrics[metric_name] = (tf.reduce_sum(
+
+      uniform_weighted_value = tf.reduce_mean(metric_as_float).numpy()
+      example_weighted_value = (tf.reduce_sum(
           tf.math.multiply(metric_as_float, num_examples_at_clients)) /
-                                               total_num_examples).numpy()
+                                total_num_examples).numpy()
+
+      quantile_values = np.quantile(metric_as_float, quantiles)
+      quantile_values = collections.OrderedDict(zip(quantiles, quantile_values))
+
+      aggregate_metrics[metric_name] = collections.OrderedDict(
+          example_weighted=example_weighted_value,
+          uniform_weighted=uniform_weighted_value,
+          quantiles=quantile_values)
 
     for (metric_name, metric_at_clients) in sum_metrics_at_clients.items():
-      summed_metrics[metric_name] = tf.reduce_sum(metric_at_clients).numpy()
+      summed_value = tf.reduce_sum(metric_at_clients).numpy()
+      metric_as_float = tf.cast(metric_at_clients, dtype=tf.float32)
+      uniform_weighted_value = tf.reduce_mean(metric_as_float).numpy()
+      quantile_values = np.quantile(metric_as_float, quantiles)
+      quantile_values = collections.OrderedDict(zip(quantiles, quantile_values))
 
-    return collections.OrderedDict(
-        uniform_weighted=uniform_weighted_metrics,
-        example_weighted=example_weighted_metrics,
-        summed=summed_metrics)
+      aggregate_metrics[metric_name] = collections.OrderedDict(
+          summed=summed_value,
+          uniform_weighted=uniform_weighted_value,
+          quantiles=quantile_values)
+    return aggregate_metrics
 
   return evaluate_fn
 
