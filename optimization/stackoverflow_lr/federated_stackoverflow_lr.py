@@ -143,17 +143,17 @@ def run_federated(
   training_process = iterative_process_builder(tff_model_fn)
 
   client_datasets_fn = training_utils.build_client_datasets_fn(
-      train_dataset=stackoverflow_train,
-      train_clients_per_round=clients_per_round,
+      dataset=stackoverflow_train,
+      clients_per_round=clients_per_round,
       random_seed=client_datasets_random_seed)
 
-  evaluate_fn = training_utils.build_evaluate_fn(
+  evaluate_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       eval_dataset=stackoverflow_validation,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
 
-  test_fn = training_utils.build_evaluate_fn(
+  test_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       # Use both val and test for symmetry with other experiments, which
       # evaluate on the entire test set.

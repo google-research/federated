@@ -145,11 +145,11 @@ def run_federated(
       tff_model_fn, client_weight_fn=client_weight_fn)
 
   client_datasets_fn = training_utils.build_client_datasets_fn(
-      train_dataset=train_clientdata,
-      train_clients_per_round=clients_per_round,
+      dataset=train_clientdata,
+      clients_per_round=clients_per_round,
       random_seed=client_datasets_random_seed)
 
-  evaluate_fn = training_utils.build_evaluate_fn(
+  evaluate_fn = training_utils.build_centralized_evaluate_fn(
       eval_dataset=test_dataset,
       model_builder=model_builder,
       loss_builder=loss_builder,

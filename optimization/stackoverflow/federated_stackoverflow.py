@@ -183,17 +183,17 @@ def run_federated(
       train_dataset_preprocess_comp, training_process)
 
   client_datasets_fn = training_utils.build_client_datasets_fn(
-      train_dataset=train_clientdata,
-      train_clients_per_round=clients_per_round,
+      dataset=train_clientdata,
+      clients_per_round=clients_per_round,
       random_seed=client_datasets_random_seed)
 
-  evaluate_fn = training_utils.build_evaluate_fn(
+  evaluate_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       eval_dataset=validation_dataset,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
 
-  test_fn = training_utils.build_evaluate_fn(
+  test_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       # Use both val and test for symmetry with other experiments, which
       # evaluate on the entire test set.

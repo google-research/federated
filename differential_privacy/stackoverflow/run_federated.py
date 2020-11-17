@@ -186,13 +186,13 @@ def main(argv):
   client_datasets_fn = training_utils.build_client_datasets_fn(
       train_dataset, FLAGS.clients_per_round)
 
-  evaluate_fn = training_utils.build_evaluate_fn(
+  evaluate_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       eval_dataset=validation_dataset,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
 
-  test_fn = training_utils.build_evaluate_fn(
+  test_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       # Use both val and test for symmetry with other experiments, which
       # evaluate on the entire test set.

@@ -123,11 +123,11 @@ def run_federated(
   training_process = iterative_process_builder(tff_model_fn)
 
   client_datasets_fn = training_utils.build_client_datasets_fn(
-      train_dataset=cifar_train,
-      train_clients_per_round=clients_per_round,
+      dataset=cifar_train,
+      clients_per_round=clients_per_round,
       random_seed=client_datasets_random_seed)
 
-  evaluate_fn = training_utils.build_evaluate_fn(
+  evaluate_fn = training_utils.build_centralized_evaluate_fn(
       eval_dataset=cifar_test,
       model_builder=model_builder,
       loss_builder=loss_builder,

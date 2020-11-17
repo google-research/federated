@@ -155,7 +155,7 @@ def main(argv):
   client_datasets_fn = training_utils.build_client_datasets_fn(
       emnist_train, FLAGS.clients_per_round)
 
-  evaluate_fn = training_utils.build_evaluate_fn(
+  evaluate_fn = training_utils.build_centralized_evaluate_fn(
       eval_dataset=emnist_test,
       model_builder=model_builder,
       loss_builder=loss_builder,

@@ -76,12 +76,12 @@ def convert_to_tuple_dataset(dataset):
         'tuple-like structure, found {} instead.'.format(example_structure))
 
 
-def build_evaluate_fn(
+def build_centralized_evaluate_fn(
     eval_dataset: tf.data.Dataset, model_builder: Callable[[], tf.keras.Model],
     loss_builder: Callable[[], tf.keras.losses.Loss],
     metrics_builder: Callable[[], List[tf.keras.metrics.Metric]]
 ) -> Callable[[tff.learning.ModelWeights], Dict[str, Any]]:
-  """Builds an evaluation function for a given model and test dataset.
+  """Builds a centralized evaluation function for a model and test dataset.
 
   The evaluation function takes as input a `tff.learning.ModelWeights`, and
   computes metrics on a keras model with the same weights.
@@ -130,6 +130,171 @@ def build_evaluate_fn(
   return evaluate_fn
 
 
+def _build_client_evaluate_fn(model, mean_metrics, sum_metrics):
+  """Creates a client evaluation function for a given model and metrics.
+
+  This evaluation function is intended to be re-used for multiple clients during
+  an evaluation pass over clients.
+
+  Args:
+    model: A `tf.keras.Model` used to compute metrics.
+    mean_metrics: A list of `tf.keras.metrics.Mean` metrics.
+    sum_metrics: A list of `tf.keras.metrics.Sum` metrics.
+
+  Returns:
+    A function that takes as input a `tf.data.Dataset`, and returns an ordered
+      dictionary of metrics for the input model on that dataset.
+  """
+
+  @tf.function
+  def get_client_eval_metrics(dataset):
+
+    # Reset metrics
+    for metric in mean_metrics:
+      metric.reset_states()
+    for metric in sum_metrics:
+      metric.reset_states()
+
+    # Compute metrics
+    num_examples = tf.constant(0, dtype=tf.int32)
+    for x_batch, y_batch in dataset:
+      output = model(x_batch, training=False)
+      for metric in mean_metrics:
+        metric.update_state(y_batch, output)
+      for metric in sum_metrics:
+        metric.update_state(output)
+      num_examples += tf.shape(output)[0]
+
+    # Record metrics
+    mean_metric_results = collections.OrderedDict()
+    for metric in mean_metrics:
+      mean_metric_results[metric.name] = metric.result()
+
+    sum_metric_results = collections.OrderedDict()
+    for metric in sum_metrics:
+      sum_metric_results[metric.name] = metric.result()
+    sum_metric_results['num_examples'] = num_examples
+
+    return mean_metric_results, sum_metric_results
+
+  return get_client_eval_metrics
+
+
+def build_federated_evaluate_fn(
+    eval_dataset: tff.simulation.ClientData,
+    model_builder: Callable[[], tf.keras.Model],
+    metrics_builder: Callable[[], List[tf.keras.metrics.Metric]],
+    clients_per_round: int,
+    random_seed: Optional[int] = None,
+) -> Callable[[tff.learning.ModelWeights, int], Dict[str, Any]]:
+  """Builds a federated evaluation method for a given model and test dataset.
+
+  The evaluation function takes as input a `tff.learning.ModelWeights`, and
+  computes metrics on a `tff.learning.Model` with the same weights. This method
+  returns a nested structure of (metric_name, metric_value) pairs. For mean-
+  based metrics (such as mean squared error), we compute both example-weighted
+  and uniform-weighted versions of the metric, while for sum-based metrics
+  (such as the number of examples in a client dataset) we compute the sum.
+
+  The resulting nested structure is an ordered dictionary with keys
+  'example_weighted', 'uniform_weighted' and 'summed', each of maps to
+  an ordered dictionary of (metric_name, metric_value) pairs, where the metric
+  value has been aggregated in one of the three ways discussed above.
+
+  If `metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]`,
+  the resulting nested structure will be of the form:
+  [
+  ('example_weighted', [('mean_squared_error', ...)]),
+  ('uniform_weighted', [('mean_squared_error', ...)]),
+  ('summed', [('num_examples', ...)])
+  ]
+
+  Args:
+    eval_dataset: A `tf.data.Dataset` object. Dataset elements should either
+      have a mapping structure of format {"x": <features>, "y": <labels>}, or a
+        tuple structure of format (<features>, <labels>).
+    model_builder: A no-arg function returning an uncompiled `tf.keras.Model`.
+    metrics_builder: A no-arg function that returns a list of
+      `tf.keras.metrics.Metric` objects. These metrics must either be instances
+      of `tf.keras.metrics.Mean` or `tf.keras.metrics.Sum`.
+    clients_per_round: An integer specifying the number of clients to sample
+      when performing evaluation.
+    random_seed: An integer used to seed the evaluation client selection.
+
+  Returns:
+    A function that take as input a `tff.learning.ModelWeights` and a round
+    number, and returns a nested structure of (metric_name, metric_value) pairs.
+  """
+
+  client_sample_function = build_client_datasets_fn(
+      eval_dataset, clients_per_round, random_seed=random_seed)
+
+  keras_model = model_builder()
+  metrics = metrics_builder()
+
+  mean_metrics = []
+  sum_metrics = []
+
+  for keras_metric in metrics:
+    if isinstance(keras_metric, tf.keras.metrics.Mean):
+      mean_metrics.append(keras_metric)
+    elif isinstance(keras_metric, tf.keras.metrics.Sum):
+      sum_metrics.append(keras_metric)
+    else:
+      raise ValueError('Unsupported metric {}, metrics must be an instance of '
+                       'tf.keras.metrics.Mean or tf.keras.metrics.Sum.')
+
+  def evaluate_fn(model_weights: tff.learning.ModelWeights,
+                  round_num: int) -> Dict[str, Any]:
+
+    model_weights_as_list = tff.learning.ModelWeights(
+        trainable=list(model_weights.trainable),
+        non_trainable=list(model_weights.non_trainable))
+    model_weights_as_list.assign_weights_to(keras_model)
+
+    client_eval_fn = _build_client_evaluate_fn(keras_model, mean_metrics,
+                                               sum_metrics)
+
+    mean_metrics_at_clients = collections.defaultdict(list)
+    sum_metrics_at_clients = collections.defaultdict(list)
+
+    # Record all client metrics
+    for client_dataset in client_sample_function(round_num):
+      tuple_ds = convert_to_tuple_dataset(client_dataset)
+      client_mean_metrics, client_sum_metrics = client_eval_fn(tuple_ds)
+
+      for (metric_name, metric_value) in client_mean_metrics.items():
+        mean_metrics_at_clients[metric_name].append(metric_value)
+      for (metric_name, metric_value) in client_sum_metrics.items():
+        sum_metrics_at_clients[metric_name].append(metric_value)
+
+    # Aggregate metrics across clients
+    uniform_weighted_metrics = collections.OrderedDict()
+    example_weighted_metrics = collections.OrderedDict()
+    summed_metrics = collections.OrderedDict()
+
+    num_examples_at_clients = tf.cast(
+        sum_metrics_at_clients['num_examples'], dtype=tf.float32)
+    total_num_examples = tf.reduce_sum(num_examples_at_clients)
+    for (metric_name, metric_at_clients) in mean_metrics_at_clients.items():
+      metric_as_float = tf.cast(metric_at_clients, dtype=tf.float32)
+      uniform_weighted_metrics[metric_name] = tf.reduce_mean(
+          metric_as_float).numpy()
+      example_weighted_metrics[metric_name] = (tf.reduce_sum(
+          tf.math.multiply(metric_as_float, num_examples_at_clients)) /
+                                               total_num_examples).numpy()
+
+    for (metric_name, metric_at_clients) in sum_metrics_at_clients.items():
+      summed_metrics[metric_name] = tf.reduce_sum(metric_at_clients).numpy()
+
+    return collections.OrderedDict(
+        uniform_weighted=uniform_weighted_metrics,
+        example_weighted=example_weighted_metrics,
+        summed=summed_metrics)
+
+  return evaluate_fn
+
+
 def build_sample_fn(
     a: Union[Sequence[Any], int],
     size: int,
@@ -173,8 +338,8 @@ def build_sample_fn(
 
 
 def build_client_datasets_fn(
-    train_dataset: tff.simulation.ClientData,
-    train_clients_per_round: int,
+    dataset: tff.simulation.ClientData,
+    clients_per_round: int,
     random_seed: Optional[int] = None
 ) -> Callable[[int], List[tf.data.Dataset]]:
   """Builds the function for generating client datasets at each round.
@@ -183,8 +348,8 @@ def build_client_datasets_fn(
   round, but with replacement across rounds) and returns their datasets.
 
   Args:
-    train_dataset: A `tff.simulation.ClientData` object.
-    train_clients_per_round: The number of client participants in each round.
+    dataset: A `tff.simulation.ClientData` object.
+    clients_per_round: The number of client participants in each round.
     random_seed: If random_seed is set as an integer, then we use it as a random
       seed for which clients are sampled at each round. In this case, we set a
       random seed before sampling clients according to a multiplicative linear
@@ -198,15 +363,15 @@ def build_client_datasets_fn(
     given round round_num.
   """
   sample_clients_fn = build_sample_fn(
-      train_dataset.client_ids,
-      size=train_clients_per_round,
+      dataset.client_ids,
+      size=clients_per_round,
       replace=False,
       random_seed=random_seed)
 
   def client_datasets(round_num):
     sampled_clients = sample_clients_fn(round_num)
     return [
-        train_dataset.create_tf_dataset_for_client(client)
+        dataset.create_tf_dataset_for_client(client)
         for client in sampled_clients
     ]
 
