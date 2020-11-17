@@ -13,7 +13,6 @@
 # limitations under the License.
 """Utilities for saving and loading experiments."""
 
-import abc
 import os.path
 import re
 from typing import Any, List, Tuple
@@ -22,78 +21,22 @@ from absl import logging
 import tensorflow as tf
 
 
-class CheckpointManager(metaclass=abc.ABCMeta):
-  """An abstract interface for `CheckpointManager`s.
+class FileCheckpointManager():
+  """A checkpoint manager backed by a file system.
 
-  A `CheckpointManager` is a utility to save and load checkpoints, which is a
-  nested structure which `tf.convert_to_tensor` supports.
+  This checkpoint manager is a utility to save and load checkpoints. Checkpoints
+  must be nested structures which `tf.convert_to_tensor` supports.
 
   The implementation you find here is slightly different from
   `tf.train.CheckpointManager`. This implementation yields nested structures
-  that are immutable where as `tf.train.CheckpointManager` is  used to manage
-  `tf.train.Checkpoint` objects which are mutable collections.  Additionally,
-  this implementation allows retaining the initial checkpoint as  part of the
+  that are immutable whereas `tf.train.CheckpointManager` is used to manage
+  `tf.train.Checkpoint` objects which are mutable collections. Additionally,
+  this implementation allows retaining the initial checkpoint as part of the
   total number of checkpoints that are kept.
-  """
 
-  def load_latest_checkpoint_or_default(self, default: Any) -> Tuple[Any, int]:
-    """Returns latest checkpoint; returns `default` if no checkpoints exist.
-
-    Saves `default` as the 0th checkpoint if no checkpoints exist.
-
-    Args:
-      default: A nested structure which `tf.convert_to_tensor` supports to use
-        as a template when reconstructing the loaded template. This structure
-        will be saved as the checkpoint for round number 0 and returned if there
-        are no pre-existing saved checkpoints.
-    """
-    state, round_num = self.load_latest_checkpoint(default)
-    if state is None:
-      state = default
-      round_num = 0
-      self.save_checkpoint(state, round_num)
-    return state, round_num
-
-  @abc.abstractmethod
-  def load_latest_checkpoint(self, structure: Any) -> Tuple[Any, int]:
-    """Returns the latest checkpointed state.
-
-    Args:
-      structure: A nested structure which `tf.convert_to_tensor` supports to use
-        as a template when reconstructing the loaded template.
-    """
-    raise NotImplementedError
-
-  @abc.abstractmethod
-  def load_checkpoint(self, structure: Any, round_num: int) -> Any:
-    """Returns the checkpointed state at the given `round_num`.
-
-    Args:
-      structure: A nested structure which `tf.convert_to_tensor` supports to use
-        as a template when reconstructing the loaded template.
-      round_num: An integer representing the round to load from.
-
-    Raises:
-      FileNotFoundError: If checkpoint for given `round_num` doesn't exist.
-    """
-    raise NotImplementedError
-
-  @abc.abstractmethod
-  def save_checkpoint(self, state: Any, round_num: int) -> None:
-    """Saves a new checkpointed `state` for the given `round_num`.
-
-    Args:
-      state: A nested structure which `tf.convert_to_tensor` supports.
-      round_num: An integer representing the current training round.
-    """
-    raise NotImplementedError
-
-
-class FileCheckpointManager(CheckpointManager):
-  """An implementation of `CheckpointManager` backed by a file system.
-
-  An implementation of `CheckpointManager` that manages checkpoints on a file
-  system.
+  The checkpoint manager is intended only for allowing simulations to be
+  resumed after interruption. In particular, it is intended to only restart the
+  same simulation, run with the same version of TensorFlow Federated.
   """
 
   def __init__(self,
@@ -117,6 +60,24 @@ class FileCheckpointManager(CheckpointManager):
     self._keep_first = keep_first
     path = re.escape(os.path.join(root_dir, prefix))
     self._round_num_expression = re.compile(r'{}([0-9]+)$'.format(path))
+
+  def load_latest_checkpoint_or_default(self, default: Any) -> Tuple[Any, int]:
+    """Returns latest checkpoint; returns `default` if no checkpoints exist.
+
+    Saves `default` as the 0th checkpoint if no checkpoints exist.
+
+    Args:
+      default: A nested structure which `tf.convert_to_tensor` supports to use
+        as a template when reconstructing the loaded template. This structure
+        will be saved as the checkpoint for round number 0 and returned if there
+        are no pre-existing saved checkpoints.
+    """
+    state, round_num = self.load_latest_checkpoint(default)
+    if state is None:
+      state = default
+      round_num = 0
+      self.save_checkpoint(state, round_num)
+    return state, round_num
 
   def load_latest_checkpoint(self, structure: Any) -> Tuple[Any, int]:
     """Returns the latest checkpointed state and round number.
