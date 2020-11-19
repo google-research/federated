@@ -40,7 +40,6 @@ def create_if_not_exists(path):
 def _setup_outputs(root_output_dir,
                    experiment_name,
                    hparam_dict,
-                   write_metrics_with_bz2=True,
                    rounds_per_profile=0):
   """Set up directories for experiment loops, write hyperparameters to disk."""
 
@@ -55,8 +54,7 @@ def _setup_outputs(root_output_dir,
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   create_if_not_exists(results_dir)
-  metrics_mngr = metrics_manager.ScalarMetricsManager(
-      results_dir, use_bz2=write_metrics_with_bz2)
+  metrics_mngr = metrics_manager.ScalarMetricsManager(results_dir)
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
   create_if_not_exists(summary_logdir)
@@ -118,7 +116,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
         test_fn: Optional[Callable[[Any], Dict[str, float]]] = None,
         root_output_dir: Optional[str] = '/tmp/fed_opt',
         hparam_dict: Optional[Dict[str, Any]] = None,
-        write_metrics_with_bz2: Optional[bool] = True,
         rounds_per_eval: Optional[int] = 1,
         rounds_per_checkpoint: Optional[int] = 50,
         rounds_per_train_eval: Optional[int] = 100,
@@ -159,8 +156,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
       experiment outputs.
     hparam_dict: An optional dictionary specifying hyperparameters of the
       experiment. If provided, the hyperparameters will be written to CSV.
-    write_metrics_with_bz2: Whether to use `bz2` compression when writing
-      metrics to CSV.
     rounds_per_eval: How often to compute validation metrics.
     rounds_per_checkpoint: How often to checkpoint the iterative process state.
       If you expect the job to restart frequently, this should be small. If no
@@ -193,8 +188,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
     raise TypeError('The server state must have a model attribute.')
 
   checkpoint_mngr, metrics_mngr, summary_writer, profiler = _setup_outputs(
-      root_output_dir, experiment_name, hparam_dict, write_metrics_with_bz2,
-      rounds_per_profile)
+      root_output_dir, experiment_name, hparam_dict, rounds_per_profile)
 
   logging.info('Asking checkpoint manager to load checkpoint.')
   state, round_num = checkpoint_mngr.load_latest_checkpoint(initial_state)
