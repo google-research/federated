@@ -112,13 +112,11 @@ def run(iterative_process: tff.templates.IterativeProcess,
         validation_fn: Callable[[Any], Dict[str, float]],
         total_rounds: int,
         experiment_name: str,
-        train_eval_fn: Optional[Callable[[Any], Dict[str, float]]] = None,
         test_fn: Optional[Callable[[Any], Dict[str, float]]] = None,
         root_output_dir: Optional[str] = '/tmp/fed_opt',
         hparam_dict: Optional[Dict[str, Any]] = None,
         rounds_per_eval: Optional[int] = 1,
         rounds_per_checkpoint: Optional[int] = 50,
-        rounds_per_train_eval: Optional[int] = 100,
         rounds_per_profile: Optional[int] = 0):
   """Runs federated training for a given `tff.templates.IterativeProcess`.
 
@@ -131,7 +129,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
         and `T` represents a python `Mapping` object.
 
   Moreover, the server state must have an attribute `model` that can be passed
-  to `validation_fn`, `train_eval_fn`, and `test_fn` (if given).
+  to `validation_fn` and `test_fn` (if given).
 
   Args:
     iterative_process: A `tff.templates.IterativeProcess` instance to run.
@@ -144,11 +142,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
     total_rounds: The number of federated training rounds to perform.
     experiment_name: The name of the experiment being run. This will be appended
       to the `root_output_dir` for purposes of writing outputs.
-    train_eval_fn: An optional callable accepting the `model` attribute of the
-      iterative process state and returning a dict of evaluation metrics. Used
-      to compute training metrics over the entire training dataset throughout
-      the course of the iterative process. If set to `None`, no such evaluation
-      is done.
     test_fn: An optional callable accepting the `model` attribute of the
       iterative process state and returning a dict of test metrics. Used to
       compute test metrics at the end of the training process.
@@ -160,9 +153,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
     rounds_per_checkpoint: How often to checkpoint the iterative process state.
       If you expect the job to restart frequently, this should be small. If no
       interruptions are expected, this can be made larger.
-    rounds_per_train_eval: How often to compute metrics over the entire training
-      dataset. Note that this is only done if a `train_eval_fn` argument is
-      supplied.
     rounds_per_profile: Experimental setting. If set to a value greater than 0,
       this dictates how often a TensorFlow profiler is run.
 
@@ -176,8 +166,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
     raise TypeError('client_datasets_fn should be callable.')
   if not callable(validation_fn):
     raise TypeError('validation_fn should be callable.')
-  if train_eval_fn is not None and not callable(train_eval_fn):
-    raise TypeError('train_eval_fn should be callable.')
   if test_fn is not None and not callable(test_fn):
     raise TypeError('test_fn should be callable.')
 
@@ -250,13 +238,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
       validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
       metrics['eval'] = validation_metrics
 
-    if train_eval_fn and round_num % rounds_per_train_eval == 0:
-      # Compute metrics over the entire training dataset
-      train_eval_start = time.time()
-      train_eval_metrics = train_eval_fn(state.model)
-      train_eval_metrics['evaluate_secs'] = time.time() - train_eval_start
-      metrics['train_eval'] = train_eval_metrics
-
     _write_metrics(metrics_mngr, summary_writer, metrics, round_num)
     round_num += 1
 
@@ -268,13 +249,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
   validation_metrics = validation_fn(state.model)
   validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
   metrics['eval'] = validation_metrics
-
-  # Training set metrics
-  if train_eval_fn:
-    train_eval_start = time.time()
-    train_eval_metrics = train_eval_fn(state.model)
-    train_eval_metrics['evaluate_secs'] = time.time() - train_eval_start
-    metrics['train_eval'] = train_eval_metrics
 
   # Test set metrics
   if test_fn:
