@@ -69,7 +69,6 @@ py_library(
     name = "metrics_manager",
     srcs = ["metrics_manager.py"],
     srcs_version = "PY3",
-    deps = [":utils_impl"],
 )
 
 py_test(
@@ -77,10 +76,7 @@ py_test(
     srcs = ["metrics_manager_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    deps = [
-        ":metrics_manager",
-        ":utils_impl",
-    ],
+    deps = [":metrics_manager"],
 )
 
 py_library(

@@ -272,11 +272,11 @@ class ExperimentRunnerTest(tf.test.TestCase):
     results_dir = os.path.join(root_output_dir, 'results', experiment_name)
 
     scalar_manager = metrics_manager.ScalarMetricsManager(results_dir)
-    metrics = scalar_manager.get_metrics()
-    self.assertEqual(2, len(metrics.index))
-    self.assertIn('eval/loss', metrics.columns)
-    self.assertIn('train_eval/loss', metrics.columns)
-    self.assertNotIn('test/loss', metrics.columns)
+    fieldnames, metrics = scalar_manager.get_metrics()
+    self.assertLen(metrics, 2)
+    self.assertIn('eval/loss', fieldnames)
+    self.assertIn('train_eval/loss', fieldnames)
+    self.assertNotIn('test/loss', fieldnames)
 
   def test_fn_writes_metrics(self):
     experiment_name = 'test_metrics'
@@ -308,11 +308,11 @@ class ExperimentRunnerTest(tf.test.TestCase):
     results_dir = os.path.join(root_output_dir, 'results', experiment_name)
 
     scalar_manager = metrics_manager.ScalarMetricsManager(results_dir)
-    metrics = scalar_manager.get_metrics()
-    self.assertEqual(2, len(metrics.index))
-    self.assertIn('eval/loss', metrics.columns)
-    self.assertIn('test/loss', metrics.columns)
-    self.assertNotIn('train_eval/loss', metrics.columns)
+    fieldnames, metrics = scalar_manager.get_metrics()
+    self.assertLen(metrics, 2)
+    self.assertIn('eval/loss', fieldnames)
+    self.assertIn('test/loss', fieldnames)
+    self.assertNotIn('train_eval/loss', fieldnames)
 
 
 if __name__ == '__main__':

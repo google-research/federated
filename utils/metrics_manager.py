@@ -14,14 +14,101 @@
 """Utility class for saving and loading scalar experiment metrics."""
 
 import collections
+import csv
 import os.path
-from typing import Any, Dict
+import shutil
+import tempfile
+from typing import Any, Dict, List, Tuple, Sequence, Set, Union
 
-import pandas as pd
+from absl import logging
+import numpy as np
 import tensorflow as tf
 import tree
 
-from utils import utils_impl
+_QUOTING = csv.QUOTE_NONNUMERIC
+
+
+def _create_if_not_exists(path):
+  try:
+    tf.io.gfile.makedirs(path)
+  except tf.errors.OpError:
+    logging.info('Skipping creation of directory [%s], already exists', path)
+
+
+def _read_from_csv(
+    file_name: str) -> Tuple[Sequence[str], List[Dict[str, Any]]]:
+  """Returns a list of fieldnames and a list of metrics from a given CSV."""
+  with tf.io.gfile.GFile(file_name, 'r') as csv_file:
+    reader = csv.DictReader(csv_file, quoting=_QUOTING)
+    fieldnames = reader.fieldnames
+    csv_metrics = list(reader)
+  return fieldnames, csv_metrics
+
+
+def _write_to_csv(metrics: List[Dict[str, Any]], file_name: str,
+                  fieldnames: Union[Sequence[str], Set[str]]):
+  """Writes a list of metrics to CSV in an atomic fashion."""
+  tmp_dir = tempfile.mkdtemp(prefix='atomic_write_to_csv_tmp')
+  tmp_name = os.path.join(tmp_dir, os.path.basename(file_name))
+  assert not tf.io.gfile.exists(tmp_name), 'File [{!s}] already exists'.format(
+      tmp_name)
+
+  # Write to a temporary GFile.
+  with tf.io.gfile.GFile(tmp_name, 'w') as csv_file:
+    writer = csv.DictWriter(csv_file, fieldnames=fieldnames, quoting=_QUOTING)
+    writer.writeheader()
+    for metric_row in metrics:
+      writer.writerow(metric_row)
+
+  # Copy to a temporary GFile next to the target, allowing for an atomic move.
+  tmp_gfile_name = os.path.join(
+      os.path.dirname(file_name), '{}.tmp{}'.format(
+          os.path.basename(file_name),
+          np.random.randint(0, 2**63, dtype=np.int64)))
+  tf.io.gfile.copy(src=tmp_name, dst=tmp_gfile_name, overwrite=True)
+
+  # Finally, do an atomic rename and clean up.
+  tf.io.gfile.rename(tmp_gfile_name, file_name, overwrite=True)
+  shutil.rmtree(tmp_dir)
+
+
+def _append_to_csv(metrics_to_append: Dict[str, Any], file_name: str):
+  """Appends `metrics` to a CSV.
+
+  Here, the CSV is assumed to have first row representing the CSV's fieldnames.
+  If `metrics` contains keys not in the CSV fieldnames, the CSV is re-written
+  in order using the union of the fieldnames and `metrics.keys`.
+
+  Args:
+    metrics_to_append: A dictionary of metrics.
+    file_name: The CSV file_name.
+
+  Returns:
+    A list of fieldnames for the updated CSV.
+  """
+  new_fieldnames = metrics_to_append.keys()
+  with tf.io.gfile.GFile(file_name, 'a+') as csv_file:
+    reader = csv.DictReader(csv_file, quoting=_QUOTING)
+    current_fieldnames = reader.fieldnames
+
+    if current_fieldnames is None:
+      writer = csv.DictWriter(
+          csv_file, fieldnames=list(new_fieldnames), quoting=_QUOTING)
+      writer.writeheader()
+      writer.writerow(metrics_to_append)
+      return new_fieldnames
+    elif new_fieldnames <= set(current_fieldnames):
+      writer = csv.DictWriter(
+          csv_file, fieldnames=current_fieldnames, quoting=_QUOTING)
+      writer.writerow(metrics_to_append)
+      return current_fieldnames
+    else:
+      metrics = list(reader)
+
+  expanded_fieldnames = set(current_fieldnames).union(new_fieldnames)
+  metrics.append(metrics_to_append)
+  _write_to_csv(metrics, file_name, expanded_fieldnames)
+  return expanded_fieldnames
 
 
 class ScalarMetricsManager():
@@ -44,7 +131,7 @@ class ScalarMetricsManager():
 
     Args:
       root_metrics_dir: A path on the filesystem to store CSVs.
-      prefix: A string to use as the prefix of filename. Usually the name of a
+      prefix: A string to use as the prefix of file_name. Usually the name of a
         specific run in a larger grid of experiments sharing a common
         `root_metrics_dir`.
 
@@ -60,23 +147,29 @@ class ScalarMetricsManager():
     if not prefix:
       raise ValueError('Empty string passed for prefix argument.')
 
-    self._metrics_filename = os.path.join(root_metrics_dir,
-                                          f'{prefix}.metrics.csv')
-    if not tf.io.gfile.exists(self._metrics_filename):
-      utils_impl.atomic_write_to_csv(pd.DataFrame(), self._metrics_filename)
+    _create_if_not_exists(root_metrics_dir)
+    self._metrics_file = os.path.join(root_metrics_dir, f'{prefix}.metrics.csv')
+    if not tf.io.gfile.exists(self._metrics_file):
+      with open(self._metrics_file, 'w') as csv_file:
+        writer = csv.DictWriter(
+            csv_file, fieldnames=['round_num'], quoting=_QUOTING)
+        writer.writeheader()
 
-    self._metrics = utils_impl.atomic_read_from_csv(self._metrics_filename)
-    if not self._metrics.empty and 'round_num' not in self._metrics.columns:
+    current_fieldnames, current_metrics = _read_from_csv(self._metrics_file)
+
+    if current_metrics and 'round_num' not in current_fieldnames:
       raise ValueError(
-          f'The specified csv file ({self._metrics_filename}) already exists '
+          f'The specified csv file ({self._metrics_file}) already exists '
           'but was not created by ScalarMetricsManager (it does not contain a '
           '`round_num` column.')
 
-    self._latest_round_num = (None if self._metrics.empty else
-                              self._metrics.round_num.max(axis=0))
+    if not current_metrics:
+      self._latest_round_num = None
+    else:
+      self._latest_round_num = current_metrics[-1]['round_num']
 
   def update_metrics(self, round_num,
-                     metrics_to_append: Dict[str, Any]) -> Dict[str, float]:
+                     metrics_to_append: Dict[str, Any]) -> Dict[str, Any]:
     """Updates the stored metrics data with metrics for a specific round.
 
     The specified `round_num` must be later than the latest round number for
@@ -122,31 +215,33 @@ class ScalarMetricsManager():
         ('/'.join(map(str, path)), item) for path, item in flat_metrics
     ]
     flat_metrics = collections.OrderedDict(flat_metrics)
-    self._metrics = self._metrics.append(flat_metrics, ignore_index=True)
-    utils_impl.atomic_write_to_csv(self._metrics, self._metrics_filename)
+    _append_to_csv(flat_metrics, self._metrics_file)
     self._latest_round_num = round_num
 
     return flat_metrics
 
-  def get_metrics(self) -> pd.DataFrame:
+  def get_metrics(self) -> Tuple[Sequence[str], List[Dict[str, Any]]]:
     """Retrieve the stored experiment metrics data for all rounds.
 
     Returns:
-      A `pandas.DataFrame` containing experiment metrics data for all rounds.
-        This DataFrame is in `wide` format: a row for each round and a column
-        for each metric. The data has been flattened, with the column names
-        equal to the path in the original nested metric structure. There is a
-        column (`round_num`) to indicate the round number.
+      A sequence representing all possible keys for the metrics, and a list
+      containing experiment metrics data for all rounds. Each entry in the list
+      is a dictionary corresponding to a given round. The data has been
+      flattened, with the column names equal to the path in the original nested
+      metric structure. There is a fieldname `round_num` to indicate the round
+      number.
     """
-    return self._metrics
+    return _read_from_csv(self._metrics_file)
 
   def clear_all_rounds(self) -> None:
     """Existing metrics for all rounds are cleared out.
 
     This method will atomically update the stored CSV file.
     """
-    self._metrics = pd.DataFrame()
-    utils_impl.atomic_write_to_csv(self._metrics, self._metrics_filename)
+    with open(self._metrics_file, 'w') as csv_file:
+      writer = csv.DictWriter(
+          csv_file, fieldnames=['round_num'], quoting=_QUOTING)
+      writer.writeheader()
     self._latest_round_num = None
 
   def clear_rounds_after(self, last_valid_round_num: int) -> None:
@@ -172,11 +267,18 @@ class ScalarMetricsManager():
       if last_valid_round_num == 0:
         return
       raise RuntimeError('Metrics do not exist yet.')
-    self._metrics = self._metrics.drop(
-        self._metrics[self._metrics.round_num > last_valid_round_num].index)
-    utils_impl.atomic_write_to_csv(self._metrics, self._metrics_filename)
+
+    reduced_fieldnames = set(['round_num'])
+    _, metrics = _read_from_csv(self._metrics_file)
+    reduced_metrics = []
+    for metric_row in metrics:
+      if metric_row['round_num'] <= last_valid_round_num:
+        reduced_fieldnames = reduced_fieldnames.union(metric_row.keys())
+        reduced_metrics.append(metric_row)
+
+    _write_to_csv(reduced_metrics, self._metrics_file, reduced_fieldnames)
     self._latest_round_num = last_valid_round_num
 
   @property
   def metrics_filename(self) -> str:
-    return self._metrics_filename
+    return self._metrics_file
