@@ -70,9 +70,6 @@ with utils_impl.record_new_flags() as training_loop_flags:
       '--root_output_dir to separate experiment results.')
   flags.DEFINE_string('root_output_dir', '/tmp/differential_privacy/',
                       'Root directory for writing experiment output.')
-  flags.DEFINE_boolean(
-      'write_metrics_with_bz2', True, 'Whether to use bz2 '
-      'compression when writing output metrics to a csv file.')
   flags.DEFINE_integer(
       'rounds_per_eval', 1,
       'How often to evaluate the global model on the validation dataset.')

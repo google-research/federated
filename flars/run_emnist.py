@@ -234,8 +234,6 @@ class _MetricsHook(object):
     with self._summary_writer.as_default():
       hp.hparams(hparam_dict)
 
-    # Using .bz2 rather than .zip due to
-    # https://github.com/pandas-dev/pandas/issues/26023
     self._results_file = os.path.join(output_dir, experiment_name,
                                       'results.csv.bz2')
 
