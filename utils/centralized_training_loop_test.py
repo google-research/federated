@@ -102,7 +102,7 @@ class CentralizedTrainingLoopTest(tf.test.TestCase):
     self.assertCountEqual(history.history.keys(), [
         'loss', 'mean_squared_error', 'val_loss', 'val_mean_squared_error', 'lr'
     ])
-    self.assertAllClose(history.history['lr'], [0.1] * 7 + [0.05] * 3)
+    self.assertAllClose(history.history['lr'], [0.1] * 8 + [0.05] * 2)
 
   def test_metric_writing(self):
     keras_model = compiled_keras_model()
