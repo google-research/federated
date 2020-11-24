@@ -150,7 +150,7 @@ class ScalarMetricsManager():
     _create_if_not_exists(root_metrics_dir)
     self._metrics_file = os.path.join(root_metrics_dir, f'{prefix}.metrics.csv')
     if not tf.io.gfile.exists(self._metrics_file):
-      with open(self._metrics_file, 'w') as csv_file:
+      with tf.io.gfile.GFile(self._metrics_file, 'w') as csv_file:
         writer = csv.DictWriter(
             csv_file, fieldnames=['round_num'], quoting=_QUOTING)
         writer.writeheader()
@@ -238,7 +238,7 @@ class ScalarMetricsManager():
 
     This method will atomically update the stored CSV file.
     """
-    with open(self._metrics_file, 'w') as csv_file:
+    with tf.io.gfile.GFile(self._metrics_file, 'w') as csv_file:
       writer = csv.DictWriter(
           csv_file, fieldnames=['round_num'], quoting=_QUOTING)
       writer.writeheader()
