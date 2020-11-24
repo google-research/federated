@@ -47,6 +47,7 @@ with utils_impl.record_new_flags() as hparam_flags:
   flags.DEFINE_string(
       'experiment_name', None,
       'Name of the experiment. Part of the name of the output directory.')
+  flags.mark_flag_as_required('experiment_name')
   flags.DEFINE_string(
       'root_output_dir', '/tmp/centralized_opt',
       'The top-level output directory experiment runs. --experiment_name will '
