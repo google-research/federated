@@ -91,9 +91,6 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_integer(
       'rounds_per_eval', 1,
       'How often to evaluate the global model on the validation dataset.')
-  flags.DEFINE_integer(
-      'rounds_per_train_eval', 100,
-      'How often to evaluate the global model on the entire training dataset.')
   flags.DEFINE_integer('rounds_per_checkpoint', 50,
                        'How often to checkpoint the global model.')
   flags.DEFINE_integer(
