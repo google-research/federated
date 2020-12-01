@@ -266,6 +266,27 @@ class ModelDeltaProcessTest(tf.test.TestCase):
     train_gap_second_half = train_outputs[3]['loss'] - train_outputs[5]['loss']
     self.assertLess(train_gap_second_half, train_gap_first_half)
 
+  def test_get_model_weights(self):
+    federated_data = [[_batch_fn()]]
+
+    iterative_process = fed_avg_schedule.build_fed_avg_process(
+        _uncompiled_model_builder,
+        client_optimizer_fn=tf.keras.optimizers.SGD,
+        server_optimizer_fn=tf.keras.optimizers.SGD)
+    state = iterative_process.initialize()
+
+    self.assertIsInstance(
+        iterative_process.get_model_weights(state), tff.learning.ModelWeights)
+    self.assertAllClose(state.model.trainable,
+                        iterative_process.get_model_weights(state).trainable)
+
+    for _ in range(3):
+      state, _ = iterative_process.next(state, federated_data)
+      self.assertIsInstance(
+          iterative_process.get_model_weights(state), tff.learning.ModelWeights)
+      self.assertAllClose(state.model.trainable,
+                          iterative_process.get_model_weights(state).trainable)
+
 
 if __name__ == '__main__':
   tf.test.main()

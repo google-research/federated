@@ -333,5 +333,12 @@ def build_fed_avg_process(
   def initialize_fn():
     return tff.federated_value(server_init_tf(), tff.SERVER)
 
-  return tff.templates.IterativeProcess(
+  iterative_process = tff.templates.IterativeProcess(
       initialize_fn=initialize_fn, next_fn=run_one_round)
+
+  @tff.tf_computation(server_state_type)
+  def get_model_weights(server_state):
+    return server_state.model
+
+  iterative_process.get_model_weights = get_model_weights
+  return iterative_process

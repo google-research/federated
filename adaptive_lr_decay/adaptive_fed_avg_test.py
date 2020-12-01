@@ -331,6 +331,42 @@ class AdaptiveFedAvgTest(tf.test.TestCase):
         expected_type,
         msg='{s}\n!={t}'.format(s=actual_type, t=expected_type))
 
+  def test_get_model_weights(self):
+    client_lr_callback = callbacks.create_reduce_lr_on_plateau(
+        learning_rate=0.1,
+        window_size=1,
+        patience=1,
+        decay_factor=1.0,
+        cooldown=0)
+
+    server_lr_callback = callbacks.create_reduce_lr_on_plateau(
+        learning_rate=0.1,
+        window_size=1,
+        patience=1,
+        decay_factor=1.0,
+        cooldown=0)
+
+    iterative_process = adaptive_fed_avg.build_fed_avg_process(
+        _uncompiled_model_builder,
+        client_lr_callback,
+        server_lr_callback,
+        client_optimizer_fn=tf.keras.optimizers.SGD,
+        server_optimizer_fn=tf.keras.optimizers.SGD)
+
+    state = iterative_process.initialize()
+
+    self.assertIsInstance(
+        iterative_process.get_model_weights(state), tff.learning.ModelWeights)
+    self.assertAllClose(state.model.trainable,
+                        iterative_process.get_model_weights(state).trainable)
+
+    state, _ = self._run_rounds(iterative_process, 5)
+
+    self.assertIsInstance(
+        iterative_process.get_model_weights(state), tff.learning.ModelWeights)
+    self.assertAllClose(state.model.trainable,
+                        iterative_process.get_model_weights(state).trainable)
+
 
 if __name__ == '__main__':
   tf.test.main()

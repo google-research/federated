@@ -56,8 +56,9 @@ def run_federated(
         represents the server state, `{B*}` represents the client datasets,
         and `T` represents a python `Mapping` object.
 
-  Moreover, the server state must have an attribute `model` of type
-  `tff.learning.ModelWeights`.
+  The iterative process must also have a callable attribute `get_model_weights`
+  that takes as input the state of the iterative process, and returns a
+  `tff.learning.ModelWeights` object.
 
   Args:
     iterative_process_builder: A function that accepts a no-arg `model_fn`, and
