@@ -299,23 +299,20 @@ class FederatedEvaluationTest(tf.test.TestCase):
         collections.OrderedDict(x=x, y=y)).batch(1)
 
   def _create_client_data(self, balanced=True):
-    client_ids = [0, 1]
     if balanced:
-      create_tf_dataset_for_client_fn = self._create_balanced_client_datasets
+      create_dataset_fn = self._create_balanced_client_datasets
     else:
-      create_tf_dataset_for_client_fn = self._create_unbalanced_client_datasets
+      create_dataset_fn = self._create_unbalanced_client_datasets
 
-    return tff.simulation.client_data.ConcreteClientData(
-        client_ids=client_ids,
-        create_tf_dataset_for_client_fn=create_tf_dataset_for_client_fn)
+    return [create_dataset_fn(0), create_dataset_fn(1)]
 
   def test_eval_metrics_for_balanced_client_data(self):
     client_data = self._create_client_data(balanced=True)
     metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]
     eval_fn = training_utils.build_federated_evaluate_fn(
-        client_data, model_builder, metrics_builder, clients_per_round=2)
+        model_builder, metrics_builder)
     model_weights = tff.learning.ModelWeights.from_model(tff_model_fn())
-    eval_metrics = eval_fn(model_weights, round_num=1)
+    eval_metrics = eval_fn(model_weights, client_data)
     logging.info('Eval metrics: %s', eval_metrics)
 
     self.assertCountEqual(eval_metrics.keys(),
@@ -347,9 +344,9 @@ class FederatedEvaluationTest(tf.test.TestCase):
     client_data = self._create_client_data(balanced=False)
     metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]
     eval_fn = training_utils.build_federated_evaluate_fn(
-        client_data, model_builder, metrics_builder, clients_per_round=2)
+        model_builder, metrics_builder)
     model_weights = tff.learning.ModelWeights.from_model(tff_model_fn())
-    eval_metrics = eval_fn(model_weights, round_num=1)
+    eval_metrics = eval_fn(model_weights, client_data)
     logging.info('Eval metrics: %s', eval_metrics)
 
     self.assertCountEqual(eval_metrics.keys(),
@@ -388,19 +385,15 @@ class FederatedEvaluationTest(tf.test.TestCase):
       return tf.data.Dataset.from_tensor_slices(
           collections.OrderedDict(x=client_value, y=client_value)).batch(1)
 
-    client_data = tff.simulation.client_data.ConcreteClientData(
-        client_ids=client_ids,
-        create_tf_dataset_for_client_fn=create_single_value_ds)
+    client_data = [create_single_value_ds(id) for id in client_ids]
 
     metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]
     eval_fn = training_utils.build_federated_evaluate_fn(
-        client_data,
         model_builder,
         metrics_builder,
-        clients_per_round=5,
         quantiles=quantiles)
     model_weights = tff.learning.ModelWeights.from_model(tff_model_fn())
-    eval_metrics = eval_fn(model_weights, round_num=1)
+    eval_metrics = eval_fn(model_weights, client_data)
     logging.info('Eval metrics: %s', eval_metrics)
 
     mse_quantiles = eval_metrics['mean_squared_error']['quantiles']
@@ -418,19 +411,15 @@ class FederatedEvaluationTest(tf.test.TestCase):
       return tf.data.Dataset.from_tensor_slices(
           collections.OrderedDict(x=client_value, y=client_value)).batch(1)
 
-    client_data = tff.simulation.client_data.ConcreteClientData(
-        client_ids=client_ids,
-        create_tf_dataset_for_client_fn=create_single_value_ds)
+    client_data = [create_single_value_ds(id) for id in client_ids]
 
     metrics_builder = lambda: [tf.keras.metrics.MeanSquaredError()]
     eval_fn = training_utils.build_federated_evaluate_fn(
-        client_data,
         model_builder,
         metrics_builder,
-        clients_per_round=5,
         quantiles=quantiles)
     model_weights = tff.learning.ModelWeights.from_model(tff_model_fn())
-    eval_metrics = eval_fn(model_weights, round_num=1)
+    eval_metrics = eval_fn(model_weights, client_data)
     logging.info('Eval metrics: %s', eval_metrics)
 
     num_examples_quantiles = eval_metrics['num_examples']['quantiles']

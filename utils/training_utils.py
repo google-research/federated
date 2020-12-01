@@ -184,13 +184,11 @@ def _build_client_evaluate_fn(model, mean_metrics, sum_metrics):
 
 
 def build_federated_evaluate_fn(
-    eval_dataset: tff.simulation.ClientData,
     model_builder: Callable[[], tf.keras.Model],
     metrics_builder: Callable[[], List[tf.keras.metrics.Metric]],
-    clients_per_round: int,
-    random_seed: Optional[int] = None,
     quantiles: Optional[Iterable[float]] = DEFAULT_QUANTILES,
-) -> Callable[[tff.learning.ModelWeights, int], Dict[str, Any]]:
+) -> Callable[[tff.learning.ModelWeights, List[tf.data.Dataset]], Dict[str,
+                                                                       Any]]:
   """Builds a federated evaluation method for a given model and test dataset.
 
   The evaluation function takes as input a `tff.learning.ModelWeights`, and
@@ -221,27 +219,19 @@ def build_federated_evaluate_fn(
   ]
 
   Args:
-    eval_dataset: A `tf.data.Dataset` object. Dataset elements should either
-      have a mapping structure of format {"x": <features>, "y": <labels>}, or a
-        tuple structure of format (<features>, <labels>).
     model_builder: A no-arg function returning an uncompiled `tf.keras.Model`.
     metrics_builder: A no-arg function that returns a list of
       `tf.keras.metrics.Metric` objects. These metrics must either be instances
       of `tf.keras.metrics.Mean` or `tf.keras.metrics.Sum`.
-    clients_per_round: An integer specifying the number of clients to sample
-      when performing evaluation.
-    random_seed: An integer used to seed the evaluation client selection.
     quantiles: Which quantiles to compute of mean-based metrics. Must be an
       iterable of float values between 0 and 1.
 
   Returns:
-    A function that take as input a `tff.learning.ModelWeights` and a round
-    number, and returns a nested structure of (metric_name, metric_value) pairs.
+    A function that takes as input a `tff.learning.ModelWeights` and a list of
+    client datasets, and returns an ordered dictionary with nested structure
+    `(metric_name, (aggregation_method, metric_value))`, corresponding to
+    various ways of aggregating the user-supplied metrics.
   """
-
-  client_sample_function = build_client_datasets_fn(
-      eval_dataset, clients_per_round, random_seed=random_seed)
-
   keras_model = model_builder()
   metrics = metrics_builder()
 
@@ -257,23 +247,23 @@ def build_federated_evaluate_fn(
       raise ValueError('Unsupported metric {}, metrics must be an instance of '
                        'tf.keras.metrics.Mean or tf.keras.metrics.Sum.')
 
+  client_eval_fn = _build_client_evaluate_fn(keras_model, mean_metrics,
+                                             sum_metrics)
+
   def evaluate_fn(model_weights: tff.learning.ModelWeights,
-                  round_num: int) -> Dict[str, Any]:
+                  client_datasets: List[tf.data.Dataset]) -> Dict[str, Any]:
 
     model_weights_as_list = tff.learning.ModelWeights(
         trainable=list(model_weights.trainable),
         non_trainable=list(model_weights.non_trainable))
     model_weights_as_list.assign_weights_to(keras_model)
 
-    client_eval_fn = _build_client_evaluate_fn(keras_model, mean_metrics,
-                                               sum_metrics)
-
     mean_metrics_at_clients = collections.defaultdict(list)
     sum_metrics_at_clients = collections.defaultdict(list)
 
     # Record all client metrics
-    for client_dataset in client_sample_function(round_num):
-      tuple_ds = convert_to_tuple_dataset(client_dataset)
+    for client_ds in client_datasets:
+      tuple_ds = convert_to_tuple_dataset(client_ds)
       client_mean_metrics, client_sum_metrics = client_eval_fn(tuple_ds)
 
       for (metric_name, metric_value) in client_mean_metrics.items():
