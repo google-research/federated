@@ -13,6 +13,7 @@
 # limitations under the License.
 """Utility class for saving and loading scalar experiment metrics."""
 
+import abc
 import collections
 import csv
 import os.path
@@ -26,6 +27,40 @@ import tensorflow as tf
 import tree
 
 _QUOTING = csv.QUOTE_NONNUMERIC
+
+
+class MetricsManager(metaclass=abc.ABCMeta):
+  """An abstract base class for metrics managers.
+
+  A `MetricManager` is a utility to log metric data across a number of
+  rounds of some simulation.
+  """
+
+  @abc.abstractmethod
+  def update_metrics(self, round_num: int, metrics_to_append: Dict[str, Any]):
+    """Updates the metrics manager with metrics for a given round.
+
+    This method updates the MetricsManager with a given nested structure of
+    tensors `metrics_to_append`, at a given round number `round_num`. This
+    method should only support strictly increasing, nonnegative round numbers,
+    but not necessarily contiguous round numbers.
+
+    For example, calling this method with `round_num = 3` then `round_num = 7`
+    is acceptable, but calling the method with `round_num = 6` then
+    `round_num = 6` (or anything less than 6) is not supported. As stated above,
+    the `round_num` must also be nonnegative, so `round_num = 0` is supported,
+    but `round_num < 0` is not.
+
+    The `metrics_to_append` can be any nested structure of tensors. The actual
+    metrics that are recorded are the leaves of this nested structure, with
+    names given by the path to the leaf.
+
+    Args:
+      round_num: A nonnegative integer representing the round number associated
+        with `metrics_to_append`.
+      metrics_to_append: A nested structure of tensors.
+    """
+    raise NotImplementedError
 
 
 def _create_if_not_exists(path):
@@ -111,7 +146,7 @@ def _append_to_csv(metrics_to_append: Dict[str, Any], file_name: str):
   return expanded_fieldnames
 
 
-class ScalarMetricsManager():
+class ScalarMetricsManager(MetricsManager):
   """Utility class for saving/loading scalar experiment metrics.
 
   The metrics are backed by CSVs stored on the file system.
@@ -181,16 +216,16 @@ class ScalarMetricsManager():
 
     Args:
       round_num: Communication round at which `metrics_to_append` was collected.
-      metrics_to_append: A dictionary of metrics collected during `round_num`.
-        These metrics can be in a nested structure, but the nesting will be
-        flattened for storage in the CSV (with the new keys equal to the paths
-        in the nested structure).
+      metrics_to_append: A nested structure of metrics collected during
+        `round_num`. The nesting will be flattened for storage in the CSV (with
+        the new keys equal to the paths in the nested structure).
 
     Returns:
-      A `collections.OrderedDict` of the data just added in a new row to the
-        pandas.DataFrame. Compared with the input `metrics_to_append`, this data
-        is flattened, with the key names equal to the path in the nested
-        structure. Also, `round_num` has been added as an additional key.
+      A `collections.OrderedDict` of the metrics used to update the manager.
+        Compared with the input `metrics_to_append`, this data is flattened,
+        with the key names equal to the path in the nested structure, and
+        `round_num` has been added as an additional key (overwriting the value
+        if already present in the input `metrics_to_append`).
 
     Raises:
       ValueError: If the provided round number is negative.
