@@ -166,10 +166,12 @@ def _mean_encoder_fn(value):
 
 def run_experiment():
   """Data preprocessing and experiment execution."""
-  emnist_train, emnist_test = emnist_dataset.get_emnist_datasets(
-      FLAGS.client_batch_size,
-      FLAGS.client_epochs_per_round,
-      only_digits=FLAGS.only_digits)
+  emnist_train, _ = emnist_dataset.get_federated_datasets(
+      train_client_batch_size=FLAGS.client_batch_size,
+      train_client_epochs_per_round=FLAGS.client_epochs_per_round,
+      only_digits=False)
+
+  _, emnist_test = emnist_dataset.get_centralized_datasets()
 
   example_dataset = emnist_train.create_tf_dataset_for_client(
       emnist_train.client_ids[0])

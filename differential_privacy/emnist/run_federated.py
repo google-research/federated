@@ -89,8 +89,12 @@ def main(argv):
     raise app.UsageError('Expected no command-line arguments, '
                          'got: {}'.format(argv))
 
-  emnist_train, emnist_test = emnist_dataset.get_emnist_datasets(
-      FLAGS.client_batch_size, FLAGS.client_epochs_per_round, only_digits=False)
+  emnist_train, _ = emnist_dataset.get_federated_datasets(
+      train_client_batch_size=FLAGS.client_batch_size,
+      train_client_epochs_per_round=FLAGS.client_epochs_per_round,
+      only_digits=False)
+
+  _, emnist_test = emnist_dataset.get_centralized_datasets()
 
   if FLAGS.model == 'cnn':
     model_builder = functools.partial(

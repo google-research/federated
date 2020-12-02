@@ -90,14 +90,13 @@ def run_federated(
       `federated_research/utils/training_utils.py`.
   """
 
-  emnist_train, _ = emnist_dataset.get_emnist_datasets(
-      client_batch_size,
-      client_epochs_per_round,
-      max_batches_per_client=max_batches_per_client,
+  emnist_train, _ = emnist_dataset.get_federated_datasets(
+      train_client_batch_size=client_batch_size,
+      train_client_epochs_per_round=client_epochs_per_round,
+      max_batches_per_train_client=max_batches_per_client,
       only_digits=False)
 
   _, emnist_test = emnist_dataset.get_centralized_datasets(
-      train_batch_size=client_batch_size,
       max_test_batches=max_eval_batches,
       only_digits=False)
 
