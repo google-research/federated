@@ -177,11 +177,13 @@ def run_federated(
     # a float32 scalar.
     return tf.cast(tf.squeeze(local_outputs['num_tokens']), tf.float32)
 
-  training_process = iterative_process_builder(
+  iterative_process = iterative_process_builder(
       tff_model_fn, client_weight_fn=client_weight_fn)
 
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-      train_dataset_preprocess_comp, training_process)
+      train_dataset_preprocess_comp, iterative_process)
+
+  training_process.get_model_weights = iterative_process.get_model_weights
 
   client_datasets_fn = training_utils.build_client_datasets_fn(
       dataset=train_clientdata,
