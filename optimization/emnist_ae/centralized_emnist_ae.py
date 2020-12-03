@@ -54,9 +54,11 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
   """
   train_dataset, eval_dataset = emnist_ae_dataset.get_centralized_datasets(
       train_batch_size=batch_size,
-      max_train_batches=max_batches,
-      max_test_batches=max_batches,
       only_digits=False)
+
+  if max_batches and max_batches >= 1:
+    train_dataset = train_dataset.take(max_batches)
+    eval_dataset = eval_dataset.take(max_batches)
 
   model = emnist_ae_models.create_autoencoder_model()
   model.compile(

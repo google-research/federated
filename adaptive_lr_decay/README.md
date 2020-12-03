@@ -129,9 +129,7 @@ bazel run :federated_trainer -- --task=cifar100 --total_rounds=100
 
 This will run 100 communication rounds of federated averaging, using SGD on both
 the server and client, with 10 clients per round and 1 client epoch per round.
-If instead you wanted each client to perform 10 gradient steps (irrespective of
-the size of their local dataset), you could set `--client_epochs_per_round=-1
---max_batches_per_client=10`. For more details on these flags, see
+For more details on these flags, see
 [federated_trainer.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/federated_trainer.py).
 
 In the example above, the client and server both use learning rates of 0.1. By

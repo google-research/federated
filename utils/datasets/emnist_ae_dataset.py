@@ -31,21 +31,13 @@ def reshape_emnist_element(element):
 
 def get_emnist_datasets(client_batch_size,
                         client_epochs_per_round,
-                        max_batches_per_client=-1,
                         only_digits=False):
   """Loads and preprocesses EMNIST training and testing sets.
 
   Args:
     client_batch_size: Integer representing the batch size on the clients.
     client_epochs_per_round: Integer representing the number of epochs for which
-      each client should perform training. This is done by repeating the
-      dataset. If set to -1, the dataset is repeated indefinitely. In this case,
-      the `max_batches_per_client` argument should be set to some positive
-      integer, to ensure finite training time.
-    max_batches_per_client: The maximum number of batches (of size
-      `client_batch_size`) in the client dataset. This is enforced by using
-      `tf.data.Dataset.take`. If set to -1 (the default value), then no maximum
-      number of batches is enforced.
+      each client should perform training. This must be a positive integer.
     only_digits: A boolean representing whether to take the digits-only
       EMNIST-10 (with only 10 labels) or the full EMNIST-62 dataset with digits
       and characters (62 labels). If set to True, we use EMNIST-10, otherwise we
@@ -58,10 +50,8 @@ def get_emnist_datasets(client_batch_size,
       data.
   """
 
-  if client_epochs_per_round == -1 and max_batches_per_client == -1:
-    raise ValueError('Argument client_epochs_per_round is set to -1. If this is'
-                     ' intended, then max_batches_per_client must be set to '
-                     'some positive integer.')
+  if client_epochs_per_round <= 0:
+    raise ValueError('client_epochs_per_round must be a positive integer.')
 
   emnist_train, emnist_test = tff.simulation.datasets.emnist.load_data(
       only_digits=only_digits)
@@ -75,8 +65,6 @@ def get_emnist_datasets(client_batch_size,
             .repeat(client_epochs_per_round)
             # Batch to a fixed client batch size
             .batch(client_batch_size, drop_remainder=False)
-            # Take a maximum number of batches
-            .take(max_batches_per_client)
             # Preprocessing step
             .map(
                 reshape_emnist_element,
@@ -96,8 +84,6 @@ def get_emnist_datasets(client_batch_size,
 
 def get_centralized_datasets(train_batch_size: int,
                              test_batch_size: Optional[int] = 500,
-                             max_train_batches: Optional[int] = None,
-                             max_test_batches: Optional[int] = None,
                              only_digits: Optional[bool] = False,
                              shuffle_train: Optional[bool] = True):
   """Loads and preprocesses centralized EMNIST autoencoder datasets.
@@ -105,10 +91,6 @@ def get_centralized_datasets(train_batch_size: int,
   Args:
     train_batch_size: The batch size for the training dataset.
     test_batch_size: The batch size for the test dataset.
-    max_train_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the training dataset.
-    max_test_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the test dataset.
     only_digits: A boolean representing whether to take the digits-only
       EMNIST-10 (with only 10 labels) or the full EMNIST-62 dataset with digits
       and characters (62 labels). If set to True, we use EMNIST-10, otherwise we
@@ -139,10 +121,5 @@ def get_centralized_datasets(train_batch_size: int,
       emnist_test.create_tf_dataset_from_all_clients(),
       test_batch_size,
       shuffle_data=False)
-
-  if max_train_batches is not None and max_train_batches > 0:
-    train_dataset = train_dataset.take(max_train_batches)
-  if max_test_batches is not None and max_test_batches > 0:
-    test_dataset = test_dataset.take(max_test_batches)
 
   return train_dataset, test_dataset

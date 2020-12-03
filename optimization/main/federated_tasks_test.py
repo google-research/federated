@@ -57,7 +57,6 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
         clients_per_round=1,
         client_datasets_random_seed=1,
         total_rounds=total_rounds,
-        max_batches_per_client=2,
         iterative_process_builder=iterative_process_builder,
         rounds_per_checkpoint=10,
         rounds_per_eval=10,

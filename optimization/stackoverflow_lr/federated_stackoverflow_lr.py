@@ -40,7 +40,6 @@ def run_federated(
     client_epochs_per_round: int,
     client_batch_size: int,
     clients_per_round: int,
-    max_batches_per_client: Optional[int] = -1,
     client_datasets_random_seed: Optional[int] = None,
     vocab_tokens_size: Optional[int] = 10000,
     vocab_tags_size: Optional[int] = 500,
@@ -79,9 +78,6 @@ def run_federated(
     client_batch_size: An integer representing the batch size used on clients.
     clients_per_round: An integer representing the number of clients
       participating in each round.
-    max_batches_per_client: An optional int specifying the number of batches
-      taken by each client at each round. If `-1`, the entire client dataset is
-      used.
     client_datasets_random_seed: An optional int used to seed which clients are
       sampled at each round. If `None`, no seed is used.
     vocab_tokens_size: Integer dictating the number of most frequent words to
@@ -110,16 +106,17 @@ def run_federated(
       client_batch_size=client_batch_size,
       client_epochs_per_round=client_epochs_per_round,
       max_training_elements_per_user=max_elements_per_user,
-      max_batches_per_user=max_batches_per_client,
       num_validation_examples=num_validation_examples)
 
   _, stackoverflow_validation, stackoverflow_test = stackoverflow_lr_dataset.get_centralized_datasets(
       train_batch_size=client_batch_size,
       vocab_tokens_size=vocab_tokens_size,
       vocab_tags_size=vocab_tags_size,
-      num_validation_examples=num_validation_examples,
-      max_validation_batches=max_eval_batches,
-      max_test_batches=max_eval_batches)
+      num_validation_examples=num_validation_examples)
+
+  if max_eval_batches and max_eval_batches >= 1:
+    stackoverflow_validation = stackoverflow_validation.take(max_eval_batches)
+    stackoverflow_test = stackoverflow_test.take(max_eval_batches)
 
   input_spec = stackoverflow_train.create_tf_dataset_for_client(
       stackoverflow_train.client_ids[0]).element_spec

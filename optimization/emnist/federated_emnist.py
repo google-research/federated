@@ -33,7 +33,6 @@ def run_federated(
     client_epochs_per_round: int,
     client_batch_size: int,
     clients_per_round: int,
-    max_batches_per_client: Optional[int] = -1,
     client_datasets_random_seed: Optional[int] = None,
     model: Optional[str] = 'cnn',
     total_rounds: Optional[int] = 1500,
@@ -69,9 +68,6 @@ def run_federated(
     client_batch_size: An integer representing the batch size used on clients.
     clients_per_round: An integer representing the number of clients
       participating in each round.
-    max_batches_per_client: An optional int specifying the number of batches
-      taken by each client at each round. If `-1`, the entire client dataset is
-      used.
     client_datasets_random_seed: An optional int used to seed which clients are
       sampled at each round. If `None`, no seed is used.
     model: A string specifying the model used for character recognition.
@@ -93,12 +89,11 @@ def run_federated(
   emnist_train, _ = emnist_dataset.get_federated_datasets(
       train_client_batch_size=client_batch_size,
       train_client_epochs_per_round=client_epochs_per_round,
-      max_batches_per_train_client=max_batches_per_client,
       only_digits=False)
 
-  _, emnist_test = emnist_dataset.get_centralized_datasets(
-      max_test_batches=max_eval_batches,
-      only_digits=False)
+  _, emnist_test = emnist_dataset.get_centralized_datasets(only_digits=False)
+  if max_eval_batches and max_eval_batches >= 1:
+    emnist_test = emnist_test.take(max_eval_batches)
 
   input_spec = emnist_train.create_tf_dataset_for_client(
       emnist_train.client_ids[0]).element_spec

@@ -73,7 +73,6 @@ def get_stackoverflow_datasets(
     max_training_elements_per_user=500,
     client_batch_size=100,
     client_epochs_per_round=1,
-    max_batches_per_user=-1,
     num_validation_examples=10000,
 ):
   """Preprocessing for Stackoverflow data.
@@ -94,8 +93,6 @@ def get_stackoverflow_datasets(
       elements to take per user. If -1, takes all elements for each user.
     client_batch_size: Integer representing the client batch size.
     client_epochs_per_round: Number of client epochs per round
-    max_batches_per_user: If set to a positive integer, the maximum number of
-      batches in each client's dataset.
     num_validation_examples: Number of elements to use for validation
 
   Returns:
@@ -114,10 +111,8 @@ def get_stackoverflow_datasets(
     raise ValueError(
         'max_training_elements_per_user must be an integer at '
         'least -1; you have passed {}'.format(max_training_elements_per_user))
-  elif client_epochs_per_round == -1 and max_batches_per_user == -1:
-    raise ValueError('Argument client_epochs_per_round is set to -1. If this is'
-                     ' intended, then max_batches_per_user must be set to '
-                     'some positive integer.')
+  elif client_epochs_per_round <= 0:
+    raise ValueError('client_epochs_per_round must be a positive integer.')
 
   # Ignoring held-out Stackoverflow users for consistency with other
   # StackOverflow experiments.
@@ -140,9 +135,7 @@ def get_stackoverflow_datasets(
             # Map sentences to bag of words
             .map(to_ids, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             # Batch
-            .batch(client_batch_size)
-            # Take a maximum number of batches
-            .take(max_batches_per_user))
+            .batch(client_batch_size))
 
   def preprocess_test_dataset(dataset):
     """Preprocess StackOverflow testing dataset."""
@@ -166,9 +159,6 @@ def get_stackoverflow_datasets(
 def get_centralized_datasets(train_batch_size: int,
                              validation_batch_size: Optional[int] = 500,
                              test_batch_size: Optional[int] = 500,
-                             max_train_batches: Optional[int] = None,
-                             max_validation_batches: Optional[int] = None,
-                             max_test_batches: Optional[int] = None,
                              vocab_tokens_size=10000,
                              vocab_tags_size=500,
                              num_validation_examples=10000,
@@ -179,12 +169,6 @@ def get_centralized_datasets(train_batch_size: int,
     train_batch_size: The batch size for the training dataset.
     validation_batch_size: The batch size for the validation dataset.
     test_batch_size: The batch size for the test dataset.
-    max_train_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the training dataset.
-    max_validation_batches: If set to a positive integer, this specifies the
-      maximum number of batches to use from the validation dataset.
-    max_test_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the test dataset.
     vocab_tokens_size: Integer representing size of the vocab to use. Vocabulary
       will be the `vocab_token_size` most frequent words.
     vocab_tags_size: Integer representing the number of tags to use. The tag
@@ -233,12 +217,5 @@ def get_centralized_datasets(train_batch_size: int,
           num_validation_examples),
       test_batch_size,
       shuffle_data=False)
-
-  if max_train_batches is not None and max_train_batches > 0:
-    train_dataset = train_dataset.take(max_train_batches)
-  if max_validation_batches is not None and max_validation_batches > 0:
-    validation_dataset = validation_dataset.take(max_validation_batches)
-  if max_test_batches is not None and max_test_batches > 0:
-    test_dataset = test_dataset.take(max_test_batches)
 
   return train_dataset, validation_dataset, test_dataset

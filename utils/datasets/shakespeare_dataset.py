@@ -90,8 +90,7 @@ def convert_snippets_to_character_sequence_examples(
     batch_size: int,
     epochs: int,
     shuffle_buffer_size: int = 50,
-    sequence_length: int = SEQUENCE_LENGTH,
-    max_batches_per_client: int = -1) -> tf.data.Dataset:
+    sequence_length: int = SEQUENCE_LENGTH) -> tf.data.Dataset:
   """Convert a dataset of string snippets to a dataset of input/output character ID sequences.
 
   Args:
@@ -101,8 +100,6 @@ def convert_snippets_to_character_sequence_examples(
     shuffle_buffer_size: Buffer size for shuffling the dataset. If nonpositive,
       no shuffling occurs.
     sequence_length: the length of each example in the batch.
-    max_batches_per_client: If set to a positive integer, the maximum number of
-      batches in each client's dataset.
 
   Returns:
     A `tf.data.Dataset` yielding `(sequence of character IDs, sequence of
@@ -124,22 +121,17 @@ def convert_snippets_to_character_sequence_examples(
       # Batch sequences together for mini-batching purposes.
       .batch(batch_size)
       # Convert batches into training examples.
-      .map(_split_target, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-      # Take a maximum number of batches
-      .take(max_batches_per_client))
+      .map(_split_target, num_parallel_calls=tf.data.experimental.AUTOTUNE))
 
 
 def construct_character_level_datasets(client_batch_size: int,
                                        client_epochs_per_round: int,
                                        sequence_length: int = SEQUENCE_LENGTH,
-                                       max_batches_per_client: int = -1,
                                        shuffle_buffer_size: int = 50):
   """Loads and preprocesses a federated Shakespeare training dataset."""
 
-  if client_epochs_per_round == -1 and max_batches_per_client == -1:
-    raise ValueError('Argument client_epochs_per_round is set to -1. If this is'
-                     ' intended, then max_batches_per_client must be set to '
-                     'some positive integer.')
+  if client_epochs_per_round <= 0:
+    raise ValueError('client_epochs_per_round must be a positive integer.')
 
   train_client_data, _ = (tff.simulation.datasets.shakespeare.load_data())
 
@@ -149,16 +141,13 @@ def construct_character_level_datasets(client_batch_size: int,
           batch_size=client_batch_size,
           epochs=client_epochs_per_round,
           shuffle_buffer_size=shuffle_buffer_size,
-          sequence_length=sequence_length,
-          max_batches_per_client=max_batches_per_client))
+          sequence_length=sequence_length))
 
   return preprocessed_train_client_data
 
 
 def get_centralized_datasets(train_batch_size: int,
                              test_batch_size: Optional[int] = 100,
-                             max_train_batches: Optional[int] = None,
-                             max_test_batches: Optional[int] = None,
                              sequence_length: Optional[int] = SEQUENCE_LENGTH,
                              shuffle_buffer_size: Optional[int] = 10000):
   """Loads and preprocesses centralized Shakespeare datasets.
@@ -166,10 +155,6 @@ def get_centralized_datasets(train_batch_size: int,
   Args:
     train_batch_size: The batch size for the training dataset.
     test_batch_size: The batch size for the test dataset.
-    max_train_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the training dataset.
-    max_test_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the test dataset.
     sequence_length: The number of characters in each example.
     shuffle_buffer_size: The shuffle buffer size for the training dataset. If
       set to nonpositive number, no shuffling occurs.
@@ -195,10 +180,5 @@ def get_centralized_datasets(train_batch_size: int,
       epochs=1,
       shuffle_buffer_size=0,
       sequence_length=sequence_length)
-
-  if max_train_batches is not None and max_train_batches > 0:
-    train_dataset = train_dataset.take(max_train_batches)
-  if max_test_batches is not None and max_test_batches > 0:
-    test_dataset = test_dataset.take(max_test_batches)
 
   return train_dataset, test_dataset

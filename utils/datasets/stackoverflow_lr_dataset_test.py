@@ -68,33 +68,17 @@ class DatasetTest(tf.test.TestCase):
     self.assertEqual(test_batch[0].shape.as_list(), [500, 100])
     self.assertEqual(test_batch[1].shape.as_list(), [500, 5])
 
-  def test_take_with_repeat(self):
-    if tf.config.list_logical_devices('GPU'):
-      self.skipTest('skip GPU test')
-    so_train, _, _ = stackoverflow_lr_dataset.get_stackoverflow_datasets(
-        vocab_tokens_size=1000,
-        vocab_tags_size=500,
-        max_training_elements_per_user=128,
-        client_batch_size=10,
-        client_epochs_per_round=-1,
-        max_batches_per_user=8,
-        num_validation_examples=500)
-    for i in range(10):
-      client_ds = so_train.create_tf_dataset_for_client(so_train.client_ids[i])
-      self.assertEqual(_compute_length_of_dataset(client_ds), 8)
-
   def test_raises_no_repeat_and_no_take(self):
     if tf.config.list_logical_devices('GPU'):
       self.skipTest('skip GPU test')
     with self.assertRaisesRegex(
-        ValueError, 'Argument client_epochs_per_round is set to -1'):
+        ValueError, 'client_epochs_per_round must be a positive integer.'):
       stackoverflow_lr_dataset.get_stackoverflow_datasets(
           vocab_tokens_size=1000,
           vocab_tags_size=500,
           max_training_elements_per_user=128,
           client_batch_size=10,
           client_epochs_per_round=-1,
-          max_batches_per_user=-1,
           num_validation_examples=500)
 
 

@@ -31,7 +31,6 @@ def run_federated(
     client_epochs_per_round: int,
     client_batch_size: int,
     clients_per_round: int,
-    max_batches_per_client: Optional[int] = -1,
     client_datasets_random_seed: Optional[int] = None,
     total_rounds: Optional[int] = 1500,
     experiment_name: Optional[str] = 'federated_emnist_ae',
@@ -66,9 +65,6 @@ def run_federated(
     client_batch_size: An integer representing the batch size used on clients.
     clients_per_round: An integer representing the number of clients
       participating in each round.
-    max_batches_per_client: An optional int specifying the number of batches
-      taken by each client at each round. If `-1`, the entire client dataset is
-      used.
     client_datasets_random_seed: An optional int used to seed which clients are
       sampled at each round. If `None`, no seed is used.
     total_rounds: The number of federated training rounds.
@@ -87,13 +83,13 @@ def run_federated(
   emnist_train, _ = emnist_ae_dataset.get_emnist_datasets(
       client_batch_size=client_batch_size,
       client_epochs_per_round=client_epochs_per_round,
-      max_batches_per_client=max_batches_per_client,
       only_digits=False)
 
   _, emnist_test = emnist_ae_dataset.get_centralized_datasets(
       train_batch_size=client_batch_size,
-      max_test_batches=max_eval_batches,
       only_digits=False)
+  if max_eval_batches and max_eval_batches >= 1:
+    emnist_test = emnist_test.take(max_eval_batches)
 
   input_spec = emnist_train.create_tf_dataset_for_client(
       emnist_train.client_ids[0]).element_spec

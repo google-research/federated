@@ -110,7 +110,6 @@ def create_train_dataset_preprocess_fn(vocab: List[str],
                                        client_epochs_per_round: int,
                                        max_seq_len: int,
                                        max_training_elements_per_user: int,
-                                       max_batches_per_user: int = -1,
                                        max_shuffle_buffer_size: int = 10000):
   """Creates preprocessing functions for Stackoverflow data.
 
@@ -130,8 +129,6 @@ def create_train_dataset_preprocess_fn(vocab: List[str],
       truncated to this length.
     max_training_elements_per_user: Integer controlling the maximum number of
       elements to take per user. If -1, takes all elements for each user.
-    max_batches_per_user: If set to a positive integer, the maximum number of
-      batches in each client's dataset.
     max_shuffle_buffer_size: Maximum shuffle buffer size.
 
   Returns:
@@ -140,10 +137,9 @@ def create_train_dataset_preprocess_fn(vocab: List[str],
   if client_batch_size <= 0:
     raise ValueError('client_batch_size must be a positive integer; you have '
                      'passed {}'.format(client_batch_size))
-  elif client_epochs_per_round == -1 and max_batches_per_user == -1:
-    raise ValueError('Argument client_epochs_per_round is set to -1. If this is'
-                     ' intended, then max_batches_per_user must be set to '
-                     'some positive integer.')
+  elif client_epochs_per_round <= 0:
+    raise ValueError('client_epochs_per_round must be a positive integer; you '
+                     'have passed {}'.format(client_epochs_per_round))
   elif max_seq_len <= 0:
     raise ValueError('max_seq_len must be a positive integer; you have '
                      'passed {}'.format(max_seq_len))
@@ -181,8 +177,7 @@ def create_train_dataset_preprocess_fn(vocab: List[str],
     dataset = dataset.repeat(client_epochs_per_round)
     dataset = dataset.map(
         to_ids, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    dataset = batch_and_split(dataset, max_seq_len, client_batch_size)
-    return dataset.take(max_batches_per_user)
+    return batch_and_split(dataset, max_seq_len, client_batch_size)
 
   return preprocess_train
 
@@ -224,7 +219,6 @@ def construct_word_level_datasets(vocab_size: int,
                                   max_seq_len: int,
                                   max_training_elements_per_user: int,
                                   num_validation_examples: int,
-                                  max_batches_per_user: int = -1,
                                   max_shuffle_buffer_size: int = 10000,
                                   num_oov_buckets: int = 1):
   """Preprocessing for Stackoverflow data.
@@ -247,8 +241,6 @@ def construct_word_level_datasets(vocab_size: int,
       elements to take per user. If -1, takes all elements for each user.
     num_validation_examples: Number of examples from Stackoverflow test set to
       use for validation on each round.
-    max_batches_per_user: If set to a positive integer, the maximum number of
-      batches in each client's dataset.
     max_shuffle_buffer_size: Maximum shuffle buffer size.
     num_oov_buckets: Number of out of vocabulary buckets.
 
@@ -281,7 +273,6 @@ def construct_word_level_datasets(vocab_size: int,
       client_epochs_per_round=client_epochs_per_round,
       max_seq_len=max_seq_len,
       max_training_elements_per_user=max_training_elements_per_user,
-      max_batches_per_user=max_batches_per_user,
       max_shuffle_buffer_size=max_shuffle_buffer_size)
   stackoverflow_train = stackoverflow_train.preprocess(preprocess_train)
 
@@ -302,9 +293,6 @@ def get_centralized_datasets(vocab_size: int,
                              train_batch_size: int,
                              validation_batch_size: Optional[int] = 100,
                              test_batch_size: Optional[int] = 100,
-                             max_train_batches: Optional[int] = None,
-                             max_validation_batches: Optional[int] = None,
-                             max_test_batches: Optional[int] = None,
                              num_validation_examples: Optional[int] = 10000,
                              shuffle_buffer_size: Optional[int] = 10000,
                              num_oov_buckets: Optional[int] = 1):
@@ -319,12 +307,6 @@ def get_centralized_datasets(vocab_size: int,
     train_batch_size: The batch size for the training dataset.
     validation_batch_size: The batch size for the validation dataset.
     test_batch_size: The batch size for the test dataset.
-    max_train_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the training dataset.
-    max_validation_batches: If set to a positive integer, this specifies the
-      maximum number of batches to use from the validation dataset.
-    max_test_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the test dataset.
     num_validation_examples: Number of examples from Stackoverflow test set to
       use for validation on each round.
     shuffle_buffer_size: The shuffle buffer size for the training dataset. If
@@ -360,12 +342,5 @@ def get_centralized_datasets(vocab_size: int,
 
   test_dataset = test_dataset.skip(num_validation_examples)
   test_dataset = batch_and_split(test_dataset, max_seq_len, test_batch_size)
-
-  if max_train_batches is not None and max_train_batches > 0:
-    train_dataset = train_dataset.take(max_train_batches)
-  if max_validation_batches is not None and max_validation_batches > 0:
-    validation_dataset = validation_dataset.take(max_validation_batches)
-  if max_test_batches is not None and max_test_batches > 0:
-    test_dataset = test_dataset.take(max_test_batches)
 
   return train_dataset, validation_dataset, test_dataset

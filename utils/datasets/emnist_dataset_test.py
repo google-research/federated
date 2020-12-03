@@ -43,84 +43,42 @@ class FederatedDatasetTest(tf.test.TestCase):
 
   def test_dataset_shape(self):
     emnist_train, emnist_test = emnist_dataset.get_federated_datasets(
-        train_client_batch_size=5,
-        train_client_epochs_per_round=-1,
-        max_batches_per_train_client=10,
-        test_client_batch_size=6,
-        test_client_epochs_per_round=-1,
-        max_batches_per_test_client=10,
+        train_client_batch_size=2,
+        train_client_epochs_per_round=1,
+        test_client_batch_size=3,
+        test_client_epochs_per_round=1,
         only_digits=True)
 
     sample_train_ds = emnist_train.create_tf_dataset_for_client(
         emnist_train.client_ids[0])
     for train_batch in sample_train_ds:
-      train_batch_shape = train_batch[0].shape
-      self.assertEqual(train_batch_shape, [5, 28, 28, 1])
+      train_batch_size = train_batch[0].shape[0]
+      train_batch_shape = train_batch[0].shape[1:]
+      self.assertLessEqual(train_batch_size, 2)
+      self.assertEqual(train_batch_shape, [28, 28, 1])
 
     sample_test_ds = emnist_test.create_tf_dataset_for_client(
         emnist_test.client_ids[0])
     for test_batch in sample_test_ds:
-      test_batch_shape = test_batch[0].shape
-      self.assertEqual(test_batch_shape, [6, 28, 28, 1])
+      test_batch_size = test_batch[0].shape[0]
+      test_batch_shape = test_batch[0].shape[1:]
+      self.assertLessEqual(test_batch_size, 3)
+      self.assertEqual(test_batch_shape, [28, 28, 1])
 
-  def test_take_without_repeat(self):
-    emnist_train, emnist_test = emnist_dataset.get_federated_datasets(
-        train_client_batch_size=10,
-        train_client_epochs_per_round=1,
-        max_batches_per_train_client=3,
-        test_client_batch_size=10,
-        test_client_epochs_per_round=1,
-        max_batches_per_test_client=2,
-        only_digits=True)
-
-    for i in range(10):
-      client_ds = emnist_train.create_tf_dataset_for_client(
-          emnist_train.client_ids[i])
-      self.assertLessEqual(_compute_length_of_dataset(client_ds), 3)
-
-    for i in range(10):
-      client_ds = emnist_test.create_tf_dataset_for_client(
-          emnist_test.client_ids[i])
-      self.assertLessEqual(_compute_length_of_dataset(client_ds), 2)
-
-  def test_take_with_repeat(self):
-    emnist_train, emnist_test = emnist_dataset.get_federated_datasets(
-        train_client_batch_size=10,
-        train_client_epochs_per_round=-1,
-        max_batches_per_train_client=3,
-        test_client_batch_size=10,
-        test_client_epochs_per_round=-1,
-        max_batches_per_test_client=2,
-        only_digits=True)
-
-    for i in range(10):
-      client_ds = emnist_train.create_tf_dataset_for_client(
-          emnist_train.client_ids[i])
-      self.assertEqual(_compute_length_of_dataset(client_ds), 3)
-
-    for i in range(10):
-      client_ds = emnist_test.create_tf_dataset_for_client(
-          emnist_test.client_ids[i])
-      self.assertEqual(_compute_length_of_dataset(client_ds), 2)
-
-  def test_raises_no_repeat_and_no_take(self):
+  def test_raises_negative_client_epochs(self):
     with self.assertRaisesRegex(
-        ValueError, 'The arguments `train_client_epochs_per_round` and '
-        '`max_batches_per_train_client` cannot both be negative.'):
+        ValueError,
+        'train_client_epochs_per_round must be a positive integer.'):
       emnist_dataset.get_federated_datasets(
-          train_client_batch_size=10,
-          train_client_epochs_per_round=-1,
-          max_batches_per_train_client=-1)
+          train_client_batch_size=10, train_client_epochs_per_round=-1)
 
     with self.assertRaisesRegex(
-        ValueError, 'The arguments `test_client_epochs_per_round` and '
-        '`max_batches_per_test_client` cannot both be negative.'):
+        ValueError, 'test_client_epochs_per_round must be a positive integer.'):
       emnist_dataset.get_federated_datasets(
           train_client_batch_size=10,
           train_client_epochs_per_round=1,
           test_client_batch_size=10,
-          test_client_epochs_per_round=-1,
-          max_batches_per_test_client=-1)
+          test_client_epochs_per_round=-1)
 
 
 class CentralizedDatasetTest(tf.test.TestCase):
@@ -136,23 +94,10 @@ class CentralizedDatasetTest(tf.test.TestCase):
     self.assertEqual(train_batch_shape, [32, 28, 28, 1])
     self.assertEqual(test_batch_shape, [100, 28, 28, 1])
 
-  def test_take_max_batches(self):
-    emnist_train, emnist_test = emnist_dataset.get_centralized_datasets(
-        train_batch_size=100,
-        test_batch_size=100,
-        max_train_batches=3,
-        max_test_batches=2,
-        only_digits=False)
-
-    self.assertEqual(_compute_length_of_dataset(emnist_train), 3)
-    self.assertEqual(_compute_length_of_dataset(emnist_test), 2)
-
   def test_nonpositive_shuffle_buffer_size(self):
     emnist_train, _ = emnist_dataset.get_centralized_datasets(
         train_batch_size=100,
         test_batch_size=100,
-        max_train_batches=5,
-        max_test_batches=5,
         train_shuffle_buffer_size=-1,
         test_shuffle_buffer_size=-1,
         only_digits=False)

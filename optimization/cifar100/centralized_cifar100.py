@@ -62,10 +62,11 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
   crop_shape = (crop_size, crop_size, NUM_CHANNELS)
 
   cifar_train, cifar_test = cifar100_dataset.get_centralized_datasets(
-      train_batch_size=batch_size,
-      max_train_batches=max_batches,
-      max_test_batches=max_batches,
-      crop_shape=crop_shape)
+      train_batch_size=batch_size, crop_shape=crop_shape)
+
+  if max_batches and max_batches >= 1:
+    cifar_train = cifar_train.take(max_batches)
+    cifar_test = cifar_test.take(max_batches)
 
   model = resnet_models.create_resnet18(
       input_shape=crop_shape, num_classes=NUM_CLASSES)

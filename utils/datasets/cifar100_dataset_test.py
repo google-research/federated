@@ -69,22 +69,9 @@ class DatasetTest(tf.test.TestCase):
 
   def test_raises_no_repeat_and_no_take(self):
     with self.assertRaisesRegex(
-        ValueError, 'Argument client_epochs_per_round is set to -1'):
+        ValueError, 'client_epochs_per_round must be a positive integer.'):
       cifar100_dataset.get_federated_cifar100(
-          client_epochs_per_round=-1,
-          train_batch_size=10,
-          max_batches_per_client=-1)
-
-  def test_take_with_repeat(self):
-    cifar_train, _ = cifar100_dataset.get_federated_cifar100(
-        client_epochs_per_round=-1,
-        train_batch_size=10,
-        max_batches_per_client=10)
-    self.assertEqual(len(cifar_train.client_ids), 500)
-    for i in range(10):
-      client_ds = cifar_train.create_tf_dataset_for_client(
-          cifar_train.client_ids[i])
-      self.assertEqual(_compute_length_of_dataset(client_ds), 10)
+          client_epochs_per_round=-1, train_batch_size=10)
 
 
 if __name__ == '__main__':

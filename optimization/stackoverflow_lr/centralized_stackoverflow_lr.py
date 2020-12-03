@@ -63,12 +63,14 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
 
   train_dataset, validation_dataset, test_dataset = stackoverflow_lr_dataset.get_centralized_datasets(
       train_batch_size=batch_size,
-      max_train_batches=max_batches,
-      max_validation_batches=max_batches,
-      max_test_batches=max_batches,
       vocab_tokens_size=vocab_tokens_size,
       vocab_tags_size=vocab_tags_size,
       num_validation_examples=num_validation_examples)
+
+  if max_batches and max_batches >= 1:
+    train_dataset = train_dataset.take(max_batches)
+    validation_dataset = validation_dataset.take(max_batches)
+    test_dataset = test_dataset.take(max_batches)
 
   model = stackoverflow_lr_models.create_logistic_model(
       vocab_tokens_size=vocab_tokens_size, vocab_tags_size=vocab_tags_size)

@@ -15,7 +15,7 @@
 
 import collections
 import functools
-from typing import Optional, Tuple
+from typing import Tuple
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -42,7 +42,6 @@ def preprocess_cifar_example(example, crop_shape, distort=False):
 def get_federated_cifar100(client_epochs_per_round,
                            train_batch_size,
                            crop_shape=CIFAR_SHAPE,
-                           max_batches_per_client=-1,
                            serializable=False):
   """Loads and preprocesses federated CIFAR100 training and testing sets.
 
@@ -56,8 +55,6 @@ def get_federated_cifar100(client_epochs_per_round,
       (CROP_HEIGHT, CROP_WIDTH, NUM_CHANNELS) which cannot have elements that
       exceed (32, 32, 3), element-wise. The element in the last index should be
       set to 3 to maintain the RGB image structure of the elements.
-    max_batches_per_client: If set to a positive integer, the maximum number of
-      batches in each client's dataset.
     serializable: Boolean indicating whether the returned datasets are intended
       to be serialized and shipped across RPC channels. If `True`, stateful
       transformations will be disallowed.
@@ -76,10 +73,8 @@ def get_federated_cifar100(client_epochs_per_round,
     raise TypeError(
         'serializable must be a Boolean; you passed {} of type {}.'.format(
             serializable, type(serializable)))
-  if client_epochs_per_round == -1 and max_batches_per_client == -1:
-    raise ValueError('Argument client_epochs_per_round is set to -1. If this is'
-                     ' intended, then max_batches_per_client must be set to '
-                     'some positive integer.')
+  if client_epochs_per_round <= 0:
+    raise ValueError('client_epochs_per_round must be a positive integer.')
 
   cifar_train, cifar_test = tff.simulation.datasets.cifar100.load_data()
   train_crop_shape = (train_batch_size,) + crop_shape
@@ -96,8 +91,7 @@ def get_federated_cifar100(client_epochs_per_round,
     if not serializable:
       dataset = dataset.shuffle(buffer_size=NUM_EXAMPLES_PER_CLIENT)
     return dataset.repeat(client_epochs_per_round).batch(
-        train_batch_size,
-        drop_remainder=True).map(train_image_map).take(max_batches_per_client)
+        train_batch_size, drop_remainder=True).map(train_image_map)
 
   def preprocess_test_dataset(dataset):
     """Preprocess CIFAR100 testing dataset."""
@@ -111,25 +105,18 @@ def get_federated_cifar100(client_epochs_per_round,
 
 
 def get_centralized_datasets(train_batch_size: int,
-                             test_batch_size: Optional[int] = 100,
-                             max_train_batches: Optional[int] = None,
-                             max_test_batches: Optional[int] = None,
-                             crop_shape: Optional[Tuple[int, int,
-                                                        int]] = CIFAR_SHAPE):
+                             test_batch_size: int = 100,
+                             crop_shape: Tuple[int, int, int] = CIFAR_SHAPE):
   """Loads and preprocesses centralized CIFAR100 training and testing sets.
 
   Args:
     train_batch_size: The batch size for the training dataset.
     test_batch_size: The batch size for the test dataset.
-    max_train_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the training dataset.
-    max_test_batches: If set to a positive integer, this specifies the maximum
-      number of batches to use from the test dataset.
-    crop_shape: An iterable of integers specifying the desired crop
-      shape for pre-processing. Must be convertable to a tuple of integers
-      (CROP_HEIGHT, CROP_WIDTH, NUM_CHANNELS) which cannot have elements that
-      exceed (32, 32, 3), element-wise. The element in the last index should be
-      set to 3 to maintain the RGB image structure of the elements.
+    crop_shape: An iterable of integers specifying the desired crop shape for
+      pre-processing. Must be convertable to a tuple of integers (CROP_HEIGHT,
+      CROP_WIDTH, NUM_CHANNELS) which cannot have elements that exceed (32, 32,
+      3), element-wise. The element in the last index should be set to 3 to
+      maintain the RGB image structure of the elements.
 
   Returns:
     train_dataset: A `tf.data.Dataset` instance representing the training
@@ -158,10 +145,5 @@ def get_centralized_datasets(train_batch_size: int,
               train_image_map, num_parallel_calls=tf.data.experimental.AUTOTUNE)
   test_dataset = cifar_test.create_tf_dataset_from_all_clients().batch(
       test_batch_size, drop_remainder=False).map(test_image_map).cache()
-
-  if max_train_batches is not None and max_train_batches > 0:
-    train_dataset = train_dataset.take(max_train_batches)
-  if max_test_batches is not None and max_test_batches > 0:
-    test_dataset = test_dataset.take(max_test_batches)
 
   return train_dataset, test_dataset

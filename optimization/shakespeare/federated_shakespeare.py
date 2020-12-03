@@ -54,7 +54,6 @@ def run_federated(
     client_epochs_per_round: int,
     client_batch_size: int,
     clients_per_round: int,
-    max_batches_per_client: Optional[int] = -1,
     client_datasets_random_seed: Optional[int] = None,
     sequence_length: Optional[int] = 80,
     total_rounds: Optional[int] = 1500,
@@ -90,9 +89,6 @@ def run_federated(
     client_batch_size: An integer representing the batch size used on clients.
     clients_per_round: An integer representing the number of clients
       participating in each round.
-    max_batches_per_client: An optional int specifying the number of batches
-      taken by each client at each round. If `-1`, the entire client dataset is
-      used.
     client_datasets_random_seed: An optional int used to seed which clients are
       sampled at each round. If `None`, no seed is used.
     sequence_length: An int specifying the length of the character sequences
@@ -113,13 +109,13 @@ def run_federated(
   train_clientdata = shakespeare_dataset.construct_character_level_datasets(
       client_batch_size=client_batch_size,
       client_epochs_per_round=client_epochs_per_round,
-      sequence_length=sequence_length,
-      max_batches_per_client=max_batches_per_client)
+      sequence_length=sequence_length)
 
   _, test_dataset = shakespeare_dataset.get_centralized_datasets(
       train_batch_size=client_batch_size,
-      max_test_batches=max_eval_batches,
       sequence_length=sequence_length)
+  if max_eval_batches and max_eval_batches >= 1:
+    test_dataset = test_dataset.take(max_eval_batches)
 
   model_builder = functools.partial(
       create_shakespeare_model, sequence_length=sequence_length)

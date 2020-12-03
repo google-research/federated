@@ -262,7 +262,6 @@ class ConstructWordLevelDatasetsTest(tf.test.TestCase):
         vocab_size=1000,
         client_batch_size=10,
         client_epochs_per_round=1,
-        max_batches_per_user=128,
         max_seq_len=20,
         max_training_elements_per_user=128,
         num_validation_examples=500,
@@ -288,12 +287,11 @@ class ConstructWordLevelDatasetsTest(tf.test.TestCase):
       self.skipTest('skip GPU test')
     mock_load_data.return_value = (mock.Mock(), mock.Mock(), mock.Mock())
     with self.assertRaisesRegex(
-        ValueError, 'Argument client_epochs_per_round is set to -1'):
+        ValueError, 'client_epochs_per_round must be a positive integer.'):
       stackoverflow_dataset.construct_word_level_datasets(
           vocab_size=100,
           client_batch_size=10,
           client_epochs_per_round=-1,
-          max_batches_per_user=-1,
           max_seq_len=20,
           max_training_elements_per_user=128,
           num_validation_examples=500,

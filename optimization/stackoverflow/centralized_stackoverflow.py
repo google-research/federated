@@ -76,12 +76,14 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
       vocab_size=vocab_size,
       max_seq_len=sequence_length,
       train_batch_size=batch_size,
-      max_train_batches=max_batches,
-      max_validation_batches=max_batches,
-      max_test_batches=max_batches,
       num_validation_examples=num_validation_examples,
       num_oov_buckets=num_oov_buckets,
   )
+
+  if max_batches and max_batches >= 1:
+    train_dataset = train_dataset.take(max_batches)
+    validation_dataset = validation_dataset.take(max_batches)
+    test_dataset = test_dataset.take(max_batches)
 
   model = stackoverflow_models.create_recurrent_model(
       vocab_size=vocab_size,

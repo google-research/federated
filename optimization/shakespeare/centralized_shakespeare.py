@@ -61,9 +61,11 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
 
   train_dataset, eval_dataset = shakespeare_dataset.get_centralized_datasets(
       train_batch_size=batch_size,
-      max_train_batches=max_batches,
-      max_test_batches=max_batches,
       sequence_length=sequence_length)
+
+  if max_batches and max_batches >= 1:
+    train_dataset = train_dataset.take(max_batches)
+    eval_dataset = eval_dataset.take(max_batches)
 
   pad_token, _, _, _ = shakespeare_dataset.get_special_tokens()
   model = shakespeare_models.create_recurrent_model(

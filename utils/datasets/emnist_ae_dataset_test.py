@@ -50,25 +50,11 @@ class DatasetTest(tf.test.TestCase):
     self.assertEqual(train_batch_shape.as_list(), [32, 28*28])
     self.assertEqual(test_batch_shape.as_list(), [100, 28 * 28])
 
-  def test_take_with_repeat(self):
-    emnist_train, _ = emnist_ae_dataset.get_emnist_datasets(
-        client_batch_size=10,
-        client_epochs_per_round=-1,
-        max_batches_per_client=10,
-        only_digits=True)
-    self.assertEqual(len(emnist_train.client_ids), 3383)
-    for i in range(10):
-      client_ds = emnist_train.create_tf_dataset_for_client(
-          emnist_train.client_ids[i])
-      self.assertEqual(_compute_length_of_dataset(client_ds), 10)
-
   def test_raises_no_repeat_and_no_take(self):
     with self.assertRaisesRegex(
-        ValueError, 'Argument client_epochs_per_round is set to -1'):
+        ValueError, 'client_epochs_per_round must be a positive integer.'):
       emnist_ae_dataset.get_emnist_datasets(
-          client_batch_size=10,
-          client_epochs_per_round=-1,
-          max_batches_per_client=-1)
+          client_batch_size=10, client_epochs_per_round=-1)
 
 
 if __name__ == '__main__':
