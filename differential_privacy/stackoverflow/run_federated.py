@@ -129,11 +129,16 @@ def main(argv):
         keras_metrics.NumTokensCounter(masked_tokens=[pad_token]),
     ]
 
-  datasets = stackoverflow_dataset.construct_word_level_datasets(
-      FLAGS.vocab_size, FLAGS.client_batch_size, FLAGS.client_epochs_per_round,
-      FLAGS.sequence_length, FLAGS.max_elements_per_user,
-      FLAGS.num_validation_examples)
-  train_dataset, validation_dataset, test_dataset = datasets
+  train_dataset, _ = stackoverflow_dataset.get_federated_datasets(
+      vocab_size=FLAGS.vocab_size,
+      train_client_batch_size=FLAGS.client_batch_size,
+      train_client_epochs_per_round=FLAGS.client_epochs_per_round,
+      max_sequence_length=FLAGS.sequence_length,
+      max_elements_per_train_client=FLAGS.max_elements_per_user)
+  _, validation_dataset, test_dataset = stackoverflow_dataset.get_centralized_datasets(
+      vocab_size=FLAGS.vocab_size,
+      max_sequence_length=FLAGS.sequence_length,
+      num_validation_examples=FLAGS.num_validation_examples)
 
   if FLAGS.uniform_weighting:
     def client_weight_fn(local_outputs):

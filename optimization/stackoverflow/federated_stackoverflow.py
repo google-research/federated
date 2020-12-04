@@ -143,8 +143,7 @@ def run_federated(
   # evaluation.
   _, validation_dataset, test_dataset = stackoverflow_dataset.get_centralized_datasets(
       vocab_size=vocab_size,
-      max_seq_len=sequence_length,
-      train_batch_size=client_batch_size,
+      max_sequence_length=sequence_length,
       num_validation_examples=num_validation_examples,
       num_oov_buckets=num_oov_buckets)
 
@@ -152,13 +151,13 @@ def run_federated(
     validation_dataset = validation_dataset.take(max_eval_batches)
     test_dataset = test_dataset.take(max_eval_batches)
 
-  train_dataset_preprocess_comp = stackoverflow_dataset.create_train_dataset_preprocess_fn(
+  train_dataset_preprocess_comp = stackoverflow_dataset.create_preprocess_fn(
       vocab=stackoverflow_dataset.create_vocab(vocab_size),
       num_oov_buckets=num_oov_buckets,
       client_batch_size=client_batch_size,
       client_epochs_per_round=client_epochs_per_round,
-      max_seq_len=sequence_length,
-      max_training_elements_per_user=max_elements_per_user)
+      max_sequence_length=sequence_length,
+      max_elements_per_client=max_elements_per_user)
 
   input_spec = train_dataset_preprocess_comp.type_signature.result.element
 

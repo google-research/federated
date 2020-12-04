@@ -98,7 +98,7 @@ class BatchAndSplitTest(tf.test.TestCase):
     token = tf.constant([[0, 1, 2, 3, 4]], dtype=tf.int64)
     ds = tf.data.Dataset.from_tensor_slices(token)
     padded_and_batched = stackoverflow_dataset.batch_and_split(
-        ds, max_seq_len=6, batch_size=1)
+        ds, max_sequence_length=6, batch_size=1)
     self.assertIsInstance(padded_and_batched, tf.data.Dataset)
     self.assertEqual(padded_and_batched.element_spec, (tf.TensorSpec(
         [None, 6], dtype=tf.int64), tf.TensorSpec([None, 6], dtype=tf.int64)))
@@ -107,7 +107,7 @@ class BatchAndSplitTest(tf.test.TestCase):
     token = tf.constant([[0, 1, 2, 3, 4]], dtype=tf.int64)
     ds = tf.data.Dataset.from_tensor_slices(token)
     padded_and_batched = stackoverflow_dataset.batch_and_split(
-        ds, max_seq_len=6, batch_size=1)
+        ds, max_sequence_length=6, batch_size=1)
     num_elems = 0
     for elem in padded_and_batched:
       self.assertAllEqual(
@@ -120,107 +120,62 @@ class BatchAndSplitTest(tf.test.TestCase):
 
 class DatasetPreprocessFnTest(tf.test.TestCase):
 
-  def test_train_preprocess_fn_return_dataset_element_spec(self):
+  def test_preprocess_fn_return_dataset_element_spec(self):
     ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    train_preprocess_fn = stackoverflow_dataset.create_train_dataset_preprocess_fn(
+    preprocess_fn = stackoverflow_dataset.create_preprocess_fn(
         client_batch_size=32,
         client_epochs_per_round=1,
-        max_seq_len=10,
-        max_training_elements_per_user=100,
+        max_sequence_length=10,
+        max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=1)
-    train_preprocessed_ds = train_preprocess_fn(ds)
-    self.assertEqual(train_preprocessed_ds.element_spec,
+    preprocessed_ds = preprocess_fn(ds)
+    self.assertEqual(preprocessed_ds.element_spec,
                      (tf.TensorSpec(shape=[None, 10], dtype=tf.int64),
                       tf.TensorSpec(shape=[None, 10], dtype=tf.int64)))
 
-  def test_test_preprocess_fn_return_dataset_element_spec(self):
+  def test_preprocess_fn_return_dataset_element_spec_oov_buckets(self):
     ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    test_preprocess_fn = stackoverflow_dataset.create_test_dataset_preprocess_fn(
-        max_seq_len=10, vocab=['one', 'must'], num_oov_buckets=1)
-    test_preprocessed_ds = test_preprocess_fn(ds)
-    self.assertEqual(test_preprocessed_ds.element_spec,
-                     (tf.TensorSpec(shape=[None, 10], dtype=tf.int64),
-                      tf.TensorSpec(shape=[None, 10], dtype=tf.int64)))
-
-  def test_train_preprocess_fn_return_dataset_element_spec_oov_buckets(self):
-    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    train_preprocess_fn = stackoverflow_dataset.create_train_dataset_preprocess_fn(
+    preprocess_fn = stackoverflow_dataset.create_preprocess_fn(
         client_batch_size=32,
         client_epochs_per_round=1,
-        max_seq_len=10,
-        max_training_elements_per_user=100,
+        max_sequence_length=10,
+        max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=10)
-    train_preprocessed_ds = train_preprocess_fn(ds)
-    self.assertEqual(train_preprocessed_ds.element_spec,
+    preprocessed_ds = preprocess_fn(ds)
+    self.assertEqual(preprocessed_ds.element_spec,
                      (tf.TensorSpec(shape=[None, 10], dtype=tf.int64),
                       tf.TensorSpec(shape=[None, 10], dtype=tf.int64)))
 
-  def test_test_preprocess_fn_return_dataset_element_spec_oov_buckets(self):
+  def test_preprocess_fn_returns_correct_sequence(self):
     ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    test_preprocess_fn = stackoverflow_dataset.create_test_dataset_preprocess_fn(
-        max_seq_len=10, vocab=['one', 'must'], num_oov_buckets=10)
-    test_preprocessed_ds = test_preprocess_fn(ds)
-    self.assertEqual(test_preprocessed_ds.element_spec,
-                     (tf.TensorSpec(shape=[None, 10], dtype=tf.int64),
-                      tf.TensorSpec(shape=[None, 10], dtype=tf.int64)))
-
-  def test_train_preprocess_fn_returns_correct_sequence(self):
-    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    train_preprocess_fn = stackoverflow_dataset.create_train_dataset_preprocess_fn(
+    preprocess_fn = stackoverflow_dataset.create_preprocess_fn(
         client_batch_size=32,
         client_epochs_per_round=1,
-        max_seq_len=6,
-        max_training_elements_per_user=100,
+        max_sequence_length=6,
+        max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=1)
 
-    train_preprocessed_ds = train_preprocess_fn(ds)
-    element = next(iter(train_preprocessed_ds))
+    preprocessed_ds = preprocess_fn(ds)
+    element = next(iter(preprocessed_ds))
 
     # BOS is len(vocab)+2, EOS is len(vocab)+3, pad is 0, OOV is len(vocab)+1
     self.assertAllEqual(
         self.evaluate(element[0]), np.array([[4, 1, 2, 3, 5, 0]]))
 
-  def test_test_preprocess_fn_returns_correct_sequence(self):
+  def test_preprocess_fn_returns_correct_sequence_oov_buckets(self):
     ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    test_preprocess_fn = stackoverflow_dataset.create_test_dataset_preprocess_fn(
-        max_seq_len=6, vocab=['one', 'must'], num_oov_buckets=1)
-    test_preprocessed_ds = test_preprocess_fn(ds)
-    element = next(iter(test_preprocessed_ds))
-    # BOS is len(vocab)+2, EOS is len(vocab)+3, pad is 0, OOV is len(vocab)+1
-    self.assertAllEqual(
-        self.evaluate(element[0]), np.array([[4, 1, 2, 3, 5, 0]]))
-
-  def test_train_preprocess_fn_returns_correct_sequence_oov_buckets(self):
-    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    train_preprocess_fn = stackoverflow_dataset.create_train_dataset_preprocess_fn(
+    preprocess_fn = stackoverflow_dataset.create_preprocess_fn(
         client_batch_size=32,
         client_epochs_per_round=1,
-        max_seq_len=6,
-        max_training_elements_per_user=100,
+        max_sequence_length=6,
+        max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=3)
-    train_preprocessed_ds = train_preprocess_fn(ds)
-    element = next(iter(train_preprocessed_ds))
-    # BOS is len(vocab)+3+1
-    self.assertEqual(self.evaluate(element[0])[0][0], 6)
-    self.assertEqual(self.evaluate(element[0])[0][1], 1)
-    self.assertEqual(self.evaluate(element[0])[0][2], 2)
-    # OOV is [len(vocab)+1, len(vocab)+2, len(vocab)+3]
-    self.assertIn(self.evaluate(element[0])[0][3], [3, 4, 5])
-    # EOS is len(vocab)+3+2
-    self.assertEqual(self.evaluate(element[0])[0][4], 7)
-    # pad is 0
-    self.assertEqual(self.evaluate(element[0])[0][5], 0)
-
-  def test_test_preprocess_fn_returns_correct_sequence_oov_buckets(self):
-    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    test_preprocess_fn = stackoverflow_dataset.create_test_dataset_preprocess_fn(
-        max_seq_len=6, vocab=['one', 'must'], num_oov_buckets=3)
-    test_preprocessed_ds = test_preprocess_fn(ds)
-    element = next(iter(test_preprocessed_ds))
+    preprocessed_ds = preprocess_fn(ds)
+    element = next(iter(preprocessed_ds))
     # BOS is len(vocab)+3+1
     self.assertEqual(self.evaluate(element[0])[0][0], 6)
     self.assertEqual(self.evaluate(element[0])[0][1], 1)
@@ -236,7 +191,7 @@ class DatasetPreprocessFnTest(tf.test.TestCase):
 STACKOVERFLOW_MODULE = 'tensorflow_federated.simulation.datasets.stackoverflow'
 
 
-class ConstructWordLevelDatasetsTest(tf.test.TestCase):
+class CreateFederatedDatasets(tf.test.TestCase):
 
   @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
   @mock.patch(STACKOVERFLOW_MODULE + '.load_data')
@@ -251,29 +206,29 @@ class ConstructWordLevelDatasetsTest(tf.test.TestCase):
     mock_train = mock.create_autospec(tff.simulation.ClientData)
     mock_validation = mock.create_autospec(tff.simulation.ClientData)
     mock_test = mock.create_autospec(tff.simulation.ClientData)
-    mock_test_dataset = mock.Mock()
-    mock_test.create_tf_dataset_from_all_clients = mock.Mock(
-        return_value=mock_test_dataset)
     mock_load_data.return_value = (mock_train, mock_validation, mock_test)
     # Return a factor word dictionary.
     mock_load_word_counts.return_value = collections.OrderedDict(a=1)
 
-    _, _, _ = stackoverflow_dataset.construct_word_level_datasets(
+    _, _ = stackoverflow_dataset.get_federated_datasets(
         vocab_size=1000,
-        client_batch_size=10,
-        client_epochs_per_round=1,
-        max_seq_len=20,
-        max_training_elements_per_user=128,
-        num_validation_examples=500,
+        train_client_batch_size=10,
+        test_client_batch_size=100,
+        train_client_epochs_per_round=1,
+        test_client_epochs_per_round=1,
+        max_sequence_length=20,
+        max_elements_per_train_client=128,
+        max_elements_per_test_client=-1,
         num_oov_buckets=1)
 
-    # Assert the validation ClientData isn't used, and the test ClientData
-    # is a single dataset over all the users.
+    # Assert the validation ClientData isn't used.
     mock_load_data.assert_called_once()
     self.assertEmpty(mock_validation.mock_calls)
-    self.assertEqual(mock_test.mock_calls,
-                     mock.call.create_tf_dataset_from_all_clients().call_list())
+
+    # Assert the training and testing data are preprocessed.
     self.assertEqual(mock_train.mock_calls,
+                     mock.call.preprocess(mock.ANY).call_list())
+    self.assertEqual(mock_test.mock_calls,
                      mock.call.preprocess(mock.ANY).call_list())
 
     # Assert the word counts were loaded once to apply to each dataset.
@@ -288,14 +243,67 @@ class ConstructWordLevelDatasetsTest(tf.test.TestCase):
     mock_load_data.return_value = (mock.Mock(), mock.Mock(), mock.Mock())
     with self.assertRaisesRegex(
         ValueError, 'client_epochs_per_round must be a positive integer.'):
-      stackoverflow_dataset.construct_word_level_datasets(
+      stackoverflow_dataset.get_federated_datasets(
           vocab_size=100,
-          client_batch_size=10,
-          client_epochs_per_round=-1,
-          max_seq_len=20,
-          max_training_elements_per_user=128,
-          num_validation_examples=500,
+          train_client_batch_size=10,
+          train_client_epochs_per_round=-1,
+          max_sequence_length=20,
+          max_elements_per_train_client=128,
           num_oov_buckets=1)
+
+
+class CreateCentralizedDatasets(tf.test.TestCase):
+
+  @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
+  @mock.patch(STACKOVERFLOW_MODULE + '.load_data')
+  def test_preprocess_applied(self, mock_load_data, mock_load_word_counts):
+    if tf.config.list_logical_devices('GPU'):
+      self.skipTest('skip GPU test')
+    # Mock out the actual data loading from disk. Assert that the preprocessing
+    # function is applied to the client data, and that only the ClientData
+    # objects we desired are used.
+    #
+    # The correctness of the preprocessing function is tested in other tests.
+    sample_ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
+
+    mock_train = mock.create_autospec(tff.simulation.ClientData)
+    mock_train.create_tf_dataset_from_all_clients = mock.Mock(
+        return_value=sample_ds)
+
+    mock_validation = mock.create_autospec(tff.simulation.ClientData)
+
+    mock_test = mock.create_autospec(tff.simulation.ClientData)
+    mock_test.create_tf_dataset_from_all_clients = mock.Mock(
+        return_value=sample_ds)
+
+    mock_load_data.return_value = (mock_train, mock_validation, mock_test)
+    # Return a factor word dictionary.
+    mock_load_word_counts.return_value = collections.OrderedDict(a=1)
+
+    _, _, _ = stackoverflow_dataset.get_centralized_datasets(
+        vocab_size=1000,
+        train_batch_size=10,
+        validation_batch_size=50,
+        test_batch_size=100,
+        num_validation_examples=10000,
+        max_sequence_length=20,
+        num_oov_buckets=1)
+
+    # Assert the validation ClientData isn't used.
+    mock_load_data.assert_called_once()
+    self.assertEmpty(mock_validation.mock_calls)
+
+    # Assert the validation ClientData isn't used, and the train and test
+    # are amalgamated into datasets single datasets over all clients.
+    mock_load_data.assert_called_once()
+    self.assertEmpty(mock_validation.mock_calls)
+    self.assertEqual(mock_train.mock_calls,
+                     mock.call.create_tf_dataset_from_all_clients().call_list())
+    self.assertEqual(mock_test.mock_calls,
+                     mock.call.create_tf_dataset_from_all_clients().call_list())
+
+    # Assert the word counts were loaded once to apply to each dataset.
+    mock_load_word_counts.assert_called_once()
 
 
 if __name__ == '__main__':

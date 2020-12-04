@@ -14,9 +14,8 @@
 """Data loader for Stackoverflow."""
 
 import collections
-from typing import List, Optional
+from typing import Callable, List, Tuple
 
-from absl import logging
 import attr
 import numpy as np
 import tensorflow as tf
@@ -41,13 +40,13 @@ class SpecialTokens(object):
   eos = attr.ib()
 
 
-def create_vocab(vocab_size):
+def create_vocab(vocab_size: int) -> List[str]:
   """Creates vocab from `vocab_size` most common words in Stackoverflow."""
   vocab_dict = tff.simulation.datasets.stackoverflow.load_word_counts()
   return list(vocab_dict.keys())[:vocab_size]
 
 
-def split_input_target(chunk):
+def split_input_target(chunk: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
   """Generate input and target data.
 
   The task of language model is to predict the next word.
@@ -56,14 +55,17 @@ def split_input_target(chunk):
     chunk: A Tensor of text data.
 
   Returns:
-    A namedtuple of input and target data.
+    A tuple of input and target data.
   """
   input_text = tf.map_fn(lambda x: x[:-1], chunk)
   target_text = tf.map_fn(lambda x: x[1:], chunk)
   return (input_text, target_text)
 
 
-def build_to_ids_fn(vocab, max_seq_len, num_oov_buckets=1):
+def build_to_ids_fn(
+    vocab: List[str],
+    max_sequence_length: int,
+    num_oov_buckets: int = 1) -> Callable[[tf.Tensor], tf.Tensor]:
   """Constructs function mapping examples to sequences of token indices."""
   special_tokens = get_special_tokens(len(vocab), num_oov_buckets)
   bos = special_tokens.bos
@@ -78,10 +80,10 @@ def build_to_ids_fn(vocab, max_seq_len, num_oov_buckets=1):
 
     sentence = tf.reshape(example['tokens'], shape=[1])
     words = tf.strings.split(sentence, sep=' ').values
-    truncated_words = words[:max_seq_len]
+    truncated_words = words[:max_sequence_length]
     tokens = table.lookup(truncated_words) + 1
     tokens = tf.cond(
-        tf.less(tf.size(tokens), max_seq_len),
+        tf.less(tf.size(tokens), max_sequence_length),
         lambda: tf.concat([tokens, [eos]], 0), lambda: tokens)
 
     return tf.concat([[bos], tokens], 0)
@@ -89,13 +91,15 @@ def build_to_ids_fn(vocab, max_seq_len, num_oov_buckets=1):
   return to_ids
 
 
-def batch_and_split(dataset, max_seq_len, batch_size):
+def batch_and_split(dataset: tf.data.Dataset, max_sequence_length: int,
+                    batch_size: int) -> tf.data.Dataset:
   return dataset.padded_batch(
-      batch_size, padded_shapes=[max_seq_len + 1]).map(
+      batch_size, padded_shapes=[max_sequence_length + 1]).map(
           split_input_target, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
 
-def get_special_tokens(vocab_size, num_oov_buckets=1):
+def get_special_tokens(vocab_size: int,
+                       num_oov_buckets: int = 1) -> SpecialTokens:
   """Gets tokens dataset preprocessing code will add to Stackoverflow."""
   return SpecialTokens(
       pad=0,
@@ -104,18 +108,18 @@ def get_special_tokens(vocab_size, num_oov_buckets=1):
       eos=vocab_size + num_oov_buckets + 2)
 
 
-def create_train_dataset_preprocess_fn(vocab: List[str],
-                                       num_oov_buckets: int,
-                                       client_batch_size: int,
-                                       client_epochs_per_round: int,
-                                       max_seq_len: int,
-                                       max_training_elements_per_user: int,
-                                       max_shuffle_buffer_size: int = 10000):
-  """Creates preprocessing functions for Stackoverflow data.
+def create_preprocess_fn(
+    vocab: List[str],
+    num_oov_buckets: int,
+    client_batch_size: int,
+    client_epochs_per_round: int,
+    max_sequence_length: int,
+    max_elements_per_client: int,
+    max_shuffle_buffer_size: int = 10000) -> tff.Computation:
+  """Creates preprocessing functions for Stack Overflow data.
 
-  This function returns a Python function which takes a dataset and returns a
-  dataset, suitable for mapping over a set of unprocessed client datasets
-  during training.
+  This function returns a `tff.Computation` which takes a dataset and returns a
+  dataset, suitable for mapping over a set of unprocessed client datasets.
 
   Args:
     vocab: Vocabulary which defines the embedding.
@@ -123,39 +127,43 @@ def create_train_dataset_preprocess_fn(vocab: List[str],
       not present in the `vocab` are hashed into one of these buckets.
     client_batch_size: Integer representing batch size to use on the clients.
     client_epochs_per_round: Number of epochs for which to repeat train client
-      dataset.
-    max_seq_len: Integer determining shape of padded batches. Sequences will be
-      padded up to this length, and sentences longer than `max_seq_len` will be
+      dataset. Must be a positive integer.
+    max_sequence_length: Integer determining shape of padded batches. Sequences
+      will be padded up to this length, and sentences longer than this will be
       truncated to this length.
-    max_training_elements_per_user: Integer controlling the maximum number of
-      elements to take per user. If -1, takes all elements for each user.
+    max_elements_per_client: Integer controlling the maximum number of elements
+      to take per client. If -1, keeps all elements for each client. This is
+      applied before repeating `client_epochs_per_round`, and is intended
+      primarily to contend with the small set of clients with tens of thousands
+      of examples.
     max_shuffle_buffer_size: Maximum shuffle buffer size.
 
   Returns:
-    `preprocess_train` function, as described above.
+    A `tff.Computation` taking as input a `tf.data.Dataset`, and returning a
+    `tf.data.Dataset` formed by preprocessing according to the input arguments.
   """
   if client_batch_size <= 0:
-    raise ValueError('client_batch_size must be a positive integer; you have '
-                     'passed {}'.format(client_batch_size))
+    raise ValueError('client_batch_size must be a positive integer. You have '
+                     'passed {}.'.format(client_batch_size))
   elif client_epochs_per_round <= 0:
-    raise ValueError('client_epochs_per_round must be a positive integer; you '
-                     'have passed {}'.format(client_epochs_per_round))
-  elif max_seq_len <= 0:
-    raise ValueError('max_seq_len must be a positive integer; you have '
-                     'passed {}'.format(max_seq_len))
-  elif max_training_elements_per_user < -1:
+    raise ValueError('client_epochs_per_round must be a positive integer. '
+                     'You have passed {}.'.format(client_epochs_per_round))
+  elif max_sequence_length <= 0:
+    raise ValueError('max_sequence_length must be a positive integer. You have '
+                     'passed {}.'.format(max_sequence_length))
+  elif max_elements_per_client == 0 or max_elements_per_client < -1:
     raise ValueError(
-        'max_training_elements_per_user must be an integer at '
-        'least -1; you have passed {}'.format(max_training_elements_per_user))
+        'max_elements_per_client must be a positive integer or -1. You have '
+        'passed {}.'.format(max_elements_per_client))
   if num_oov_buckets <= 0:
-    raise ValueError('num_oov_buckets must be a positive integer; you have '
-                     'passed {}'.format(num_oov_buckets))
+    raise ValueError('num_oov_buckets must be a positive integer. You have '
+                     'passed {}.'.format(num_oov_buckets))
 
-  if (max_training_elements_per_user == -1 or
-      max_training_elements_per_user > max_shuffle_buffer_size):
+  if (max_elements_per_client == -1 or
+      max_elements_per_client > max_shuffle_buffer_size):
     shuffle_buffer_size = max_shuffle_buffer_size
   else:
-    shuffle_buffer_size = max_training_elements_per_user
+    shuffle_buffer_size = max_elements_per_client
 
   feature_dtypes = collections.OrderedDict(
       creation_date=tf.string,
@@ -167,150 +175,137 @@ def create_train_dataset_preprocess_fn(vocab: List[str],
   )
 
   @tff.tf_computation(tff.SequenceType(feature_dtypes))
-  def preprocess_train(dataset):
+  def preprocess_fn(dataset):
     to_ids = build_to_ids_fn(
-        vocab=vocab, max_seq_len=max_seq_len, num_oov_buckets=num_oov_buckets)
-    dataset = dataset.take(max_training_elements_per_user)
-    if shuffle_buffer_size > 0:
-      logging.info('Adding shuffle with buffer size: %d', shuffle_buffer_size)
-      dataset = dataset.shuffle(shuffle_buffer_size)
-    dataset = dataset.repeat(client_epochs_per_round)
-    dataset = dataset.map(
-        to_ids, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    return batch_and_split(dataset, max_seq_len, client_batch_size)
+        vocab=vocab,
+        max_sequence_length=max_sequence_length,
+        num_oov_buckets=num_oov_buckets)
+    dataset = dataset.take(max_elements_per_client).shuffle(
+        shuffle_buffer_size).repeat(client_epochs_per_round).map(
+            to_ids, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    return batch_and_split(dataset, max_sequence_length, client_batch_size)
 
-  return preprocess_train
+  return preprocess_fn
 
 
-def create_test_dataset_preprocess_fn(vocab: List[str], num_oov_buckets: int,
-                                      max_seq_len: int):
-  """Creates preprocessing functions for Stackoverflow data.
+def get_federated_datasets(
+    vocab_size: int,
+    max_sequence_length: int,
+    num_oov_buckets: int = 1,
+    train_client_batch_size: int = 16,
+    test_client_batch_size: int = 100,
+    train_client_epochs_per_round: int = 1,
+    test_client_epochs_per_round: int = 1,
+    max_elements_per_train_client: int = 1000,
+    max_elements_per_test_client: int = -1,
+    train_shuffle_buffer_size: int = 10000,
+    test_shuffle_buffer_size: int = 1
+) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
+  """Loads and preprocesses federated Stack Overflow training and testing sets.
 
-  This function returns a function which represents preprocessing logic
-  for use on centralized validation and test datasets outside of TFF.
-
-  Args:
-    vocab: Vocabulary which defines the embedding.
-    num_oov_buckets: The number of out of vocabulary buckets.
-    max_seq_len: Integer determining shape of padded batches. Sequences will be
-      padded up to this length, and sentences longer than `max_seq_len` will be
-      truncated to this length.
-
-  Returns:
-    `preprocess_val_and_test`, as described above.
-  """
-  if max_seq_len <= 0:
-    raise ValueError('max_seq_len must be a positive integer; you have '
-                     'passed {}'.format(max_seq_len))
-
-  def preprocess_val_and_test(dataset):
-    to_ids = build_to_ids_fn(
-        vocab=vocab, max_seq_len=max_seq_len, num_oov_buckets=num_oov_buckets)
-    id_dataset = dataset.map(
-        to_ids, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    return batch_and_split(id_dataset, max_seq_len, EVAL_BATCH_SIZE)
-
-  return preprocess_val_and_test
-
-
-def construct_word_level_datasets(vocab_size: int,
-                                  client_batch_size: int,
-                                  client_epochs_per_round: int,
-                                  max_seq_len: int,
-                                  max_training_elements_per_user: int,
-                                  num_validation_examples: int,
-                                  max_shuffle_buffer_size: int = 10000,
-                                  num_oov_buckets: int = 1):
-  """Preprocessing for Stackoverflow data.
-
-  Notice that this preprocessing function *ignores* the heldout Stackoverflow
-  dataset for consistency with the other datasets in the proposed optimization
-  paper, and returns a validation/test split of the Stackoverflow "test" data,
-  containing more examples from users in the Stackoverflow train dataset.
+  Notice that this preprocessing function ignores the heldout Stack Overflow
+  dataset for consistency with "Adaptive Federated Optimization".
 
   Args:
     vocab_size: Integer representing size of the vocab to use. Vocabulary will
       then be the `vocab_size` most frequent words in the Stackoverflow dataset.
-    client_batch_size: Integer representing batch size to use on the clients.
-    client_epochs_per_round: Number of epochs for which to repeat train client
-      dataset.
-    max_seq_len: Integer determining shape of padded batches. Sequences will be
-      padded up to this length, and sentences longer than `max_seq_len` will be
-      truncated to this length.
-    max_training_elements_per_user: Integer controlling the maximum number of
-      elements to take per user. If -1, takes all elements for each user.
-    num_validation_examples: Number of examples from Stackoverflow test set to
-      use for validation on each round.
-    max_shuffle_buffer_size: Maximum shuffle buffer size.
+    max_sequence_length: Integer determining the shape of the padded batches in
+      each client dataset. Sequences will be padded up to this length, and
+      sequences longer than `max_sequence_len` will be truncated to this length.
     num_oov_buckets: Number of out of vocabulary buckets.
+    train_client_batch_size: The batch size for all train clients.
+    test_client_batch_size: The batch size for all test clients.
+    train_client_epochs_per_round: The number of epochs each train client should
+      iterate over their local dataset, via `tf.data.Dataset.repeat`. Must be a
+      positive integer.
+    test_client_epochs_per_round: The number of epochs each test client should
+      iterate over their local dataset, via `tf.data.Dataset.repeat`. Must be a
+      positive integer.
+    max_elements_per_train_client: Integer controlling the maximum number of
+      elements to take per client. If -1, keeps all elements for each training
+      client.
+    max_elements_per_test_client: Integer controlling the maximum number of
+      elements to take per client. If -1, keeps all elements for each test
+      client.
+    train_shuffle_buffer_size: An integer representing the shuffle buffer size
+      (as in `tf.data.Dataset.shuffle`) for each train client's dataset. If set
+      to some integer less than or equal to 1, no shuffling occurs.
+    test_shuffle_buffer_size: An integer representing the shuffle buffer size
+      (as in `tf.data.Dataset.shuffle`) for each test client's dataset. If set
+      to some integer less than or equal to 1, no shuffling occurs.
 
   Returns:
-    stackoverflow_train: An instance of `tff.simulation.ClientData`
-      representing Stackoverflow data for training.
-    stackoverflow_validation: A split of the Stackoverflow Test data as outlined
-      in `tff.simulation.datasets.stackoverflow`, containing at most
-      `num_validation_examples` examples.
-    stackoverflow_test: A split of the same Stackoverflow Test data containing
-    the examples not used in `stackoverflow_validation`.
+    A tuple (stackoverflow_train, stackoverflow_test) of
+    `tff.simulation.ClientData` instances representing the federated training
+    and test datasets.
   """
-  if num_validation_examples < 1:
-    raise ValueError(
-        'num_validation_examples must be an integer at '
-        'least 1; you have passed {}'.format(num_validation_examples))
-  elif vocab_size <= 0:
+  if vocab_size <= 0:
     raise ValueError('vocab_size must be a positive integer; you have '
                      'passed {}'.format(vocab_size))
+  if train_shuffle_buffer_size <= 1:
+    train_shuffle_buffer_size = 1
+  if test_shuffle_buffer_size <= 1:
+    test_shuffle_buffer_size = 1
 
   (stackoverflow_train, _,
    stackoverflow_test) = tff.simulation.datasets.stackoverflow.load_data()
 
   vocab = create_vocab(vocab_size)
 
-  preprocess_train = create_train_dataset_preprocess_fn(
+  preprocess_train_fn = create_preprocess_fn(
       vocab=vocab,
       num_oov_buckets=num_oov_buckets,
-      client_batch_size=client_batch_size,
-      client_epochs_per_round=client_epochs_per_round,
-      max_seq_len=max_seq_len,
-      max_training_elements_per_user=max_training_elements_per_user,
-      max_shuffle_buffer_size=max_shuffle_buffer_size)
-  stackoverflow_train = stackoverflow_train.preprocess(preprocess_train)
+      client_batch_size=train_client_batch_size,
+      client_epochs_per_round=train_client_epochs_per_round,
+      max_sequence_length=max_sequence_length,
+      max_elements_per_client=max_elements_per_train_client,
+      max_shuffle_buffer_size=train_shuffle_buffer_size)
+  stackoverflow_train = stackoverflow_train.preprocess(preprocess_train_fn)
 
-  raw_test_dataset = stackoverflow_test.create_tf_dataset_from_all_clients()
+  preprocess_test_fn = create_preprocess_fn(
+      vocab=vocab,
+      num_oov_buckets=num_oov_buckets,
+      client_batch_size=test_client_batch_size,
+      client_epochs_per_round=test_client_epochs_per_round,
+      max_sequence_length=max_sequence_length,
+      max_elements_per_client=max_elements_per_test_client,
+      max_shuffle_buffer_size=test_shuffle_buffer_size)
+  stackoverflow_test = stackoverflow_test.preprocess(preprocess_test_fn)
 
-  preprocess_val_and_test = create_test_dataset_preprocess_fn(
-      vocab=vocab, num_oov_buckets=num_oov_buckets, max_seq_len=max_seq_len)
-  stackoverflow_val = preprocess_val_and_test(
-      raw_test_dataset.take(num_validation_examples))
-  stackoverflow_test = preprocess_val_and_test(
-      raw_test_dataset.skip(num_validation_examples))
-
-  return stackoverflow_train, stackoverflow_val, stackoverflow_test
+  return stackoverflow_train, stackoverflow_test
 
 
-def get_centralized_datasets(vocab_size: int,
-                             max_seq_len: int,
-                             train_batch_size: int,
-                             validation_batch_size: Optional[int] = 100,
-                             test_batch_size: Optional[int] = 100,
-                             num_validation_examples: Optional[int] = 10000,
-                             shuffle_buffer_size: Optional[int] = 10000,
-                             num_oov_buckets: Optional[int] = 1):
+def get_centralized_datasets(
+    vocab_size: int,
+    max_sequence_length: int,
+    train_batch_size: int = 16,
+    validation_batch_size: int = 100,
+    test_batch_size: int = 100,
+    num_validation_examples: int = 10000,
+    train_shuffle_buffer_size: int = 10000,
+    validation_shuffle_buffer_size: int = 1,
+    test_shuffle_buffer_size: int = 1,
+    num_oov_buckets: int = 1
+) -> Tuple[tf.data.Dataset, tf.data.Dataset, tf.data.Dataset]:
   """Creates centralized datasets for Stack Overflow NWP.
 
   Args:
     vocab_size: Integer representing size of the vocab to use. Vocabulary will
       then be the `vocab_size` most frequent words in the Stackoverflow dataset.
-    max_seq_len: Integer determining shape of padded batches. Sequences will be
-      padded up to this length, and sentences longer than `max_seq_len` will be
-      truncated to this length.
+    max_sequence_length: Integer determining shape of padded batches. Sequences
+      will be padded up to this length, and sentences longer than
+      `max_sequence_length` will be truncated to this length.
     train_batch_size: The batch size for the training dataset.
     validation_batch_size: The batch size for the validation dataset.
     test_batch_size: The batch size for the test dataset.
     num_validation_examples: Number of examples from Stackoverflow test set to
       use for validation on each round.
-    shuffle_buffer_size: The shuffle buffer size for the training dataset. If
-      set to nonpositive number, no shuffling occurs.
+    train_shuffle_buffer_size: The shuffle buffer size for the training dataset.
+      If set to a number <= 1, no shuffling occurs.
+    validation_shuffle_buffer_size: The shuffle buffer size for the validation
+      dataset. If set to a number <= 1, no shuffling occurs.
+    test_shuffle_buffer_size: The shuffle buffer size for the training dataset.
+      If set to a number <= 1, no shuffling occurs.
     num_oov_buckets: Number of out of vocabulary buckets.
 
   Returns:
@@ -322,25 +317,43 @@ def get_centralized_datasets(vocab_size: int,
   """
 
   vocab = create_vocab(vocab_size)
-  to_ids = build_to_ids_fn(
-      vocab=vocab, max_seq_len=max_seq_len, num_oov_buckets=num_oov_buckets)
+  train_preprocess_fn = create_preprocess_fn(
+      vocab=vocab,
+      num_oov_buckets=num_oov_buckets,
+      client_batch_size=train_batch_size,
+      client_epochs_per_round=1,
+      max_sequence_length=max_sequence_length,
+      max_elements_per_client=-1,
+      max_shuffle_buffer_size=train_shuffle_buffer_size)
+
+  validation_preprocess_fn = create_preprocess_fn(
+      vocab=vocab,
+      num_oov_buckets=num_oov_buckets,
+      client_batch_size=validation_batch_size,
+      client_epochs_per_round=1,
+      max_sequence_length=max_sequence_length,
+      max_elements_per_client=-1,
+      max_shuffle_buffer_size=validation_shuffle_buffer_size)
+
+  test_preprocess_fn = create_preprocess_fn(
+      vocab=vocab,
+      num_oov_buckets=num_oov_buckets,
+      client_batch_size=test_batch_size,
+      client_epochs_per_round=1,
+      max_sequence_length=max_sequence_length,
+      max_elements_per_client=-1,
+      max_shuffle_buffer_size=test_shuffle_buffer_size)
+
   raw_train, _, raw_test = tff.simulation.datasets.stackoverflow.load_data()
+  stackoverflow_train = raw_train.create_tf_dataset_from_all_clients()
+  stackoverflow_train = train_preprocess_fn(stackoverflow_train)
 
-  train_dataset = raw_train.create_tf_dataset_from_all_clients()
-  train_dataset = train_dataset.shuffle(buffer_size=shuffle_buffer_size)
-  train_dataset = train_dataset.map(
-      to_ids, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-  train_dataset = batch_and_split(train_dataset, max_seq_len, train_batch_size)
+  test_and_val_dataset = raw_test.create_tf_dataset_from_all_clients()
 
-  test_dataset = raw_test.create_tf_dataset_from_all_clients()
-  test_dataset = test_dataset.map(
-      to_ids, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  stackoverflow_validation = test_and_val_dataset.take(num_validation_examples)
+  stackoverflow_validation = validation_preprocess_fn(stackoverflow_validation)
 
-  validation_dataset = test_dataset.take(num_validation_examples)
-  validation_dataset = batch_and_split(validation_dataset, max_seq_len,
-                                       validation_batch_size)
+  stackoverflow_test = test_and_val_dataset.skip(num_validation_examples)
+  stackoverflow_test = test_preprocess_fn(stackoverflow_test)
 
-  test_dataset = test_dataset.skip(num_validation_examples)
-  test_dataset = batch_and_split(test_dataset, max_seq_len, test_batch_size)
-
-  return train_dataset, validation_dataset, test_dataset
+  return stackoverflow_train, stackoverflow_validation, stackoverflow_test

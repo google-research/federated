@@ -74,7 +74,7 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
 
   train_dataset, validation_dataset, test_dataset = stackoverflow_dataset.get_centralized_datasets(
       vocab_size=vocab_size,
-      max_seq_len=sequence_length,
+      max_sequence_length=sequence_length,
       train_batch_size=batch_size,
       num_validation_examples=num_validation_examples,
       num_oov_buckets=num_oov_buckets,
