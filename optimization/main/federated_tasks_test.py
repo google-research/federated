@@ -26,7 +26,7 @@ from optimization.shakespeare import federated_shakespeare
 from optimization.shared import fed_avg_schedule
 from optimization.stackoverflow import federated_stackoverflow
 from optimization.stackoverflow_lr import federated_stackoverflow_lr
-from utils import metrics_manager
+from utils import csv_manager
 
 
 def iterative_process_builder(model_fn, client_weight_fn=None):
@@ -71,7 +71,7 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
     results_dir = os.path.join(root_output_dir, 'results', exp_name)
     self.assertTrue(tf.io.gfile.exists(results_dir))
 
-    scalar_manager = metrics_manager.ScalarMetricsManager(results_dir)
+    scalar_manager = csv_manager.ScalarMetricsManager(results_dir)
     fieldnames, metrics = scalar_manager.get_metrics()
 
     self.assertIn(

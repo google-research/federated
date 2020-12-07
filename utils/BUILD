@@ -66,17 +66,39 @@ py_test(
 )
 
 py_library(
+    name = "csv_manager",
+    srcs = ["csv_manager.py"],
+    srcs_version = "PY3",
+    deps = [":metrics_manager"],
+)
+
+py_test(
+    name = "csv_manager_test",
+    srcs = ["csv_manager_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":csv_manager"],
+)
+
+py_library(
     name = "metrics_manager",
     srcs = ["metrics_manager.py"],
     srcs_version = "PY3",
 )
 
-py_test(
-    name = "metrics_manager_test",
-    srcs = ["metrics_manager_test.py"],
-    python_version = "PY3",
+py_library(
+    name = "tensorboard_manager",
+    srcs = ["tensorboard_manager.py"],
     srcs_version = "PY3",
     deps = [":metrics_manager"],
+)
+
+py_test(
+    name = "tensorboard_manager_test",
+    srcs = ["tensorboard_manager_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":tensorboard_manager"],
 )
 
 py_library(
@@ -85,7 +107,8 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":checkpoint_manager",
-        ":metrics_manager",
+        ":csv_manager",
+        ":tensorboard_manager",
         ":utils_impl",
     ],
 )
@@ -98,7 +121,7 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":checkpoint_manager",
-        ":metrics_manager",
+        ":csv_manager",
         ":training_loop",
     ],
 )

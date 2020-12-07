@@ -79,6 +79,6 @@ py_test(
         "//optimization/shared:fed_avg_schedule",
         "//optimization/stackoverflow:federated_stackoverflow",
         "//optimization/stackoverflow_lr:federated_stackoverflow_lr",
-        "//utils:metrics_manager",
+        "//utils:csv_manager",
     ],
 )

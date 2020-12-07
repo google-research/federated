@@ -25,9 +25,9 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from utils import checkpoint_manager
-from utils import metrics_manager
+from utils import csv_manager
+from utils import tensorboard_manager
 from utils import utils_impl
-from tensorboard.plugins.hparams import api as hp
 
 
 class IterativeProcessCompatibilityError(TypeError):
@@ -58,18 +58,16 @@ def _setup_outputs(root_output_dir,
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   create_if_not_exists(results_dir)
-  metrics_mngr = metrics_manager.ScalarMetricsManager(results_dir)
+  metrics_mngr = csv_manager.ScalarMetricsManager(results_dir)
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
-  create_if_not_exists(summary_logdir)
-  summary_writer = tf.summary.create_file_writer(summary_logdir)
+  tb_mngr = tensorboard_manager.TensorBoardManager(summary_dir=summary_logdir)
 
   if hparam_dict:
     hparam_dict['metrics_file'] = metrics_mngr.metrics_filename
     hparams_file = os.path.join(results_dir, 'hparams.csv')
     utils_impl.atomic_write_to_csv(pd.Series(hparam_dict), hparams_file)
-    with summary_writer.as_default():
-      hp.hparams({k: v for k, v in hparam_dict.items() if v is not None})
+    tb_mngr.update_hparams(hparam_dict)
 
   logging.info('Writing...')
   logging.info('    checkpoints to: %s', checkpoint_dir)
@@ -84,10 +82,10 @@ def _setup_outputs(root_output_dir,
     else:
       yield
 
-  return checkpoint_mngr, metrics_mngr, summary_writer, profiler
+  return checkpoint_mngr, metrics_mngr, tb_mngr, profiler
 
 
-def _write_metrics(metrics_mngr, summary_writer, metrics, round_num):
+def _write_metrics(metrics_mngr, tb_mngr, metrics, round_num):
   """Atomic metrics writer which inlines logic from MetricsHook class."""
   if not isinstance(metrics, dict):
     raise TypeError('metrics should be type `dict`.')
@@ -95,13 +93,9 @@ def _write_metrics(metrics_mngr, summary_writer, metrics, round_num):
     raise TypeError('round_num should be type `int`.')
 
   flat_metrics = metrics_mngr.update_metrics(round_num, metrics)
+  tb_mngr.update_metrics(round_num, metrics)
   logging.info('Evaluation at round {:d}:\n{!s}'.format(
       round_num, pprint.pformat(flat_metrics)))
-
-  # Also write metrics to a tf.summary logdir
-  with summary_writer.as_default():
-    for name, val in flat_metrics.items():
-      tf.summary.scalar(name, val, step=round_num)
 
 
 def _compute_numpy_l2_difference(model, previous_model):
@@ -203,7 +197,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
   logging.info('Starting iterative_process training loop...')
   initial_state = iterative_process.initialize()
 
-  checkpoint_mngr, metrics_mngr, summary_writer, profiler = _setup_outputs(
+  checkpoint_mngr, metrics_mngr, tb_mngr, profiler = _setup_outputs(
       root_output_dir, experiment_name, hparam_dict, rounds_per_profile)
 
   logging.info('Asking checkpoint manager to load checkpoint.')
@@ -267,7 +261,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
       validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
       metrics['eval'] = validation_metrics
 
-    _write_metrics(metrics_mngr, summary_writer, metrics, round_num)
+    _write_metrics(metrics_mngr, tb_mngr, metrics, round_num)
     round_num += 1
 
   # Final metrics evaluation once the training has completed
@@ -285,6 +279,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
     test_metrics = test_fn(current_model)
     test_metrics['evaluate_secs'] = time.time() - test_start_time
     metrics['test'] = test_metrics
-  _write_metrics(metrics_mngr, summary_writer, metrics, total_rounds)
+  _write_metrics(metrics_mngr, tb_mngr, metrics, total_rounds)
 
   return state

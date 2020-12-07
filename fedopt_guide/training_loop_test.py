@@ -21,7 +21,7 @@ import tensorflow_federated as tff
 
 from fedopt_guide import training_loop
 from utils import checkpoint_manager
-from utils import metrics_manager
+from utils import csv_manager
 from utils import training_utils
 
 _Batch = collections.namedtuple('Batch', ['x', 'y'])
@@ -387,7 +387,7 @@ class ExperimentRunnerTest(tf.test.TestCase):
 
     results_dir = os.path.join(root_output_dir, 'results', experiment_name)
 
-    scalar_manager = metrics_manager.ScalarMetricsManager(results_dir)
+    scalar_manager = csv_manager.ScalarMetricsManager(results_dir)
     fieldnames, metrics = scalar_manager.get_metrics()
     self.assertLen(metrics, 2)
     self.assertIn('eval/sparse_categorical_accuracy/example_weighted',

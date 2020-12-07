@@ -18,10 +18,10 @@ import os
 
 import tensorflow as tf
 
-from utils import metrics_manager
+from utils import csv_manager
 
 
-def _create_dummy_metrics():
+def _create_placeholder_metrics():
   return collections.OrderedDict([
       ('a', {
           'b': 1.0,
@@ -30,8 +30,8 @@ def _create_dummy_metrics():
   ])
 
 
-def _create_dummy_metrics_with_extra_column():
-  metrics = _create_dummy_metrics()
+def _create_placeholder_metrics_with_extra_column():
+  metrics = _create_placeholder_metrics()
   metrics['a']['d'] = 3.0
   return metrics
 
@@ -39,22 +39,22 @@ def _create_dummy_metrics_with_extra_column():
 class ScalarMetricsManagerTest(tf.test.TestCase):
 
   def test_metrics_are_appended(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
-    _, metrics = metrics_mngr.get_metrics()
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
+    _, metrics = csv_mngr.get_metrics()
     self.assertEmpty(metrics)
 
-    metrics_mngr.update_metrics(0, _create_dummy_metrics())
-    _, metrics = metrics_mngr.get_metrics()
+    csv_mngr.update_metrics(0, _create_placeholder_metrics())
+    _, metrics = csv_mngr.get_metrics()
     self.assertLen(metrics, 1)
 
-    metrics_mngr.update_metrics(1, _create_dummy_metrics())
-    _, metrics = metrics_mngr.get_metrics()
+    csv_mngr.update_metrics(1, _create_placeholder_metrics())
+    _, metrics = csv_mngr.get_metrics()
     self.assertLen(metrics, 2)
 
   def test_update_metrics_returns_flat_dict(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
-    input_data_dict = _create_dummy_metrics()
-    appended_data_dict = metrics_mngr.update_metrics(0, input_data_dict)
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
+    input_data_dict = _create_placeholder_metrics()
+    appended_data_dict = csv_mngr.update_metrics(0, input_data_dict)
     self.assertEqual({
         'a/b': 1.0,
         'a/c': 2.0,
@@ -62,44 +62,43 @@ class ScalarMetricsManagerTest(tf.test.TestCase):
     }, appended_data_dict)
 
   def test_column_names(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
-    metrics_mngr.update_metrics(0, _create_dummy_metrics())
-    fieldnames, _ = metrics_mngr.get_metrics()
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
+    csv_mngr.update_metrics(0, _create_placeholder_metrics())
+    fieldnames, _ = csv_mngr.get_metrics()
     self.assertCountEqual(['a/b', 'a/c', 'round_num'], fieldnames)
 
   def test_update_metrics_adds_column_if_previously_unseen_metric_added(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
-    metrics_mngr.update_metrics(0, _create_dummy_metrics())
-    fieldnames, metrics = metrics_mngr.get_metrics()
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
+    csv_mngr.update_metrics(0, _create_placeholder_metrics())
+    fieldnames, metrics = csv_mngr.get_metrics()
     self.assertCountEqual(fieldnames, ['round_num', 'a/b', 'a/c'])
     self.assertNotIn('a/d', metrics[0].keys())
 
-    metrics_mngr.update_metrics(1, _create_dummy_metrics_with_extra_column())
-    fieldnames, metrics = metrics_mngr.get_metrics()
+    csv_mngr.update_metrics(1, _create_placeholder_metrics_with_extra_column())
+    fieldnames, metrics = csv_mngr.get_metrics()
     self.assertCountEqual(fieldnames, ['round_num', 'a/b', 'a/c', 'a/d'])
     self.assertEqual(metrics[0]['a/d'], '')
 
   def test_update_metrics_adds_empty_str_if_previous_column_not_provided(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
-    metrics_mngr.update_metrics(0, _create_dummy_metrics_with_extra_column())
-    metrics_mngr.update_metrics(1, _create_dummy_metrics())
-    _, metrics = metrics_mngr.get_metrics()
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
+    csv_mngr.update_metrics(0, _create_placeholder_metrics_with_extra_column())
+    csv_mngr.update_metrics(1, _create_placeholder_metrics())
+    _, metrics = csv_mngr.get_metrics()
     self.assertEqual(metrics[1]['a/d'], '')
 
   def test_csvfile_is_saved(self):
     temp_dir = self.get_temp_dir()
-    metrics_manager.ScalarMetricsManager(temp_dir, prefix='foo')
+    csv_manager.ScalarMetricsManager(temp_dir, prefix='foo')
     self.assertEqual(set(os.listdir(temp_dir)), set(['foo.metrics.csv']))
 
   def test_reload_of_csvfile(self):
     temp_dir = self.get_temp_dir()
-    metrics_mngr = metrics_manager.ScalarMetricsManager(temp_dir, prefix='bar')
-    metrics_mngr.update_metrics(0, _create_dummy_metrics())
-    metrics_mngr.update_metrics(5, _create_dummy_metrics())
+    csv_mngr = csv_manager.ScalarMetricsManager(temp_dir, prefix='bar')
+    csv_mngr.update_metrics(0, _create_placeholder_metrics())
+    csv_mngr.update_metrics(5, _create_placeholder_metrics())
 
-    new_metrics_mngr = metrics_manager.ScalarMetricsManager(
-        temp_dir, prefix='bar')
-    fieldnames, metrics = new_metrics_mngr.get_metrics()
+    new_csv_mngr = csv_manager.ScalarMetricsManager(temp_dir, prefix='bar')
+    fieldnames, metrics = new_csv_mngr.get_metrics()
     self.assertCountEqual(fieldnames, ['round_num', 'a/b', 'a/c'])
     self.assertLen(metrics, 2, 'There should be 2 rows (for rounds 0 and 5).')
     self.assertEqual(5, metrics[-1]['round_num'],
@@ -108,49 +107,49 @@ class ScalarMetricsManagerTest(tf.test.TestCase):
     self.assertEqual(set(os.listdir(temp_dir)), set(['bar.metrics.csv']))
 
   def test_update_metrics_raises_value_error_if_round_num_is_negative(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
 
     with self.assertRaises(ValueError):
-      metrics_mngr.update_metrics(-1, _create_dummy_metrics())
+      csv_mngr.update_metrics(-1, _create_placeholder_metrics())
 
   def test_update_metrics_raises_value_error_if_round_num_is_out_of_order(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
 
-    metrics_mngr.update_metrics(1, _create_dummy_metrics())
+    csv_mngr.update_metrics(1, _create_placeholder_metrics())
 
     with self.assertRaises(ValueError):
-      metrics_mngr.update_metrics(0, _create_dummy_metrics())
+      csv_mngr.update_metrics(0, _create_placeholder_metrics())
 
   def test_clear_rounds_after_raises_runtime_error_if_no_metrics(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
 
     # Clear is allowed with no metrics if no rounds have yet completed.
-    metrics_mngr.clear_rounds_after(last_valid_round_num=0)
+    csv_mngr.clear_rounds_after(last_valid_round_num=0)
 
     with self.assertRaises(RuntimeError):
       # Raise exception with no metrics if no rounds have yet completed.
-      metrics_mngr.clear_rounds_after(last_valid_round_num=1)
+      csv_mngr.clear_rounds_after(last_valid_round_num=1)
 
   def test_clear_rounds_after_raises_value_error_if_round_num_is_negative(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
-    metrics_mngr.update_metrics(0, _create_dummy_metrics())
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
+    csv_mngr.update_metrics(0, _create_placeholder_metrics())
 
     with self.assertRaises(ValueError):
-      metrics_mngr.clear_rounds_after(last_valid_round_num=-1)
+      csv_mngr.clear_rounds_after(last_valid_round_num=-1)
 
   def test_rows_are_cleared_and_last_round_num_is_reset(self):
-    metrics_mngr = metrics_manager.ScalarMetricsManager(self.get_temp_dir())
+    csv_mngr = csv_manager.ScalarMetricsManager(self.get_temp_dir())
 
-    metrics_mngr.update_metrics(0, _create_dummy_metrics())
-    metrics_mngr.update_metrics(5, _create_dummy_metrics())
-    metrics_mngr.update_metrics(10, _create_dummy_metrics())
-    _, metrics = metrics_mngr.get_metrics()
+    csv_mngr.update_metrics(0, _create_placeholder_metrics())
+    csv_mngr.update_metrics(5, _create_placeholder_metrics())
+    csv_mngr.update_metrics(10, _create_placeholder_metrics())
+    _, metrics = csv_mngr.get_metrics()
     self.assertLen(metrics, 3,
                    'There should be 3 rows (for rounds 0, 5, and 10).')
 
-    metrics_mngr.clear_rounds_after(last_valid_round_num=7)
+    csv_mngr.clear_rounds_after(last_valid_round_num=7)
 
-    _, metrics = metrics_mngr.get_metrics()
+    _, metrics = csv_mngr.get_metrics()
     self.assertLen(
         metrics, 2,
         'After clearing all rounds after last_valid_round_num=7, should be 2 '
@@ -161,18 +160,18 @@ class ScalarMetricsManagerTest(tf.test.TestCase):
     # The internal state of the manager knows the last round number is 7, so it
     # raises an exception if a user attempts to add new metrics at round 7, ...
     with self.assertRaises(ValueError):
-      metrics_mngr.update_metrics(7, _create_dummy_metrics())
+      csv_mngr.update_metrics(7, _create_placeholder_metrics())
 
     # ... but allows a user to add new metrics at a round number greater than 7.
-    metrics_mngr.update_metrics(8, _create_dummy_metrics())  # (No exception.)
+    csv_mngr.update_metrics(8, _create_placeholder_metrics())  # (No exception.)
 
   def test_rows_are_cleared_is_reflected_in_saved_file(self):
     temp_dir = self.get_temp_dir()
-    metrics_mngr = metrics_manager.ScalarMetricsManager(temp_dir, prefix='foo')
+    csv_mngr = csv_manager.ScalarMetricsManager(temp_dir, prefix='foo')
 
-    metrics_mngr.update_metrics(0, _create_dummy_metrics())
-    metrics_mngr.update_metrics(5, _create_dummy_metrics())
-    metrics_mngr.update_metrics(10, _create_dummy_metrics())
+    csv_mngr.update_metrics(0, _create_placeholder_metrics())
+    csv_mngr.update_metrics(5, _create_placeholder_metrics())
+    csv_mngr.update_metrics(10, _create_placeholder_metrics())
 
     filename = os.path.join(temp_dir, 'foo.metrics.csv')
     with tf.io.gfile.GFile(filename, 'r') as csvfile:
@@ -182,7 +181,7 @@ class ScalarMetricsManagerTest(tf.test.TestCase):
     # call to `update_metrics`.
     self.assertEqual(num_lines_before, 4)
 
-    metrics_mngr.clear_rounds_after(last_valid_round_num=7)
+    csv_mngr.clear_rounds_after(last_valid_round_num=7)
 
     with tf.io.gfile.GFile(filename, 'r') as csvfile:
       num_lines_after = len(csvfile.readlines())
@@ -192,7 +191,7 @@ class ScalarMetricsManagerTest(tf.test.TestCase):
     self.assertEqual(num_lines_after, 3)
 
   def test_constructor_raises_value_error_if_csvfile_is_invalid(self):
-    metrics_missing_round_num = _create_dummy_metrics()
+    metrics_missing_round_num = _create_placeholder_metrics()
     temp_dir = self.get_temp_dir()
     # This csvfile is 'invalid' in that it was not originally created by an
     # instance of ScalarMetricsManager, and is missing a column for
@@ -205,7 +204,7 @@ class ScalarMetricsManagerTest(tf.test.TestCase):
       writer.writerow(metrics_missing_round_num)
 
     with self.assertRaises(ValueError):
-      metrics_manager.ScalarMetricsManager(temp_dir, prefix='foo')
+      csv_manager.ScalarMetricsManager(temp_dir, prefix='foo')
 
 
 if __name__ == '__main__':
