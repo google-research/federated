@@ -22,7 +22,7 @@ import tensorflow_federated as tff
 
 from utils import training_loop
 from utils import training_utils
-from utils.datasets import emnist_ae_dataset
+from utils.datasets import emnist_dataset
 from utils.models import emnist_ae_models
 
 
@@ -80,14 +80,16 @@ def run_federated(
       `federated_research/utils/training_utils.py`.
   """
 
-  emnist_train, _ = emnist_ae_dataset.get_emnist_datasets(
-      client_batch_size=client_batch_size,
-      client_epochs_per_round=client_epochs_per_round,
-      only_digits=False)
+  emnist_train, _ = emnist_dataset.get_federated_datasets(
+      train_client_batch_size=client_batch_size,
+      train_client_epochs_per_round=client_epochs_per_round,
+      only_digits=False,
+      emnist_task='autoencoder')
 
-  _, emnist_test = emnist_ae_dataset.get_centralized_datasets(
+  _, emnist_test = emnist_dataset.get_centralized_datasets(
       train_batch_size=client_batch_size,
-      only_digits=False)
+      only_digits=False,
+      emnist_task='autoencoder')
   if max_eval_batches and max_eval_batches >= 1:
     emnist_test = emnist_test.take(max_eval_batches)
 

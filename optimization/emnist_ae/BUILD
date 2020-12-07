@@ -10,7 +10,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         "//utils:centralized_training_loop",
-        "//utils/datasets:emnist_ae_dataset",
+        "//utils/datasets:emnist_dataset",
         "//utils/models:emnist_ae_models",
     ],
 )
@@ -22,7 +22,7 @@ py_library(
     deps = [
         "//utils:training_loop",
         "//utils:training_utils",
-        "//utils/datasets:emnist_ae_dataset",
+        "//utils/datasets:emnist_dataset",
         "//utils/models:emnist_ae_models",
     ],
 )

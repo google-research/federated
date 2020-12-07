@@ -13,8 +13,8 @@
 # limitations under the License.
 """Library for loading and preprocessing EMNIST training and testing data."""
 
-import functools
-from typing import Optional
+import collections
+from typing import Any, Callable, Optional, Tuple
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -22,19 +22,58 @@ import tensorflow_federated as tff
 MAX_CLIENT_DATASET_SIZE = 418
 
 
-def _reshape_emnist_element(element):
+def _reshape_for_digit_recognition(element):
   return (tf.expand_dims(element['pixels'], axis=-1), element['label'])
 
 
-def _preprocess(dataset,
-                shuffle_buffer_size,
-                num_epochs,
-                batch_size,
-                num_parallel_calls=tf.data.experimental.AUTOTUNE):
-  """Preprocessing function for EMNIST client datasets."""
-  return dataset.shuffle(shuffle_buffer_size).repeat(num_epochs).batch(
-      batch_size, drop_remainder=False).map(
-          _reshape_emnist_element, num_parallel_calls=num_parallel_calls)
+def _reshape_for_autoencoder(element):
+  x = 1 - tf.reshape(element['pixels'], (-1, 28 * 28))
+  return (x, x)
+
+
+def create_preprocess_fn(
+    num_epochs: int,
+    batch_size: int,
+    shuffle_buffer_size: int,
+    mapping_fn: Callable[[Any], Any],
+    num_parallel_calls: tf.Tensor = tf.data.experimental.AUTOTUNE
+) -> tff.Computation:
+  """Creates a preprocessing function for EMNIST client datasets.
+
+  The preprocessing shuffles, repeats, batches, and then reshapes, using
+  the `shuffle`, `repeat`, `batch`, and `map` attributes of a
+  `tf.data.Dataset`, in that order.
+
+  Args:
+    num_epochs: An integer representing the number of epochs to repeat the
+      client datasets.
+    batch_size: An integer representing the batch size on clients.
+    shuffle_buffer_size: An integer representing the shuffle buffer size on
+      clients. If set to a number <= 1, no shuffling occurs.
+    mapping_fn: A mapping function applied to EMNIST elements after shuffling,
+      repeating, and batching occurs.
+    num_parallel_calls: An integer representing the number of parallel calls
+      used when performing `tf.data.Dataset.map`.
+
+  Returns:
+    A `tff.Computation` performing the preprocessing discussed above.
+  """
+  if num_epochs < 1:
+    raise ValueError('num_epochs must be a positive integer.')
+  if shuffle_buffer_size <= 1:
+    shuffle_buffer_size = 1
+
+  feature_dtypes = collections.OrderedDict(
+      pixels=tff.TensorType(tf.float32, shape=(28, 28)),
+      label=tff.TensorType(tf.int32))
+
+  @tff.tf_computation(tff.SequenceType(feature_dtypes))
+  def preprocess_fn(dataset):
+    return dataset.shuffle(shuffle_buffer_size).repeat(num_epochs).batch(
+        batch_size, drop_remainder=False).map(
+            mapping_fn, num_parallel_calls=num_parallel_calls)
+
+  return preprocess_fn
 
 
 def get_federated_datasets(
@@ -44,7 +83,9 @@ def get_federated_datasets(
     test_client_epochs_per_round: Optional[int] = 1,
     train_shuffle_buffer_size: Optional[int] = MAX_CLIENT_DATASET_SIZE,
     test_shuffle_buffer_size: Optional[int] = 1,
-    only_digits: Optional[bool] = False):
+    only_digits: Optional[bool] = False,
+    emnist_task: str = 'digit_recognition'
+) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
   """Loads and preprocesses federated EMNIST training and testing sets.
 
   Args:
@@ -67,6 +108,10 @@ def get_federated_datasets(
       EMNIST-10 (with only 10 labels) or the full EMNIST-62 dataset with digits
       and characters (62 labels). If set to True, we use EMNIST-10, otherwise we
       use EMNIST-62.
+    emnist_task: A string indicating the EMNIST task being performed. Must be
+      one of 'digit_recognition' or 'autoencoder'. If the former, then elements
+      are mapped to tuples of the form (pixels, label), if the latter then
+      elements are mapped to tuples of the form (pixels, pixels).
 
   Returns:
     A tuple (emnist_train, emnist_test) of `tff.simulation.ClientData` instances
@@ -82,32 +127,42 @@ def get_federated_datasets(
     train_shuffle_buffer_size = 1
   if test_shuffle_buffer_size <= 1:
     test_shuffle_buffer_size = 1
+  if emnist_task == 'digit_recognition':
+    mapping_fn = _reshape_for_digit_recognition
+  elif emnist_task == 'autoencoder':
+    mapping_fn = _reshape_for_autoencoder
+  else:
+    raise ValueError('emnist_task must be one of "digit_recognition" or '
+                     '"autoencoder".')
 
   emnist_train, emnist_test = tff.simulation.datasets.emnist.load_data(
       only_digits=only_digits)
 
-  preprocess_train_dataset = functools.partial(
-      _preprocess,
-      shuffle_buffer_size=train_shuffle_buffer_size,
+  train_preprocess_fn = create_preprocess_fn(
       num_epochs=train_client_epochs_per_round,
-      batch_size=train_client_batch_size)
+      batch_size=train_client_batch_size,
+      shuffle_buffer_size=train_shuffle_buffer_size,
+      mapping_fn=mapping_fn)
 
-  preprocess_test_dataset = functools.partial(
-      _preprocess,
-      shuffle_buffer_size=test_shuffle_buffer_size,
+  test_preprocess_fn = create_preprocess_fn(
       num_epochs=test_client_epochs_per_round,
-      batch_size=test_client_batch_size)
+      batch_size=test_client_batch_size,
+      shuffle_buffer_size=test_shuffle_buffer_size,
+      mapping_fn=mapping_fn)
 
-  emnist_train = emnist_train.preprocess(preprocess_train_dataset)
-  emnist_test = emnist_test.preprocess(preprocess_test_dataset)
+  emnist_train = emnist_train.preprocess(train_preprocess_fn)
+  emnist_test = emnist_test.preprocess(test_preprocess_fn)
   return emnist_train, emnist_test
 
 
-def get_centralized_datasets(train_batch_size: Optional[int] = 20,
-                             test_batch_size: Optional[int] = 500,
-                             train_shuffle_buffer_size: Optional[int] = 10000,
-                             test_shuffle_buffer_size: Optional[int] = 1,
-                             only_digits: Optional[bool] = False):
+def get_centralized_datasets(
+    train_batch_size: Optional[int] = 20,
+    test_batch_size: Optional[int] = 500,
+    train_shuffle_buffer_size: Optional[int] = 10000,
+    test_shuffle_buffer_size: Optional[int] = 1,
+    only_digits: Optional[bool] = False,
+    emnist_task: str = 'digit_recognition'
+) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
   """Loads and preprocesses centralized EMNIST training and testing sets.
 
   Args:
@@ -123,6 +178,10 @@ def get_centralized_datasets(train_batch_size: Optional[int] = 20,
       EMNIST-10 (with only 10 labels) or the full EMNIST-62 dataset with digits
       and characters (62 labels). If set to True, we use EMNIST-10, otherwise we
       use EMNIST-62.
+    emnist_task: A string indicating the EMNIST task being performed. Must be
+      one of 'digit_recognition' or 'autoencoder'. If the former, then elements
+      are mapped to tuples of the form (pixels, label), if the latter then
+      elements are mapped to tuples of the form (pixels, pixels).
 
   Returns:
     A tuple (train_dataset, test_dataset) of `tf.data.Dataset` instances
@@ -132,6 +191,13 @@ def get_centralized_datasets(train_batch_size: Optional[int] = 20,
     train_shuffle_buffer_size = 1
   if test_shuffle_buffer_size <= 1:
     test_shuffle_buffer_size = 1
+  if emnist_task == 'digit_recognition':
+    mapping_fn = _reshape_for_digit_recognition
+  elif emnist_task == 'autoencoder':
+    mapping_fn = _reshape_for_autoencoder
+  else:
+    raise ValueError('emnist_task must be one of "digit_recognition" or '
+                     '"autoencoder".')
 
   emnist_train, emnist_test = tff.simulation.datasets.emnist.load_data(
       only_digits=only_digits)
@@ -139,15 +205,19 @@ def get_centralized_datasets(train_batch_size: Optional[int] = 20,
   emnist_train = emnist_train.create_tf_dataset_from_all_clients()
   emnist_test = emnist_test.create_tf_dataset_from_all_clients()
 
-  emnist_train = _preprocess(
-      emnist_train,
+  train_preprocess_fn = create_preprocess_fn(
+      num_epochs=1,
+      batch_size=train_batch_size,
       shuffle_buffer_size=train_shuffle_buffer_size,
+      mapping_fn=mapping_fn)
+
+  test_preprocess_fn = create_preprocess_fn(
       num_epochs=1,
-      batch_size=train_batch_size)
-  emnist_test = _preprocess(
-      emnist_test,
+      batch_size=test_batch_size,
       shuffle_buffer_size=test_shuffle_buffer_size,
-      num_epochs=1,
-      batch_size=test_batch_size)
+      mapping_fn=mapping_fn)
+
+  emnist_train = train_preprocess_fn(emnist_train)
+  emnist_test = test_preprocess_fn(emnist_test)
 
   return emnist_train, emnist_test

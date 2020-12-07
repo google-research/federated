@@ -43,25 +43,6 @@ py_test(
 )
 
 py_library(
-    name = "emnist_ae_dataset",
-    srcs = ["emnist_ae_dataset.py"],
-    srcs_version = "PY3",
-)
-
-py_test(
-    name = "emnist_ae_dataset_test",
-    srcs = ["emnist_ae_dataset_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    tags = [
-        "manual",
-        "nokokoro",
-        "nopresubmit",
-    ],
-    deps = [":emnist_ae_dataset"],
-)
-
-py_library(
     name = "shakespeare_dataset",
     srcs = ["shakespeare_dataset.py"],
     srcs_version = "PY3",

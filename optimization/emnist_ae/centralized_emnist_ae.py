@@ -18,7 +18,7 @@ from typing import Any, Mapping, Optional
 import tensorflow as tf
 
 from utils import centralized_training_loop
-from utils.datasets import emnist_ae_dataset
+from utils.datasets import emnist_dataset
 from utils.models import emnist_ae_models
 
 
@@ -52,9 +52,8 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
       that many batches. If set to None or a nonpositive integer, the full
       datasets are used.
   """
-  train_dataset, eval_dataset = emnist_ae_dataset.get_centralized_datasets(
-      train_batch_size=batch_size,
-      only_digits=False)
+  train_dataset, eval_dataset = emnist_dataset.get_centralized_datasets(
+      train_batch_size=batch_size, only_digits=False, emnist_task='autoencoder')
 
   if max_batches and max_batches >= 1:
     train_dataset = train_dataset.take(max_batches)
