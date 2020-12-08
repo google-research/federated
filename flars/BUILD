@@ -22,7 +22,10 @@ py_library(
     name = "flars_fedavg",
     srcs = ["flars_fedavg.py"],
     srcs_version = "PY3",
-    deps = [":flars_optimizer"],
+    deps = [
+        ":flars_optimizer",
+        "//utils:tensor_utils",
+    ],
 )
 
 py_test(

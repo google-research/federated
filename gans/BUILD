@@ -14,7 +14,10 @@ py_library(
     name = "gan_training_tf_fns",
     srcs = ["gan_training_tf_fns.py"],
     srcs_version = "PY3",
-    deps = [":gan_losses"],
+    deps = [
+        ":gan_losses",
+        "//utils:tensor_utils",
+    ],
 )
 
 py_test(

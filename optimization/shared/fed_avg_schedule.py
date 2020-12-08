@@ -30,7 +30,7 @@ from typing import Callable, Optional, Union
 import attr
 import tensorflow as tf
 import tensorflow_federated as tff
-from tensorflow_federated.python.tensorflow_libs import tensor_utils
+from utils import tensor_utils
 
 
 # Convenience type aliases.

@@ -31,11 +31,11 @@ How To Back door Federated Learning
     https://arxiv.org/abs/1807.00459
 """
 
+import collections
+
 import attr
 import tensorflow as tf
 import tensorflow_federated as tff
-
-from tensorflow_federated.python.tensorflow_libs import tensor_utils
 
 
 @attr.s(eq=False, frozen=True)
@@ -222,7 +222,7 @@ class ClientExplicitBoosting:
 
     return ClientOutput(
         weights_delta, weights_delta_weight, aggregated_outputs,
-        tensor_utils.to_odict({
+        collections.OrderedDict({
             'num_examples': num_examples_sum,
             'weight_norm': weight_norm,
         }))
@@ -592,7 +592,7 @@ class ClientProjectBoost:
 
     return ClientOutput(
         weights_delta, weights_delta_weight, aggregated_outputs,
-        tensor_utils.to_odict({
+        collections.OrderedDict({
             'num_examples': num_examples_sum,
             'weight_norm': weight_norm,
         }))

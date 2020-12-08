@@ -147,10 +147,24 @@ py_library(
     srcs_version = "PY3",
 )
 
+py_library(
+    name = "tensor_utils",
+    srcs = ["tensor_utils.py"],
+    srcs_version = "PY3",
+)
+
 py_test(
     name = "utils_impl_test",
     srcs = ["utils_impl_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [":utils_impl"],
+)
+
+py_test(
+    name = "tensor_utils_test",
+    srcs = ["tensor_utils_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":tensor_utils"],
 )

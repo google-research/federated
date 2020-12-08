@@ -15,5 +15,8 @@ py_test(
     srcs = ["robust_federated_aggregation_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    deps = [":robust_federated_aggregation"],
+    deps = [
+        ":robust_federated_aggregation",
+        "//utils:tensor_utils",
+    ],
 )

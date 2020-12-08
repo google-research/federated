@@ -26,7 +26,7 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from flars import flars_optimizer
-from tensorflow_federated.python.tensorflow_libs import tensor_utils
+from utils import tensor_utils
 
 
 @attr.s(eq=False, frozen=True)

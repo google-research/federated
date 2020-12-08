@@ -23,7 +23,7 @@ import attr
 import tensorflow as tf
 
 from gans import gan_losses
-from tensorflow_federated.python.tensorflow_libs import tensor_utils
+from utils import tensor_utils
 
 
 def assert_no_anon_tuples(x):

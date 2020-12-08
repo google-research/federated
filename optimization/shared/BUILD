@@ -8,6 +8,7 @@ py_library(
     name = "fed_avg_schedule",
     srcs = ["fed_avg_schedule.py"],
     srcs_version = "PY3",
+    deps = ["//utils:tensor_utils"],
 )
 
 py_test(
