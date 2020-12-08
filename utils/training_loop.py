@@ -67,7 +67,8 @@ def _setup_outputs(root_output_dir,
     hparam_dict['metrics_file'] = metrics_mngr.metrics_filename
     hparams_file = os.path.join(results_dir, 'hparams.csv')
     utils_impl.atomic_write_to_csv(pd.Series(hparam_dict), hparams_file)
-    tb_mngr.update_hparams(hparam_dict)
+    tb_mngr.update_hparams(
+        {k: v for k, v in hparam_dict.items() if v is not None})
 
   logging.info('Writing...')
   logging.info('    checkpoints to: %s', checkpoint_dir)
