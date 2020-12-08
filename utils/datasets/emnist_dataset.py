@@ -14,7 +14,7 @@
 """Library for loading and preprocessing EMNIST training and testing data."""
 
 import collections
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Tuple
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -77,13 +77,13 @@ def create_preprocess_fn(
 
 
 def get_federated_datasets(
-    train_client_batch_size: Optional[int] = 20,
-    test_client_batch_size: Optional[int] = 100,
-    train_client_epochs_per_round: Optional[int] = 1,
-    test_client_epochs_per_round: Optional[int] = 1,
-    train_shuffle_buffer_size: Optional[int] = MAX_CLIENT_DATASET_SIZE,
-    test_shuffle_buffer_size: Optional[int] = 1,
-    only_digits: Optional[bool] = False,
+    train_client_batch_size: int = 20,
+    test_client_batch_size: int = 100,
+    train_client_epochs_per_round: int = 1,
+    test_client_epochs_per_round: int = 1,
+    train_shuffle_buffer_size: int = MAX_CLIENT_DATASET_SIZE,
+    test_shuffle_buffer_size: int = 1,
+    only_digits: bool = False,
     emnist_task: str = 'digit_recognition'
 ) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
   """Loads and preprocesses federated EMNIST training and testing sets.
@@ -156,11 +156,11 @@ def get_federated_datasets(
 
 
 def get_centralized_datasets(
-    train_batch_size: Optional[int] = 20,
-    test_batch_size: Optional[int] = 500,
-    train_shuffle_buffer_size: Optional[int] = 10000,
-    test_shuffle_buffer_size: Optional[int] = 1,
-    only_digits: Optional[bool] = False,
+    train_batch_size: int = 20,
+    test_batch_size: int = 500,
+    train_shuffle_buffer_size: int = 10000,
+    test_shuffle_buffer_size: int = 1,
+    only_digits: bool = False,
     emnist_task: str = 'digit_recognition'
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
   """Loads and preprocesses centralized EMNIST training and testing sets.
