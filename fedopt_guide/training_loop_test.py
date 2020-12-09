@@ -86,8 +86,15 @@ def _build_federated_averaging_process():
 
 def _evaluation_fn():
   metrics_builder = lambda: [tf.keras.metrics.SparseCategoricalAccuracy()]
-  return training_utils.build_federated_evaluate_fn(
+  fed_eval_fn = training_utils.build_federated_evaluate_fn(
       model_builder=_keras_model_builder, metrics_builder=metrics_builder)
+  fed_data = _federated_data()
+
+  def eval_fn(model, round_num):
+    del round_num
+    return fed_eval_fn(model, fed_data)
+
+  return eval_fn
 
 
 def _federated_data():
@@ -103,8 +110,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return _federated_data()
 
-    def evaluation_fn(model, eval_data):
-      del model, eval_data
+    def evaluation_fn(model, round_num):
+      del model, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
@@ -112,7 +119,6 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       training_loop.run(
           iterative_process=[bad_iterative_process],
           train_client_datasets_fn=client_datasets_fn,
-          eval_client_datasets_fn=client_datasets_fn,
           evaluation_fn=evaluation_fn,
           total_rounds=10,
           experiment_name='non_iterative_process',
@@ -121,10 +127,9 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
   def test_raises_non_callable_train_client_dataset(self):
     iterative_process = _build_federated_averaging_process()
     client_dataset = _create_tf_dataset_for_client(3)
-    eval_client_datasets_fn = lambda round_num: [client_dataset]
 
-    def evaluation_fn(model):
-      del model
+    def evaluation_fn(model, round_num):
+      del model, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
@@ -132,7 +137,6 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       training_loop.run(
           iterative_process=iterative_process,
           train_client_datasets_fn=client_dataset,
-          eval_client_datasets_fn=eval_client_datasets_fn,
           evaluation_fn=evaluation_fn,
           total_rounds=10,
           experiment_name='non_callable_client_dataset',
@@ -151,7 +155,6 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       training_loop.run(
           iterative_process=iterative_process,
           train_client_datasets_fn=client_datasets_fn,
-          eval_client_datasets_fn=client_datasets_fn,
           evaluation_fn=metrics_dict,
           total_rounds=10,
           experiment_name='non_callable_evaluate',
@@ -164,15 +167,14 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return _federated_data()
 
-    def evaluation_fn(model, eval_data):
-      del model, eval_data
+    def evaluation_fn(model, round_num):
+      del model, round_num
       return {}
 
     with self.assertRaises(TypeError):
       training_loop.run(
           iterative_process=iterative_process,
           train_client_datasets_fn=client_datasets_fn,
-          eval_client_datasets_fn=client_datasets_fn,
           evaluation_fn=evaluation_fn,
           total_rounds=10,
           experiment_name='non_str_output_dir',
@@ -197,8 +199,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return _federated_data()
 
-    def evaluation_fn(model, eval_data):
-      del model, eval_data
+    def evaluation_fn(model, round_num):
+      del model, round_num
       return {}
 
     with self.assertRaisesRegex(
@@ -207,7 +209,6 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       training_loop.run(
           iterative_process=iterative_process,
           train_client_datasets_fn=client_datasets_fn,
-          eval_client_datasets_fn=client_datasets_fn,
           evaluation_fn=evaluation_fn,
           total_rounds=10,
           experiment_name='bad_iterative_process')
@@ -232,8 +233,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return _federated_data()
 
-    def evaluation_fn(model, eval_data):
-      del model, eval_data
+    def evaluation_fn(model, round_num):
+      del model, round_num
       return {}
 
     with self.assertRaisesRegex(
@@ -242,7 +243,6 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       training_loop.run(
           iterative_process=iterative_process,
           train_client_datasets_fn=client_datasets_fn,
-          eval_client_datasets_fn=client_datasets_fn,
           evaluation_fn=evaluation_fn,
           total_rounds=10,
           experiment_name='bad_iterative_process')
@@ -269,8 +269,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return _federated_data()
 
-    def evaluation_fn(model, eval_data):
-      del model, eval_data
+    def evaluation_fn(model, round_num):
+      del model, round_num
       return {}
 
     with self.assertRaisesRegex(
@@ -280,7 +280,6 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       training_loop.run(
           iterative_process=iterative_process,
           train_client_datasets_fn=client_datasets_fn,
-          eval_client_datasets_fn=client_datasets_fn,
           evaluation_fn=evaluation_fn,
           total_rounds=10,
           experiment_name='bad_iterative_process')
@@ -308,7 +307,6 @@ class ExperimentRunnerTest(tf.test.TestCase):
     final_state = training_loop.run(
         iterative_process=iterative_process,
         train_client_datasets_fn=client_datasets_fn,
-        eval_client_datasets_fn=client_datasets_fn,
         evaluation_fn=_evaluation_fn(),
         total_rounds=1,
         experiment_name='fedavg_decreases_loss',
@@ -326,15 +324,14 @@ class ExperimentRunnerTest(tf.test.TestCase):
       del round_num
       return _federated_data()
 
-    def evaluation_fn(model, eval_data):
-      del model, eval_data
+    def evaluation_fn(model, round_num):
+      del model, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
     final_state = training_loop.run(
         iterative_process=iterative_process,
         train_client_datasets_fn=client_datasets_fn,
-        eval_client_datasets_fn=client_datasets_fn,
         evaluation_fn=evaluation_fn,
         total_rounds=1,
         experiment_name=experiment_name,
@@ -377,7 +374,6 @@ class ExperimentRunnerTest(tf.test.TestCase):
     training_loop.run(
         iterative_process=iterative_process,
         train_client_datasets_fn=client_datasets_fn,
-        eval_client_datasets_fn=client_datasets_fn,
         evaluation_fn=_evaluation_fn(),
         total_rounds=1,
         experiment_name=experiment_name,

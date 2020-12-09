@@ -129,8 +129,7 @@ def _check_iterative_process_compatibility(iterative_process):
 
 def run(iterative_process: tff.templates.IterativeProcess,
         train_client_datasets_fn: Callable[[int], List[tf.data.Dataset]],
-        eval_client_datasets_fn: Callable[[int], List[tf.data.Dataset]],
-        evaluation_fn: Callable[[Any, List[tf.data.Dataset]], Dict[str, float]],
+        evaluation_fn: Callable[[Any, int], Dict[str, float]],
         total_rounds: int,
         experiment_name: str,
         test_fn: Optional[Callable[[Any], Dict[str, float]]] = None,
@@ -158,13 +157,10 @@ def run(iterative_process: tff.templates.IterativeProcess,
     train_client_datasets_fn: Function accepting an integer argument (the round
       number) and returning a list of train client datasets to use as federated
       data for that training round.
-    eval_client_datasets_fn: Function accepting an integer argument (the round
-      number) and returning a list of evaluation client datasets to use as
-      federated data for that evaluation round.
     evaluation_fn: A callable accepting the output of the `get_model_weights`
-      attribute of the iterative process, and a list of evaluation client
-      datasets. Returns a dictionary of evaluation metrics. Used to compute
-      evaluation metrics throughout the training process.
+      attribute of the iterative process and a `round_num`, and returning a
+      dictionary of evaluation metrics. Used to compute evaluation metrics
+      throughout the training process.
     total_rounds: The number of federated training rounds to perform.
     experiment_name: The name of the experiment being run. This will be appended
       to the `root_output_dir` for purposes of writing outputs.
@@ -186,8 +182,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
   _check_iterative_process_compatibility(iterative_process)
   if not callable(train_client_datasets_fn):
     raise TypeError('train_client_datasets_fn should be callable.')
-  if not callable(eval_client_datasets_fn):
-    raise TypeError('eval_client_datasets_fn should be callable.')
   if not callable(evaluation_fn):
     raise TypeError('evaluation_fn should be callable.')
   if test_fn is not None and not callable(test_fn):
@@ -248,8 +242,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
     if round_num % rounds_per_eval == 0:
       # Compute evaluation metrics
       evaluate_start_time = time.time()
-      federated_eval_data = eval_client_datasets_fn(round_num)
-      validation_metrics = evaluation_fn(current_model, federated_eval_data)
+      validation_metrics = evaluation_fn(current_model, round_num)
       validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
       metrics['eval'] = validation_metrics
 
@@ -261,8 +254,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
 
   # Evaluation metrics
   evaluate_start_time = time.time()
-  federated_eval_data = eval_client_datasets_fn(round_num)
-  validation_metrics = evaluation_fn(current_model, federated_eval_data)
+  validation_metrics = evaluation_fn(current_model, round_num)
   validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
   metrics['eval'] = validation_metrics
 
