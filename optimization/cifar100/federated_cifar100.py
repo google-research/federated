@@ -88,9 +88,9 @@ def run_federated(
 
   crop_shape = (crop_size, crop_size, 3)
 
-  cifar_train, _ = cifar100_dataset.get_federated_cifar100(
-      client_epochs_per_round=client_epochs_per_round,
-      train_batch_size=client_batch_size,
+  cifar_train, _ = cifar100_dataset.get_federated_datasets(
+      train_client_epochs_per_round=client_epochs_per_round,
+      train_client_batch_size=client_batch_size,
       crop_shape=crop_shape)
 
   _, cifar_test = cifar100_dataset.get_centralized_datasets(
