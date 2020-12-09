@@ -106,16 +106,15 @@ def run_federated(
       `federated_research/utils/training_utils.py`.
   """
 
-  train_clientdata = shakespeare_dataset.construct_character_level_datasets(
-      client_batch_size=client_batch_size,
-      client_epochs_per_round=client_epochs_per_round,
+  shakespeare_train, _ = shakespeare_dataset.get_federated_datasets(
+      train_client_batch_size=client_batch_size,
+      train_client_epochs_per_round=client_epochs_per_round,
       sequence_length=sequence_length)
 
-  _, test_dataset = shakespeare_dataset.get_centralized_datasets(
-      train_batch_size=client_batch_size,
+  _, shakespeare_test = shakespeare_dataset.get_centralized_datasets(
       sequence_length=sequence_length)
   if max_eval_batches and max_eval_batches >= 1:
-    test_dataset = test_dataset.take(max_eval_batches)
+    shakespeare_test = shakespeare_test.take(max_eval_batches)
 
   model_builder = functools.partial(
       create_shakespeare_model, sequence_length=sequence_length)
@@ -123,8 +122,7 @@ def run_federated(
   loss_builder = functools.partial(
       tf.keras.losses.SparseCategoricalCrossentropy, from_logits=True)
 
-  input_spec = train_clientdata.create_tf_dataset_for_client(
-      train_clientdata.client_ids[0]).element_spec
+  input_spec = shakespeare_train.element_type_structure
 
   def client_weight_fn(local_outputs):
     # Num_tokens is a tensor with type int64[1], to use as a weight need
@@ -142,12 +140,12 @@ def run_federated(
       tff_model_fn, client_weight_fn=client_weight_fn)
 
   client_datasets_fn = training_utils.build_client_datasets_fn(
-      dataset=train_clientdata,
+      dataset=shakespeare_train,
       clients_per_round=clients_per_round,
       random_seed=client_datasets_random_seed)
 
   evaluate_fn = training_utils.build_centralized_evaluate_fn(
-      eval_dataset=test_dataset,
+      eval_dataset=shakespeare_test,
       model_builder=model_builder,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)

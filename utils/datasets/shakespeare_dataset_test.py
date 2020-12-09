@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import tensorflow as tf
 
 from utils.datasets import shakespeare_dataset
@@ -50,16 +51,14 @@ class DatasetPreprocessingTest(tf.test.TestCase):
         [[2, 3], [5, 6]],
     ), example)
 
-  def test_convert_snippets_to_character_sequence_examples(self):
+  def test_preprocess_fn(self):
     pad, _, bos, eos = shakespeare_dataset.get_special_tokens()
-    ds = shakespeare_dataset.convert_snippets_to_character_sequence_examples(
-        tf.data.Dataset.from_tensor_slices({
-            'snippets': ['a snippet', 'different snippet'],
-        }),
-        batch_size=2,
-        epochs=2,
-        shuffle_buffer_size=1,
-        sequence_length=10)
+    initial_ds = tf.data.Dataset.from_tensor_slices(
+        collections.OrderedDict(snippets=['a snippet', 'different snippet']))
+    preprocess_fn = shakespeare_dataset.create_preprocess_fn(
+        num_epochs=2, batch_size=2, shuffle_buffer_size=1, sequence_length=10)
+
+    ds = preprocess_fn(initial_ds)
     expected_outputs = [
         # First batch.
         ([[bos, 64, 14, 25, 45, 66, 4, 4, 65, 5],
@@ -98,11 +97,12 @@ class DatasetPreprocessingTest(tf.test.TestCase):
         msg='Not all expected output seen.\nLeft over expectations: {!s}'
         .format(expected_outputs))
 
-  def test_raises_no_repeat_and_no_take(self):
+  def test_raises_negative_epochs_per_round(self):
     with self.assertRaisesRegex(
-        ValueError, 'client_epochs_per_round must be a positive integer.'):
-      shakespeare_dataset.construct_character_level_datasets(
-          client_batch_size=10, client_epochs_per_round=-1)
+        ValueError,
+        'train_client_epochs_per_round must be a positive integer.'):
+      shakespeare_dataset.get_federated_datasets(
+          train_client_batch_size=10, train_client_epochs_per_round=-1)
 
 
 if __name__ == '__main__':
