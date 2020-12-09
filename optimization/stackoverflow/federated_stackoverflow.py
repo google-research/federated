@@ -24,7 +24,7 @@ import tensorflow_federated as tff
 from optimization.shared import keras_metrics
 from utils import training_loop
 from utils import training_utils
-from utils.datasets import stackoverflow_dataset
+from utils.datasets import stackoverflow_word_prediction
 from utils.models import stackoverflow_models
 
 
@@ -115,7 +115,7 @@ def run_federated(
   loss_builder = functools.partial(
       tf.keras.losses.SparseCategoricalCrossentropy, from_logits=True)
 
-  special_tokens = stackoverflow_dataset.get_special_tokens(
+  special_tokens = stackoverflow_word_prediction.get_special_tokens(
       vocab_size, num_oov_buckets)
   pad_token = special_tokens.pad
   oov_tokens = special_tokens.oov
@@ -141,7 +141,7 @@ def run_federated(
   # `tff.learning.build_federated_evaluation` to get metrics over client
   # distributions, as well as the example weight means from this centralized
   # evaluation.
-  _, validation_dataset, test_dataset = stackoverflow_dataset.get_centralized_datasets(
+  _, validation_dataset, test_dataset = stackoverflow_word_prediction.get_centralized_datasets(
       vocab_size=vocab_size,
       max_sequence_length=sequence_length,
       num_validation_examples=num_validation_examples,
@@ -151,8 +151,8 @@ def run_federated(
     validation_dataset = validation_dataset.take(max_eval_batches)
     test_dataset = test_dataset.take(max_eval_batches)
 
-  train_dataset_preprocess_comp = stackoverflow_dataset.create_preprocess_fn(
-      vocab=stackoverflow_dataset.create_vocab(vocab_size),
+  train_dataset_preprocess_comp = stackoverflow_word_prediction.create_preprocess_fn(
+      vocab=stackoverflow_word_prediction.create_vocab(vocab_size),
       num_oov_buckets=num_oov_buckets,
       client_batch_size=client_batch_size,
       client_epochs_per_round=client_epochs_per_round,

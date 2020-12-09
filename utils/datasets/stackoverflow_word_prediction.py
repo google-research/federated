@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Data loader for Stackoverflow."""
+"""Data loader for Stack Overflow next-word-prediction tasks."""
 
 import collections
 from typing import Callable, List, Tuple
@@ -116,7 +116,7 @@ def create_preprocess_fn(
     max_sequence_length: int,
     max_elements_per_client: int,
     max_shuffle_buffer_size: int = 10000) -> tff.Computation:
-  """Creates preprocessing functions for Stack Overflow data.
+  """Creates a preprocessing functions for Stack Overflow next-word-prediction.
 
   This function returns a `tff.Computation` which takes a dataset and returns a
   dataset, suitable for mapping over a set of unprocessed client datasets.
@@ -201,10 +201,10 @@ def get_federated_datasets(
     train_shuffle_buffer_size: int = 10000,
     test_shuffle_buffer_size: int = 1
 ) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
-  """Loads and preprocesses federated Stack Overflow training and testing sets.
+  """Loads federated Stack Overflow next-word prediction datasets.
 
-  Notice that this preprocessing function ignores the heldout Stack Overflow
-  dataset for consistency with "Adaptive Federated Optimization".
+  This function ignores the heldout Stack Overflow dataset for consistency with
+  "Adaptive Federated Optimization".
 
   Args:
     vocab_size: Integer representing size of the vocab to use. Vocabulary will

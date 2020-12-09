@@ -19,7 +19,7 @@ import tensorflow as tf
 
 from optimization.shared import keras_metrics
 from utils import centralized_training_loop
-from utils.datasets import stackoverflow_dataset
+from utils.datasets import stackoverflow_word_prediction
 from utils.models import stackoverflow_models
 
 
@@ -72,7 +72,7 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
       datasets are used.
   """
 
-  train_dataset, validation_dataset, test_dataset = stackoverflow_dataset.get_centralized_datasets(
+  train_dataset, validation_dataset, test_dataset = stackoverflow_word_prediction.get_centralized_datasets(
       vocab_size=vocab_size,
       max_sequence_length=sequence_length,
       train_batch_size=batch_size,
@@ -94,7 +94,7 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
       num_layers=num_layers,
       shared_embedding=shared_embedding)
 
-  special_tokens = stackoverflow_dataset.get_special_tokens(
+  special_tokens = stackoverflow_word_prediction.get_special_tokens(
       vocab_size=vocab_size, num_oov_buckets=num_oov_buckets)
   pad_token = special_tokens.pad
   oov_tokens = special_tokens.oov

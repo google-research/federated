@@ -62,30 +62,30 @@ py_test(
 )
 
 py_library(
-    name = "stackoverflow_dataset",
-    srcs = ["stackoverflow_dataset.py"],
+    name = "stackoverflow_word_prediction",
+    srcs = ["stackoverflow_word_prediction.py"],
     srcs_version = "PY3",
 )
 
 py_test(
-    name = "stackoverflow_dataset_test",
+    name = "stackoverflow_word_prediction_test",
     size = "medium",
-    srcs = ["stackoverflow_dataset_test.py"],
+    srcs = ["stackoverflow_word_prediction_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    deps = [":stackoverflow_dataset"],
+    deps = [":stackoverflow_word_prediction"],
 )
 
 py_library(
-    name = "stackoverflow_lr_dataset",
-    srcs = ["stackoverflow_lr_dataset.py"],
+    name = "stackoverflow_tag_prediction",
+    srcs = ["stackoverflow_tag_prediction.py"],
     srcs_version = "PY3",
 )
 
 py_test(
-    name = "stackoverflow_lr_dataset_test",
+    name = "stackoverflow_tag_prediction_test",
     size = "large",
-    srcs = ["stackoverflow_lr_dataset_test.py"],
+    srcs = ["stackoverflow_tag_prediction_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
     tags = [
@@ -93,5 +93,5 @@ py_test(
         "nokokoro",
         "notap",
     ],
-    deps = [":stackoverflow_lr_dataset"],
+    deps = [":stackoverflow_tag_prediction"],
 )

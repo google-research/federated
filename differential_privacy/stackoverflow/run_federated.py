@@ -27,7 +27,7 @@ from optimization.shared import optimizer_utils
 from utils import training_loop
 from utils import training_utils
 from utils import utils_impl
-from utils.datasets import stackoverflow_dataset
+from utils.datasets import stackoverflow_word_prediction
 from utils.models import stackoverflow_models
 
 with utils_impl.record_new_flags():
@@ -110,7 +110,8 @@ def main(argv):
   loss_builder = functools.partial(
       tf.keras.losses.SparseCategoricalCrossentropy, from_logits=True)
 
-  special_tokens = stackoverflow_dataset.get_special_tokens(FLAGS.vocab_size)
+  special_tokens = stackoverflow_word_prediction.get_special_tokens(
+      FLAGS.vocab_size)
   pad_token = special_tokens.pad
   oov_tokens = special_tokens.oov
   eos_token = special_tokens.eos
@@ -129,13 +130,13 @@ def main(argv):
         keras_metrics.NumTokensCounter(masked_tokens=[pad_token]),
     ]
 
-  train_dataset, _ = stackoverflow_dataset.get_federated_datasets(
+  train_dataset, _ = stackoverflow_word_prediction.get_federated_datasets(
       vocab_size=FLAGS.vocab_size,
       train_client_batch_size=FLAGS.client_batch_size,
       train_client_epochs_per_round=FLAGS.client_epochs_per_round,
       max_sequence_length=FLAGS.sequence_length,
       max_elements_per_train_client=FLAGS.max_elements_per_user)
-  _, validation_dataset, test_dataset = stackoverflow_dataset.get_centralized_datasets(
+  _, validation_dataset, test_dataset = stackoverflow_word_prediction.get_centralized_datasets(
       vocab_size=FLAGS.vocab_size,
       max_sequence_length=FLAGS.sequence_length,
       num_validation_examples=FLAGS.num_validation_examples)

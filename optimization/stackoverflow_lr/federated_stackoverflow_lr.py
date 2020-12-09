@@ -23,7 +23,7 @@ import tensorflow_federated as tff
 
 from utils import training_loop
 from utils import training_utils
-from utils.datasets import stackoverflow_lr_dataset
+from utils.datasets import stackoverflow_tag_prediction
 from utils.models import stackoverflow_lr_models
 
 
@@ -100,18 +100,17 @@ def run_federated(
       `federated_research/utils/training_utils.py`.
   """
 
-  stackoverflow_train, _, _ = stackoverflow_lr_dataset.get_stackoverflow_datasets(
-      vocab_tokens_size=vocab_tokens_size,
-      vocab_tags_size=vocab_tags_size,
-      client_batch_size=client_batch_size,
-      client_epochs_per_round=client_epochs_per_round,
-      max_training_elements_per_user=max_elements_per_user,
-      num_validation_examples=num_validation_examples)
+  stackoverflow_train, _ = stackoverflow_tag_prediction.get_federated_datasets(
+      word_vocab_size=vocab_tokens_size,
+      tag_vocab_size=vocab_tags_size,
+      train_client_batch_size=client_batch_size,
+      train_client_epochs_per_round=client_epochs_per_round,
+      max_elements_per_train_client=max_elements_per_user)
 
-  _, stackoverflow_validation, stackoverflow_test = stackoverflow_lr_dataset.get_centralized_datasets(
+  _, stackoverflow_validation, stackoverflow_test = stackoverflow_tag_prediction.get_centralized_datasets(
       train_batch_size=client_batch_size,
-      vocab_tokens_size=vocab_tokens_size,
-      vocab_tags_size=vocab_tags_size,
+      word_vocab_size=vocab_tokens_size,
+      tag_vocab_size=vocab_tags_size,
       num_validation_examples=num_validation_examples)
 
   if max_eval_batches and max_eval_batches >= 1:

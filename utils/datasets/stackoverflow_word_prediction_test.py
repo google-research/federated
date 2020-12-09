@@ -18,7 +18,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from utils.datasets import stackoverflow_dataset
+from utils.datasets import stackoverflow_word_prediction
 
 
 TEST_DATA = collections.OrderedDict(
@@ -41,15 +41,16 @@ class DatasetTest(tf.test.TestCase):
     tokens = tf.constant([[0, 1, 2, 3, 4]], dtype=tf.int64)
     expected_input = [[0, 1, 2, 3]]
     expected_target = [[1, 2, 3, 4]]
-    split = stackoverflow_dataset.split_input_target(tokens)
+    split = stackoverflow_word_prediction.split_input_target(tokens)
     self.assertAllEqual(self.evaluate(split[0]), expected_input)
     self.assertAllEqual(self.evaluate(split[1]), expected_target)
 
   def test_build_to_ids_fn_truncates(self):
     vocab = ['A', 'B', 'C']
     max_seq_len = 1
-    bos = stackoverflow_dataset.get_special_tokens(len(vocab)).bos
-    to_ids_fn = stackoverflow_dataset.build_to_ids_fn(vocab, max_seq_len)
+    bos = stackoverflow_word_prediction.get_special_tokens(len(vocab)).bos
+    to_ids_fn = stackoverflow_word_prediction.build_to_ids_fn(
+        vocab, max_seq_len)
     data = {'tokens': 'A B C'}
     processed = to_ids_fn(data)
     self.assertAllEqual(self.evaluate(processed), [bos, 1])
@@ -57,10 +58,12 @@ class DatasetTest(tf.test.TestCase):
   def test_build_to_ids_fn_embeds_all_vocab(self):
     vocab = ['A', 'B', 'C']
     max_seq_len = 5
-    special_tokens = stackoverflow_dataset.get_special_tokens(len(vocab))
+    special_tokens = stackoverflow_word_prediction.get_special_tokens(
+        len(vocab))
     bos = special_tokens.bos
     eos = special_tokens.eos
-    to_ids_fn = stackoverflow_dataset.build_to_ids_fn(vocab, max_seq_len)
+    to_ids_fn = stackoverflow_word_prediction.build_to_ids_fn(
+        vocab, max_seq_len)
     data = {'tokens': 'A B C'}
     processed = to_ids_fn(data)
     self.assertAllEqual(self.evaluate(processed), [bos, 1, 2, 3, eos])
@@ -68,8 +71,10 @@ class DatasetTest(tf.test.TestCase):
   def test_pad_token_correct(self):
     vocab = ['A', 'B', 'C']
     max_seq_len = 5
-    to_ids_fn = stackoverflow_dataset.build_to_ids_fn(vocab, max_seq_len)
-    special_tokens = stackoverflow_dataset.get_special_tokens(len(vocab))
+    to_ids_fn = stackoverflow_word_prediction.build_to_ids_fn(
+        vocab, max_seq_len)
+    special_tokens = stackoverflow_word_prediction.get_special_tokens(
+        len(vocab))
     pad, bos, eos = special_tokens.pad, special_tokens.bos, special_tokens.eos
     data = {'tokens': 'A B C'}
     processed = to_ids_fn(data)
@@ -82,9 +87,9 @@ class DatasetTest(tf.test.TestCase):
     vocab = ['A', 'B', 'C']
     max_seq_len = 5
     num_oov_buckets = 2
-    to_ids_fn = stackoverflow_dataset.build_to_ids_fn(
+    to_ids_fn = stackoverflow_word_prediction.build_to_ids_fn(
         vocab, max_seq_len, num_oov_buckets=num_oov_buckets)
-    oov_tokens = stackoverflow_dataset.get_special_tokens(
+    oov_tokens = stackoverflow_word_prediction.get_special_tokens(
         len(vocab), num_oov_buckets=num_oov_buckets).oov
     data = {'tokens': 'A B D'}
     processed = to_ids_fn(data)
@@ -97,7 +102,7 @@ class BatchAndSplitTest(tf.test.TestCase):
   def test_batch_and_split_fn_returns_dataset_with_correct_type_spec(self):
     token = tf.constant([[0, 1, 2, 3, 4]], dtype=tf.int64)
     ds = tf.data.Dataset.from_tensor_slices(token)
-    padded_and_batched = stackoverflow_dataset.batch_and_split(
+    padded_and_batched = stackoverflow_word_prediction.batch_and_split(
         ds, max_sequence_length=6, batch_size=1)
     self.assertIsInstance(padded_and_batched, tf.data.Dataset)
     self.assertEqual(padded_and_batched.element_spec, (tf.TensorSpec(
@@ -106,7 +111,7 @@ class BatchAndSplitTest(tf.test.TestCase):
   def test_batch_and_split_fn_returns_dataset_yielding_expected_elements(self):
     token = tf.constant([[0, 1, 2, 3, 4]], dtype=tf.int64)
     ds = tf.data.Dataset.from_tensor_slices(token)
-    padded_and_batched = stackoverflow_dataset.batch_and_split(
+    padded_and_batched = stackoverflow_word_prediction.batch_and_split(
         ds, max_sequence_length=6, batch_size=1)
     num_elems = 0
     for elem in padded_and_batched:
@@ -122,7 +127,7 @@ class DatasetPreprocessFnTest(tf.test.TestCase):
 
   def test_preprocess_fn_return_dataset_element_spec(self):
     ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    preprocess_fn = stackoverflow_dataset.create_preprocess_fn(
+    preprocess_fn = stackoverflow_word_prediction.create_preprocess_fn(
         client_batch_size=32,
         client_epochs_per_round=1,
         max_sequence_length=10,
@@ -136,7 +141,7 @@ class DatasetPreprocessFnTest(tf.test.TestCase):
 
   def test_preprocess_fn_return_dataset_element_spec_oov_buckets(self):
     ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    preprocess_fn = stackoverflow_dataset.create_preprocess_fn(
+    preprocess_fn = stackoverflow_word_prediction.create_preprocess_fn(
         client_batch_size=32,
         client_epochs_per_round=1,
         max_sequence_length=10,
@@ -150,7 +155,7 @@ class DatasetPreprocessFnTest(tf.test.TestCase):
 
   def test_preprocess_fn_returns_correct_sequence(self):
     ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    preprocess_fn = stackoverflow_dataset.create_preprocess_fn(
+    preprocess_fn = stackoverflow_word_prediction.create_preprocess_fn(
         client_batch_size=32,
         client_epochs_per_round=1,
         max_sequence_length=6,
@@ -167,7 +172,7 @@ class DatasetPreprocessFnTest(tf.test.TestCase):
 
   def test_preprocess_fn_returns_correct_sequence_oov_buckets(self):
     ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
-    preprocess_fn = stackoverflow_dataset.create_preprocess_fn(
+    preprocess_fn = stackoverflow_word_prediction.create_preprocess_fn(
         client_batch_size=32,
         client_epochs_per_round=1,
         max_sequence_length=6,
@@ -210,7 +215,7 @@ class CreateFederatedDatasets(tf.test.TestCase):
     # Return a factor word dictionary.
     mock_load_word_counts.return_value = collections.OrderedDict(a=1)
 
-    _, _ = stackoverflow_dataset.get_federated_datasets(
+    _, _ = stackoverflow_word_prediction.get_federated_datasets(
         vocab_size=1000,
         train_client_batch_size=10,
         test_client_batch_size=100,
@@ -243,7 +248,7 @@ class CreateFederatedDatasets(tf.test.TestCase):
     mock_load_data.return_value = (mock.Mock(), mock.Mock(), mock.Mock())
     with self.assertRaisesRegex(
         ValueError, 'client_epochs_per_round must be a positive integer.'):
-      stackoverflow_dataset.get_federated_datasets(
+      stackoverflow_word_prediction.get_federated_datasets(
           vocab_size=100,
           train_client_batch_size=10,
           train_client_epochs_per_round=-1,
@@ -280,7 +285,7 @@ class CreateCentralizedDatasets(tf.test.TestCase):
     # Return a factor word dictionary.
     mock_load_word_counts.return_value = collections.OrderedDict(a=1)
 
-    _, _, _ = stackoverflow_dataset.get_centralized_datasets(
+    _, _, _ = stackoverflow_word_prediction.get_centralized_datasets(
         vocab_size=1000,
         train_batch_size=10,
         validation_batch_size=50,

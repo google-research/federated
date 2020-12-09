@@ -13,7 +13,7 @@ py_binary(
         "//utils:training_loop",
         "//utils:training_utils",
         "//utils:utils_impl",
-        "//utils/datasets:stackoverflow_dataset",
+        "//utils/datasets:stackoverflow_word_prediction",
         "//utils/models:stackoverflow_models",
     ],
 )
