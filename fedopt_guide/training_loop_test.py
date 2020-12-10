@@ -381,10 +381,10 @@ class ExperimentRunnerTest(tf.test.TestCase):
         rounds_per_eval=10,
         test_fn=test_fn)
 
-    results_dir = os.path.join(root_output_dir, 'results', experiment_name)
-
-    scalar_manager = csv_manager.CSVMetricsManager(results_dir)
-    fieldnames, metrics = scalar_manager.get_metrics()
+    csv_file = os.path.join(root_output_dir, 'results', experiment_name,
+                            'experiment.metrics.csv')
+    metrics_manager = csv_manager.CSVMetricsManager(csv_file)
+    fieldnames, metrics = metrics_manager.get_metrics()
     self.assertLen(metrics, 2)
     self.assertIn('eval/sparse_categorical_accuracy/example_weighted',
                   fieldnames)

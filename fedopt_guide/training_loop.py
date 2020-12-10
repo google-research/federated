@@ -54,7 +54,8 @@ def _setup_outputs(root_output_dir, experiment_name, hparam_dict):
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   create_if_not_exists(results_dir)
-  metrics_mngr = csv_manager.CSVMetricsManager(results_dir)
+  csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
+  metrics_mngr = csv_manager.CSVMetricsManager(csv_file)
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
   create_if_not_exists(summary_logdir)

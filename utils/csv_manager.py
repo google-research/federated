@@ -136,9 +136,7 @@ def _flatten_nested_dict(struct: Dict[str, Any]) -> Dict[str, Any]:
 class CSVMetricsManager(metrics_manager.MetricsManager):
   """Utility class for saving/loading experiment metrics via a CSV file."""
 
-  def __init__(self,
-               root_metrics_dir: str = '/tmp',
-               prefix: str = 'experiment'):
+  def __init__(self, csv_filepath: str):
     """Returns an initialized `CSVMetricsManager`.
 
     This class will maintain metrics in a CSV file in the filesystem. The path
@@ -154,29 +152,22 @@ class CSVMetricsManager(metrics_manager.MetricsManager):
     files, such as `.bz2` formats, or encoded directories.
 
     Args:
-      root_metrics_dir: A path on the filesystem to store CSVs.
-      prefix: A string to use as the prefix of file_name. Usually the name of a
-        specific run in a larger grid of experiments sharing a common
-        `root_metrics_dir`.
+      csv_filepath: A string specifying the file to write and read metrics from.
 
     Raises:
-      ValueError: If `root_metrics_dir` is empty string.
-      ValueError: If `prefix` is empty string.
+      ValueError: If `csv_filepath` is an empty string.
       ValueError: If the specified metrics csv file already exists but does not
         contain a `round_num` column.
     """
     super().__init__()
-    if not root_metrics_dir:
-      raise ValueError('Empty string passed for root_metrics_dir argument.')
-    if not prefix:
-      raise ValueError('Empty string passed for prefix argument.')
+    if not csv_filepath:
+      raise ValueError('Empty string passed for csv_filepath argument.')
 
-    _create_if_not_exists(root_metrics_dir)
-    self._metrics_file = os.path.join(root_metrics_dir, f'{prefix}.metrics.csv')
+    self._metrics_file = csv_filepath
     if not tf.io.gfile.exists(self._metrics_file):
-      with tf.io.gfile.GFile(self._metrics_file, 'w') as csv_file:
+      with tf.io.gfile.GFile(self._metrics_file, 'w') as file_object:
         writer = csv.DictWriter(
-            csv_file, fieldnames=['round_num'], quoting=_QUOTING)
+            file_object, fieldnames=['round_num'], quoting=_QUOTING)
         writer.writeheader()
 
     current_fieldnames, current_metrics = _read_from_csv(self._metrics_file)
