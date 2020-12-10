@@ -20,7 +20,7 @@ import tensorflow as tf
 from utils import tensorboard_manager
 
 
-def _create_placeholder_metrics():
+def _create_scalar_metrics():
   return collections.OrderedDict([
       ('a', {
           'b': 1.0,
@@ -29,25 +29,41 @@ def _create_placeholder_metrics():
   ])
 
 
-def _create_placeholder_metrics_with_extra_column():
-  metrics = _create_placeholder_metrics()
+def _create_nonscalar_metrics():
+  return collections.OrderedDict([
+      ('a', {
+          'b': tf.ones([1]),
+          'c': tf.zeros([2, 2]),
+      }),
+  ])
+
+
+def _create_scalar_metrics_with_extra_column():
+  metrics = _create_scalar_metrics()
   metrics['a']['d'] = 3.0
   return metrics
 
 
 class TensorBoardManagerTest(tf.test.TestCase):
 
-  def test_metrics_are_written(self):
+  def test_scalar_metrics_are_written(self):
     summary_dir = os.path.join(self.get_temp_dir(), 'logdir')
     tb_mngr = tensorboard_manager.TensorBoardManager(summary_dir=summary_dir)
-    tb_mngr.update_metrics(0, _create_placeholder_metrics())
+    tb_mngr.update_metrics(0, _create_scalar_metrics())
+    self.assertTrue(tf.io.gfile.exists(summary_dir))
+    self.assertLen(tf.io.gfile.listdir(summary_dir), 1)
+
+  def test_nonscalar_metrics_are_written(self):
+    summary_dir = os.path.join(self.get_temp_dir(), 'logdir')
+    tb_mngr = tensorboard_manager.TensorBoardManager(summary_dir=summary_dir)
+    tb_mngr.update_metrics(0, _create_nonscalar_metrics())
     self.assertTrue(tf.io.gfile.exists(summary_dir))
     self.assertLen(tf.io.gfile.listdir(summary_dir), 1)
 
   def test_update_metrics_returns_flat_dict(self):
     tb_mngr = tensorboard_manager.TensorBoardManager(
         summary_dir=self.get_temp_dir())
-    input_data_dict = _create_placeholder_metrics()
+    input_data_dict = _create_scalar_metrics()
     appended_data_dict = tb_mngr.update_metrics(0, input_data_dict)
     self.assertEqual({
         'a/b': 1.0,
@@ -60,21 +76,21 @@ class TensorBoardManagerTest(tf.test.TestCase):
         summary_dir=self.get_temp_dir())
 
     with self.assertRaises(ValueError):
-      tb_mngr.update_metrics(-1, _create_placeholder_metrics())
+      tb_mngr.update_metrics(-1, _create_scalar_metrics())
 
   def test_update_metrics_raises_value_error_if_round_num_is_out_of_order(self):
     tb_mngr = tensorboard_manager.TensorBoardManager(
         summary_dir=self.get_temp_dir())
 
-    tb_mngr.update_metrics(1, _create_placeholder_metrics())
+    tb_mngr.update_metrics(1, _create_scalar_metrics())
 
     with self.assertRaises(ValueError):
-      tb_mngr.update_metrics(0, _create_placeholder_metrics())
+      tb_mngr.update_metrics(0, _create_scalar_metrics())
 
   def test_update_hparams_returns_flat_dict(self):
     tb_mngr = tensorboard_manager.TensorBoardManager(
         summary_dir=self.get_temp_dir())
-    input_data_dict = _create_placeholder_metrics()
+    input_data_dict = _create_scalar_metrics()
     appended_data_dict = tb_mngr.update_hparams(input_data_dict)
     self.assertEqual({
         'a/b': 1.0,

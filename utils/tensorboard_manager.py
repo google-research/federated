@@ -17,6 +17,7 @@ import collections
 from typing import Any, Dict
 
 from absl import logging
+import numpy as np
 import tensorflow as tf
 import tree
 
@@ -32,19 +33,20 @@ def _create_if_not_exists(path):
 
 
 def _flatten_nested_dict(struct: Dict[str, Any]) -> Dict[str, Any]:
-  """Flattens a given nested dictionary, sorting by flattened key value.
+  """Flattens a given nested structure of tensors, sorting by flattened keys.
 
   For example, if we have the nested dictionary {'d':3, 'a': {'b': 1, 'c':2}, },
-  this will produce the (ordered) dictionary {'a/b': 1, 'a/c': 2, 'd': 3}.
+  this will produce the (ordered) dictionary {'a/b': 1, 'a/c': 2, 'd': 3}. This
+  will unpack lists, so that {'a': [3, 4, 5]} will be flattened to the ordered
+  dictionary {'a/0': 3, 'a/1': 4, 'a/2': 5}. The values of the resulting
+  flattened dictionary will be the tensors at the corresponding leaf nodes
+  of the original struct.
 
   Args:
     struct: A nested dictionary.
 
   Returns:
     A `collections.OrderedDict` representing a flattened version of `struct`.
-    Compared with the input `struct`, this data is flattened, with the key
-    names equal to the path in the nested structure. The `OrderedDict` is
-    sorted by the flattened keys.
   """
   flat_struct = tree.flatten_with_path(struct)
   flat_struct = [('/'.join(map(str, path)), item) for path, item in flat_struct]
@@ -93,6 +95,11 @@ class TensorBoardManager(metrics_manager.MetricsManager):
     is intended usage, allowing one to restart and resume experiments from
     previous rounds.
 
+    The metrics written by the underlying `tf.summary.SummaryWriter` will be the
+    leaf node tensors of the metrics_to_append structure. Purely scalar tensors
+    will be written using `tf.summary.scalar`, while tensors with non-zero rank
+    will be written using `tf.summary.histogram`.
+
     Args:
       round_num: Communication round at which `metrics_to_append` was collected.
       metrics_to_append: A nested structure of metrics collected during
@@ -124,7 +131,11 @@ class TensorBoardManager(metrics_manager.MetricsManager):
     flat_metrics = _flatten_nested_dict(metrics_to_append)
     with self._summary_writer.as_default():
       for name, val in flat_metrics.items():
-        tf.summary.scalar(name, val, step=round_num)
+        val_array = np.array(val)
+        if val_array.shape:
+          tf.summary.histogram(name, val, step=round_num)
+        else:
+          tf.summary.scalar(name, val, step=round_num)
 
     self._latest_round_num = round_num
     return flat_metrics
