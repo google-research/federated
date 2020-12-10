@@ -359,7 +359,7 @@ class ExperimentRunnerTest(tf.test.TestCase):
 
     results_dir = os.path.join(root_output_dir, 'results', experiment_name)
 
-    scalar_manager = csv_manager.ScalarMetricsManager(results_dir)
+    scalar_manager = csv_manager.CSVMetricsManager(results_dir)
     fieldnames, metrics = scalar_manager.get_metrics()
     self.assertLen(metrics, 2)
     self.assertIn('eval/loss', fieldnames)

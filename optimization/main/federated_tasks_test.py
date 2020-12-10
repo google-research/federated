@@ -71,7 +71,7 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
     results_dir = os.path.join(root_output_dir, 'results', exp_name)
     self.assertTrue(tf.io.gfile.exists(results_dir))
 
-    scalar_manager = csv_manager.ScalarMetricsManager(results_dir)
+    scalar_manager = csv_manager.CSVMetricsManager(results_dir)
     fieldnames, metrics = scalar_manager.get_metrics()
 
     self.assertIn(

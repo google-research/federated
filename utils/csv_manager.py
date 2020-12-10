@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utility class for saving and loading scalar experiment metrics."""
+"""Utility class for saving and loading experiment metrics via CSV."""
 
 import collections
 import csv
@@ -114,35 +114,32 @@ def _append_to_csv(metrics_to_append: Dict[str, Any], file_name: str):
 
 
 def _flatten_nested_dict(struct: Dict[str, Any]) -> Dict[str, Any]:
-  """Flattens a given nested dictionary, sorting by flattened key value.
+  """Flattens a given nested structure of tensors, sorting by flattened keys.
 
   For example, if we have the nested dictionary {'d':3, 'a': {'b': 1, 'c':2}, },
-  this will produce the (ordered) dictionary {'a/b': 1, 'a/c': 2, 'd': 3}.
+  this will produce the (ordered) dictionary {'a/b': 1, 'a/c': 2, 'd': 3}. This
+  will unpack lists, so that {'a': [3, 4, 5]} will be flattened to the ordered
+  dictionary {'a/0': 3, 'a/1': 4, 'a/2': 5}. The resulting values of the
+  flattened dictionary will be the leaf nodetensors in the original struct.
 
   Args:
     struct: A nested dictionary.
 
   Returns:
     A `collections.OrderedDict` representing a flattened version of `struct`.
-    Compared with the input `struct`, this data is flattened, with the key
-    names equal to the path in the nested structure. The `OrderedDict` is
-    sorted by the flattened keys.
   """
   flat_struct = tree.flatten_with_path(struct)
   flat_struct = [('/'.join(map(str, path)), item) for path, item in flat_struct]
   return collections.OrderedDict(sorted(flat_struct))
 
 
-class ScalarMetricsManager(metrics_manager.MetricsManager):
-  """Utility class for saving/loading scalar experiment metrics.
-
-  The metrics are backed by CSVs stored on the file system.
-  """
+class CSVMetricsManager(metrics_manager.MetricsManager):
+  """Utility class for saving/loading experiment metrics via a CSV file."""
 
   def __init__(self,
                root_metrics_dir: str = '/tmp',
                prefix: str = 'experiment'):
-    """Returns an initialized `ScalarMetricsManager`.
+    """Returns an initialized `CSVMetricsManager`.
 
     This class will maintain metrics in a CSV file in the filesystem. The path
     of the file is {`root_metrics_dir`}/{`prefix`}.metrics.csv. To use this
@@ -150,6 +147,11 @@ class ScalarMetricsManager(metrics_manager.MetricsManager):
     initialize and then call the clear_rounds_after() method to remove all rows
     for round numbers later than the restart round number. This ensures that no
     duplicate rows of data exist in the CSV.
+
+    In order to reduce metric writing time, metrics passed to `update_metrics`
+    are appended to the underlying CSV file (as long as they do not introduce
+    any new key values). This may be *incompatible* with zipped
+    files, such as `.bz2` formats, or encoded directories.
 
     Args:
       root_metrics_dir: A path on the filesystem to store CSVs.
@@ -182,7 +184,7 @@ class ScalarMetricsManager(metrics_manager.MetricsManager):
     if current_metrics and 'round_num' not in current_fieldnames:
       raise ValueError(
           f'The specified csv file ({self._metrics_file}) already exists '
-          'but was not created by ScalarMetricsManager (it does not contain a '
+          'but was not created by CSVMetricsManager (it does not contain a '
           '`round_num` column.')
 
     if not current_metrics:
@@ -200,6 +202,12 @@ class ScalarMetricsManager(metrics_manager.MetricsManager):
     `metrics_to_append` contains a new, previously unseen metric name, a new
     column in the dataframe will be added for that metric, and all previous rows
     will fill in with NaN values for the metric.
+
+    The metrics written are the leaf node tensors of the metrics_to_append
+    structure. Purely scalar tensors will be written as scalars in the CSV,
+    while tensors with non-zero rank will be written as a list of lists. For
+    example, the tensor `tf.ones([2, 2])` will be written to the CSV as
+    `'[[1.0, 1.0], [1.0, 1.0]'`.
 
     Args:
       round_num: Communication round at which `metrics_to_append` was collected.
@@ -234,9 +242,11 @@ class ScalarMetricsManager(metrics_manager.MetricsManager):
     metrics_to_append['round_num'] = round_num
 
     flat_metrics = _flatten_nested_dict(metrics_to_append)
-    _append_to_csv(flat_metrics, self._metrics_file)
+    flat_metrics_as_list = collections.OrderedDict()
+    for key, value in flat_metrics.items():
+      flat_metrics_as_list[key] = np.array(value).tolist()
+    _append_to_csv(flat_metrics_as_list, self._metrics_file)
     self._latest_round_num = round_num
-
     return flat_metrics
 
   def get_metrics(self) -> Tuple[Sequence[str], List[Dict[str, Any]]]:
