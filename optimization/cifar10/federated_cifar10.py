@@ -22,7 +22,7 @@ import tensorflow_federated as tff
 
 from utils import training_loop
 from utils import training_utils
-from utils.datasets import cifar100_dataset
+from utils.datasets import cifar10_dataset
 from utils.models import resnet_models
 
 CIFAR_SHAPE = (32, 32, 3)
