@@ -27,6 +27,7 @@ from absl import flags
 import tensorflow as tf
 import tensorflow_federated as tff
 
+from optimization.cifar10 import federated_cifar10
 from optimization.cifar100 import federated_cifar100
 from optimization.emnist import federated_emnist
 from optimization.emnist_ae import federated_emnist_ae
