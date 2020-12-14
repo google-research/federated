@@ -37,7 +37,7 @@ def run_federated(
     client_datasets_random_seed: Optional[int] = None,
     crop_size: Optional[int] = 24,
     total_rounds: Optional[int] = 1500,
-    experiment_name: Optional[str] = 'federated_cifar100',
+    experiment_name: Optional[str] = 'federated_cifar10',
     root_output_dir: Optional[str] = '/tmp/fed_opt',
     max_eval_batches: Optional[int] = None,
     **kwargs):
@@ -83,12 +83,12 @@ def run_federated(
 
   crop_shape = (crop_size, crop_size, 3)
 
-  cifar_train, _ = cifar100_dataset.get_federated_datasets(
+  cifar_train, _ = cifar10_dataset.get_federated_datasets(
       train_client_epochs_per_round=client_epochs_per_round,
       train_client_batch_size=client_batch_size,
       crop_shape=crop_shape)
 
-  _, cifar_test = cifar100_dataset.get_centralized_datasets(
+  _, cifar_test = cifar10_dataset.get_centralized_datasets(
       train_batch_size=client_batch_size,
       crop_shape=crop_shape)
   if max_eval_batches and max_eval_batches >= 1:

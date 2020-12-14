@@ -60,7 +60,7 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
   """
   crop_shape = (crop_size, crop_size, NUM_CHANNELS)
 
-  cifar_train, cifar_test = cifar100_dataset.get_centralized_datasets(
+  cifar_train, cifar_test = cifar10_dataset.get_centralized_datasets(
       train_batch_size=batch_size, crop_shape=crop_shape)
 
   if max_batches and max_batches >= 1:
