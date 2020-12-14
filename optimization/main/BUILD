@@ -49,7 +49,7 @@ py_binary(
     srcs = ["federated_trainer.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    dips = [
+    deps = [
         "//optimization/cifar10:federated_cifar10",
         "//optimization/cifar100:federated_cifar100",
         "//optimization/emnist:federated_emnist",
