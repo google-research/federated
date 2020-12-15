@@ -20,7 +20,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from utils import checkpoint_manager
 from utils import csv_manager
 from utils import training_loop
 
@@ -310,7 +309,7 @@ class ExperimentRunnerTest(tf.test.TestCase):
         root_output_dir=root_output_dir)
     final_model = iterative_process.get_model_weights(final_state)
 
-    ckpt_manager = checkpoint_manager.FileCheckpointManager(
+    ckpt_manager = tff.simulation.FileCheckpointManager(
         os.path.join(root_output_dir, 'checkpoints', experiment_name))
     restored_state, restored_round = ckpt_manager.load_latest_checkpoint(
         final_state)

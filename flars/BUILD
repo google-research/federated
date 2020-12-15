@@ -48,7 +48,6 @@ py_binary(
     deps = [
         ":flars_fedavg",
         ":flars_optimizer",
-        "//utils:checkpoint_manager",
         "//utils:utils_impl",
         "//utils/models:emnist_models",
     ],

@@ -9,7 +9,6 @@ py_library(
     srcs = ["training_loop.py"],
     srcs_version = "PY3",
     deps = [
-        "//utils:checkpoint_manager",
         "//utils:csv_manager",
         "//utils:utils_impl",
     ],
@@ -23,7 +22,6 @@ py_test(
     srcs_version = "PY3",
     deps = [
         "//fedopt_guide:training_loop",
-        "//utils:checkpoint_manager",
         "//utils:csv_manager",
         "//utils:training_utils",
     ],

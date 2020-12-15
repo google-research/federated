@@ -23,7 +23,6 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from utils import checkpoint_manager
 from utils import csv_manager
 from utils import utils_impl
 from tensorboard.plugins.hparams import api as hp
@@ -50,7 +49,7 @@ def _setup_outputs(root_output_dir, experiment_name, hparam_dict):
 
   checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
   create_if_not_exists(checkpoint_dir)
-  checkpoint_mngr = checkpoint_manager.FileCheckpointManager(checkpoint_dir)
+  checkpoint_mngr = tff.simulation.FileCheckpointManager(checkpoint_dir)
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   create_if_not_exists(results_dir)

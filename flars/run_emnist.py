@@ -31,7 +31,6 @@ import tree
 
 from flars import flars_fedavg
 from flars import flars_optimizer
-from utils import checkpoint_manager
 from utils import utils_impl
 from utils.models import emnist_models
 from tensorboard.plugins.hparams import api as hp
@@ -126,8 +125,7 @@ def _federated_averaging_training_loop(model_fn,
   logging.info('Starting federated training loop')
 
   checkpoint_dir = os.path.join(FLAGS.root_output_dir, FLAGS.exp_name)
-  checkpoint_manager_obj = checkpoint_manager.FileCheckpointManager(
-      checkpoint_dir)
+  checkpoint_manager_obj = tff.simulation.FileCheckpointManager(checkpoint_dir)
 
   if FLAGS.server_optimizer != 'flars':
     logging.error('Unsupported server_optimzier: %s', FLAGS.server_optimizer)
