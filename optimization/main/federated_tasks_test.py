@@ -59,8 +59,7 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
         total_rounds=total_rounds,
         iterative_process_builder=iterative_process_builder,
         rounds_per_checkpoint=10,
-        rounds_per_eval=10,
-        max_eval_batches=2)
+        rounds_per_eval=10)
     root_output_dir = self.get_temp_dir()
     exp_name = 'test_run_federated'
     shared_args['root_output_dir'] = root_output_dir
