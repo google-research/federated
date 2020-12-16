@@ -24,7 +24,12 @@ CIFAR_SHAPE = (32, 32, 3)
 TOTAL_FEATURE_SIZE = 32 * 32 * 3
 NUM_EXAMPLES_PER_CLIENT = 5000
 
-def load_cifar10_federated(num_clients=10, num_classes=10, alpha=1, train_client_batch_size=20, test_client_batch_size=100):
+def load_cifar10_federated(
+    num_clients: int = 10, 
+    num_classes: int = 10, 
+    alpha: float = 1, 
+    train_client_batch_size: int = 20, 
+    test_client_batch_size: int = 100):
     '''
     Loads the train dataset into a non iid distribution over clients using the
     sampling method based on LDA, taken from this paper:
@@ -63,7 +68,9 @@ def load_cifar10_federated(num_clients=10, num_classes=10, alpha=1, train_client
         x_train, y_train = x_train[:train_samples_per_client], y_train[:train_samples_per_client]
         
         data = collections.OrderedDict((('image', x_train), ('label', y_train)))        
-        test_data = collections.OrderedDict((('image', test_images[i*num_per_client_test:(i+1)*num_per_client_test]), ('label', test_labels[i*num_per_client_test:(i+1)*num_per_client_test].astype('int64').squeeze())))
+        test_data = collections.OrderedDict(
+            (('image', test_images[i*num_per_client_test:(i+1)*num_per_client_test]), 
+            ('label', test_labels[i*num_per_client_test:(i+1)*num_per_client_test].astype('int64').squeeze())))
         client_train_dataset[client_name] = data
         client_test_dataset[client_name] = test_data
 
@@ -215,7 +222,9 @@ def get_federated_datasets(
   if test_shuffle_buffer_size <= 1:
     test_shuffle_buffer_size = 1
 
-  cifar_train, cifar_test = load_cifar10_federated(train_client_batch_size=train_client_batch_size, test_client_batch_size=test_client_batch_size)
+  cifar_train, cifar_test = load_cifar10_federated(
+      train_client_batch_size=train_client_batch_size, 
+      test_client_batch_size=test_client_batch_size)
   train_crop_shape = (train_client_batch_size,) + crop_shape
   test_crop_shape = (test_client_batch_size,) + crop_shape
 
