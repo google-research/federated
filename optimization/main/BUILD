@@ -1,6 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 
-package(default_visibility = ["//visibility:private"])
+package(default_visibility = ["//google/optimization/main:__subpackages__"])
 
 licenses(["notice"])
 
