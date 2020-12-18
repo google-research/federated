@@ -10,7 +10,6 @@ py_binary(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
-        "//optimization/cifar10:centralized_cifar10",
         "//optimization/cifar100:centralized_cifar100",
         "//optimization/emnist:centralized_emnist",
         "//optimization/emnist_ae:centralized_emnist_ae",
@@ -34,8 +33,7 @@ py_test(
         "nopresubmit",
     ],
     deps = [
-        "//optimization/cifar10:centralized_cifar10",
-	"//optimization/cifar100:centralized_cifar100",
+        "//optimization/cifar100:centralized_cifar100",
         "//optimization/emnist:centralized_emnist",
         "//optimization/emnist_ae:centralized_emnist_ae",
         "//optimization/shakespeare:centralized_shakespeare",
@@ -50,7 +48,6 @@ py_binary(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
-        "//optimization/cifar10:federated_cifar10",
         "//optimization/cifar100:federated_cifar100",
         "//optimization/emnist:federated_emnist",
         "//optimization/emnist_ae:federated_emnist_ae",
@@ -75,7 +72,6 @@ py_test(
         "nopresubmit",
     ],
     deps = [
-        "//optimization/cifar10:federated_cifar10",        
         "//optimization/cifar100:federated_cifar100",
         "//optimization/emnist:federated_emnist",
         "//optimization/emnist_ae:federated_emnist_ae",

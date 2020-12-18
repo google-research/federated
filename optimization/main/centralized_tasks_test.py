@@ -19,7 +19,6 @@ from absl.testing import parameterized
 import pandas as pd
 import tensorflow as tf
 
-from optimization.cifar10 import centralized_cifar10
 from optimization.cifar100 import centralized_cifar100
 from optimization.emnist import centralized_emnist
 from optimization.emnist_ae import centralized_emnist_ae
@@ -31,7 +30,6 @@ from optimization.stackoverflow_lr import centralized_stackoverflow_lr
 class CentralizedTasksTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('cifar10', centralized_cifar10.run_centralized),
       ('cifar100', centralized_cifar100.run_centralized),
       ('emnist_cr', centralized_emnist.run_centralized),
       ('emnist_ae', centralized_emnist_ae.run_centralized),

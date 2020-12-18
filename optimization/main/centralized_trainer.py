@@ -24,7 +24,6 @@ import collections
 from absl import app
 from absl import flags
 
-from optimization.cifar10 import centralized_cifar10
 from optimization.cifar100 import centralized_cifar100
 from optimization.emnist import centralized_emnist
 from optimization.emnist_ae import centralized_emnist_ae
@@ -35,7 +34,7 @@ from optimization.stackoverflow_lr import centralized_stackoverflow_lr
 from utils import utils_impl
 
 _SUPPORTED_TASKS = [
-    'cifar10', 'cifar100', 'emnist_cr', 'emnist_ae', 'shakespeare', 'stackoverflow_nwp',
+    'cifar100', 'emnist_cr', 'emnist_ae', 'shakespeare', 'stackoverflow_nwp',
     'stackoverflow_lr'
 ]
 
@@ -128,10 +127,6 @@ def main(argv):
   if FLAGS.task == 'cifar100':
     centralized_cifar100.run_centralized(
         **common_args, crop_size=FLAGS.cifar100_crop_size)
-
-  elif FLAGS.task == 'cifar10':
-    centralized_cifar100.run_centralized(
-        **common_args, crop_size=FLAGS.cifar10_crop_size)
 
   elif FLAGS.task == 'emnist_cr':
     centralized_emnist.run_centralized(

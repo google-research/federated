@@ -19,7 +19,6 @@ import os.path
 from absl.testing import parameterized
 import tensorflow as tf
 
-from optimization.cifar10 import federated_cifar10
 from optimization.cifar100 import federated_cifar100
 from optimization.emnist import federated_emnist
 from optimization.emnist_ae import federated_emnist_ae
@@ -43,7 +42,6 @@ def iterative_process_builder(model_fn, client_weight_fn=None):
 class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('cifar10', federated_cifar10.run_federated),
       ('cifar100', federated_cifar100.run_federated),
       ('emnist_cr', federated_emnist.run_federated),
       ('emnist_ae', federated_emnist_ae.run_federated),

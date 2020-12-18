@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Runs federated training on various tasks using a generalized form of FedAvg.
+
 Specifically, we create (according to flags) an iterative processes that allows
 for client and server learning rate schedules, as well as various client and
 server optimization methods. For more details on the learning rate scheduling
@@ -27,7 +28,6 @@ from absl import flags
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.cifar10 import federated_cifar10
 from optimization.cifar100 import federated_cifar100
 from optimization.emnist import federated_emnist
 from optimization.emnist_ae import federated_emnist_ae
@@ -39,7 +39,7 @@ from optimization.stackoverflow_lr import federated_stackoverflow_lr
 from utils import utils_impl
 
 _SUPPORTED_TASKS = [
-    'cifar10', 'cifar100', 'emnist_cr', 'emnist_ae', 'shakespeare', 'stackoverflow_nwp',
+    'cifar100', 'emnist_cr', 'emnist_ae', 'shakespeare', 'stackoverflow_nwp',
     'stackoverflow_lr'
 ]
 
@@ -85,11 +85,6 @@ with utils_impl.record_hparam_flags() as task_flags:
 with utils_impl.record_hparam_flags() as cifar100_flags:
   # CIFAR-100 flags
   flags.DEFINE_integer('cifar100_crop_size', 24, 'The height and width of '
-                       'images after preprocessing.')
-
-with utils_impl.record_hparam_flags() as cifar10_flags:
-  # CIFAR-100 flags
-  flags.DEFINE_integer('cifar10_crop_size', 24, 'The height and width of '
                        'images after preprocessing.')
 
 with utils_impl.record_hparam_flags() as emnist_cr_flags:
@@ -142,7 +137,6 @@ with utils_impl.record_hparam_flags() as so_lr_flags:
 FLAGS = flags.FLAGS
 
 TASK_FLAGS = collections.OrderedDict(
-    cifar10=cifar10_flags,
     cifar100=cifar100_flags,
     emnist_cr=emnist_cr_flags,
     shakespeare=shakespeare_flags,
@@ -150,7 +144,6 @@ TASK_FLAGS = collections.OrderedDict(
     stackoverflow_lr=so_lr_flags)
 
 TASK_FLAG_PREFIXES = collections.OrderedDict(
-    cifar10='cifar10',
     cifar100='cifar100',
     emnist_cr='emnist_cr',
     emnist_ae='emnist_ae',
@@ -180,9 +173,11 @@ def _get_hparam_flags():
 
 def _get_task_args():
   """Returns an ordered dictionary of task-specific arguments.
+
   This method returns a dict of (arg_name, arg_value) pairs, where the
   arg_name has had the task name removed as a prefix (if it exists), as well
   as any leading `-` or `_` characters.
+
   Returns:
     An ordered dictionary of (arg_name, arg_value) pairs.
   """
@@ -216,12 +211,14 @@ def main(argv):
       client_weight_fn: Optional[Callable[[Any], tf.Tensor]] = None,
   ) -> tff.templates.IterativeProcess:
     """Creates an iterative process using a given TFF `model_fn`.
+
     Args:
       model_fn: A no-arg function returning a `tff.learning.Model`.
       client_weight_fn: Optional function that takes the output of
         `model.report_local_outputs` and returns a tensor providing the weight
         in the federated average of model deltas. If not provided, the default
         is the total number of examples processed on device.
+
     Returns:
       A `tff.templates.IterativeProcess`.
     """
@@ -241,8 +238,6 @@ def main(argv):
 
   if FLAGS.task == 'cifar100':
     run_federated_fn = federated_cifar100.run_federated
-  elif FLAGS.task == 'cifar10':
-    run_federated_fn = federated_cifar10.run_federated
   elif FLAGS.task == 'emnist_cr':
     run_federated_fn = federated_emnist.run_federated
   elif FLAGS.task == 'emnist_ae':
