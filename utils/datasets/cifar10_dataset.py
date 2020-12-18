@@ -30,54 +30,72 @@ def load_cifar10_federated(
     alpha: float = 1, 
     train_client_batch_size: int = 20, 
     test_client_batch_size: int = 100):
-    '''
-    Loads the train dataset into a non iid distribution over clients using the
-    sampling method based on LDA, taken from this paper:
-    Measuring the Effects of Non-Identical Data Distribution for
-    Federated Visual Classification (https://arxiv.org/pdf/1909.06335.pdf).
-    '''
-    (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
-    client_train_dataset = collections.OrderedDict()
-    client_test_dataset = collections.OrderedDict()
+  '''Construct a synthetic federated CIFAR-10 from its centralized version
 
-    # for each class in the dataset, there are 10 for CIFAR-10
-    idx_batch = [[] for _ in range(num_clients)]
+  Loads the train dataset into a non iid distribution over clients using the
+  sampling method based on LDA, taken from this paper:
+  Measuring the Effects of Non-Identical Data Distribution for
+  Federated Visual Classification (https://arxiv.org/pdf/1909.06335.pdf).
 
-    for k in range(num_classes):
-        '''
-        This will form the final dataset dictionary for each client
-        For each class(label) sample in a proportion for each client. 
-        The proportion is determined by a dirichlet distribution.
-        '''
-        label_k = np.where(train_labels.squeeze()==k)[0]
-        np.random.shuffle(label_k)
-        proportion = np.random.dirichlet(alpha*np.ones((num_clients,)))
-        proportion = proportion*(label_k.shape[0])
-        proportion = np.cumsum(proportion).astype(int)
-        split_labels = np.split(label_k, proportion)
-        
-        idx_batch = [idx_j + splitk.tolist() for idx_j, splitk in zip(idx_batch, split_labels)]
+  Args:
+    num_clients: An integer specifing the total number of clients.
+    num_classes: An integer representing the number of lables in the dataset.
+    alpha: A float controling the data heterogeneity among clients.
+    train_client_batch_size: A float representing the batch size during 
+      training.
+    test_client_batch_size: A float representing the batch size during
+      test.
 
-    num_per_client_test = int((len(test_labels) // (num_clients*test_client_batch_size))*test_client_batch_size)
+  Returns:
+    A tuple of `tff.simulation.ClientData` representing unpreprocessed
+    train data and test data.
+  '''
+  (train_images, train_labels), (test_images, test_labels) \
+      = datasets.cifar10.load_data()
+  client_train = collections.OrderedDict()
+  client_test = collections.OrderedDict()
 
-    for i in range(num_clients):
-        client_name = str(i)
-        x_train = train_images[np.array(idx_batch[i])]
-        y_train = train_labels[np.array(idx_batch[i])].astype('int64').squeeze()
-        train_samples_per_client = (x_train.shape[0] // train_client_batch_size) * train_client_batch_size
-        x_train, y_train = x_train[:train_samples_per_client], y_train[:train_samples_per_client]
-        
-        data = collections.OrderedDict((('image', x_train), ('label', y_train)))        
-        test_data = collections.OrderedDict(
-            (('image', test_images[i*num_per_client_test:(i+1)*num_per_client_test]), 
-            ('label', test_labels[i*num_per_client_test:(i+1)*num_per_client_test].astype('int64').squeeze())))
-        client_train_dataset[client_name] = data
-        client_test_dataset[client_name] = test_data
+  # The following structure will store the image index for each client
+  idx_batch = [[] for _ in range(num_clients)]
 
-    train_dataset = tff.simulation.FromTensorSlicesClientData(client_train_dataset)
-    test_dataset = tff.simulation.FromTensorSlicesClientData(client_test_dataset)
+  for k in range(num_classes):
+    # For each class(label) sample in a proportion for each client. 
+    # The proportion is determined by a dirichlet distribution.
+    label_k = np.where(train_labels.squeeze()==k)[0]
+    np.random.shuffle(label_k)
+    proportion = np.random.dirichlet(alpha*np.ones((num_clients,)))
+    proportion = proportion*(label_k.shape[0])
+    proportion = np.cumsum(proportion).astype(int)
+    split_labels = np.split(label_k, proportion)
+      
+    idx_batch = [idx_j + splitk.tolist() for idx_j, splitk \
+       in zip(idx_batch, split_labels)]
 
-    return train_dataset, test_dataset
+  num_per_client_test = int((len(test_labels) \
+      // (num_clients*test_client_batch_size))*test_client_batch_size)
+
+  for i in range(num_clients):
+    client_name = str(i)
+    x_train = train_images[np.array(idx_batch[i])]
+    y_train = train_labels[np.array(idx_batch[i])].astype('int64').squeeze()
+    train_samples_per_client = (x_train.shape[0] \
+        // train_client_batch_size) * train_client_batch_size
+    x_train = x_train[:train_samples_per_client]
+    y_train = y_train[:train_samples_per_client]
+    
+    data = collections.OrderedDict((('image', x_train), ('label', y_train)))
+    test_idx_start = i*num_per_client_test
+    test_idx_end = (i+1)*num_per_client_test       
+    test_data = collections.OrderedDict(
+        (('image', test_images[test_idx_start:test_idx_end]), 
+        ('label', test_labels[test_idx_start:test_idx_end].astype('int64').squeeze())))
+    client_train[client_name] = data
+    client_test[client_name] = test_data
+
+  train_dataset = tff.simulation.FromTensorSlicesClientData(client_train)
+  test_dataset = tff.simulation.FromTensorSlicesClientData(client_test)
+
+  return train_dataset, test_dataset
 
 
 def build_image_map(crop_shape, distort=False):
