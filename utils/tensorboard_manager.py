@@ -19,9 +19,9 @@ from typing import Any, Dict
 from absl import logging
 import numpy as np
 import tensorflow as tf
+import tensorflow_federated as tff
 import tree
 
-from utils import metrics_manager
 from tensorboard.plugins.hparams import api as hp
 
 
@@ -53,7 +53,7 @@ def _flatten_nested_dict(struct: Dict[str, Any]) -> Dict[str, Any]:
   return collections.OrderedDict(sorted(flat_struct))
 
 
-class TensorBoardManager(metrics_manager.MetricsManager):
+class TensorBoardManager(tff.simulation.MetricsManager):
   """Utility class for saving metrics using `tf.summary`.
 
   This class is intended to log scalar metrics and hyperparameters so that they

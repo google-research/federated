@@ -8,10 +8,7 @@ py_library(
     name = "training_loop",
     srcs = ["training_loop.py"],
     srcs_version = "PY3",
-    deps = [
-        "//utils:csv_manager",
-        "//utils:utils_impl",
-    ],
+    deps = ["//utils:utils_impl"],
 )
 
 py_test(
@@ -22,7 +19,6 @@ py_test(
     srcs_version = "PY3",
     deps = [
         "//fedopt_guide:training_loop",
-        "//utils:csv_manager",
         "//utils:training_utils",
     ],
 )

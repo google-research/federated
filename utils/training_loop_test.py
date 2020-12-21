@@ -20,7 +20,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from utils import csv_manager
 from utils import training_loop
 
 _Batch = collections.namedtuple('Batch', ['x', 'y'])
@@ -358,7 +357,7 @@ class ExperimentRunnerTest(tf.test.TestCase):
 
     csv_file = os.path.join(root_output_dir, 'results', experiment_name,
                             'experiment.metrics.csv')
-    metrics_manager = csv_manager.CSVMetricsManager(csv_file)
+    metrics_manager = tff.simulation.CSVMetricsManager(csv_file)
     fieldnames, metrics = metrics_manager.get_metrics()
     self.assertLen(metrics, 2)
     self.assertIn('eval/loss', fieldnames)

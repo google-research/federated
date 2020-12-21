@@ -18,6 +18,7 @@ import os.path
 
 from absl.testing import parameterized
 import tensorflow as tf
+import tensorflow_federated as tff
 
 from optimization.cifar100 import federated_cifar100
 from optimization.emnist import federated_emnist
@@ -26,7 +27,6 @@ from optimization.shakespeare import federated_shakespeare
 from optimization.shared import fed_avg_schedule
 from optimization.stackoverflow import federated_stackoverflow
 from optimization.stackoverflow_lr import federated_stackoverflow_lr
-from utils import csv_manager
 
 
 def iterative_process_builder(model_fn, client_weight_fn=None):
@@ -70,7 +70,7 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
     results_dir = os.path.join(root_output_dir, 'results', exp_name)
     self.assertTrue(tf.io.gfile.exists(results_dir))
 
-    scalar_manager = csv_manager.CSVMetricsManager(
+    scalar_manager = tff.simulation.CSVMetricsManager(
         os.path.join(results_dir, 'experiment.metrics.csv'))
     fieldnames, metrics = scalar_manager.get_metrics()
 

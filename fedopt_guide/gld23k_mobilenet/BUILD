@@ -38,10 +38,7 @@ py_test(
         "nokokoro",
         "nopresubmit",
     ],
-    deps = [
-        ":federated_main",
-        "//utils:csv_manager",
-    ],
+    deps = [":federated_main"],
 )
 
 py_test(

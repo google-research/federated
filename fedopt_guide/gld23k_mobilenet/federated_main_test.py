@@ -16,7 +16,6 @@ import os
 import tensorflow as tf
 import tensorflow_federated as tff
 from fedopt_guide.gld23k_mobilenet import federated_main
-from utils import csv_manager
 
 
 def iterative_process_builder(model_fn, client_weight_fn=None):
@@ -50,7 +49,7 @@ class FederatedMainTest(tf.test.TestCase):
     results_dir = os.path.join(root_output_dir, 'results', exp_name)
     self.assertTrue(tf.io.gfile.exists(results_dir))
 
-    scalar_manager = csv_manager.CSVMetricsManager(
+    scalar_manager = tff.simulation.CSVMetricsManager(
         os.path.join(results_dir, 'experiment.metrics.csv'))
     fieldnames, metrics = scalar_manager.get_metrics()
 

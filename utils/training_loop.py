@@ -24,7 +24,6 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from utils import csv_manager
 from utils import tensorboard_manager
 from utils import utils_impl
 
@@ -58,7 +57,7 @@ def _setup_outputs(root_output_dir,
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   create_if_not_exists(results_dir)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  metrics_mngr = csv_manager.CSVMetricsManager(csv_file)
+  metrics_mngr = tff.simulation.CSVMetricsManager(csv_file)
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
   tb_mngr = tensorboard_manager.TensorBoardManager(summary_dir=summary_logdir)
