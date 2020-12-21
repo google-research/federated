@@ -142,6 +142,8 @@ def run_federated(
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
 
+  validation_fn = lambda model_weights, round_num: evaluate_fn(model_weights)
+
   test_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       # Use both val and test for symmetry with other experiments, which
@@ -156,7 +158,7 @@ def run_federated(
   training_loop.run(
       iterative_process=training_process,
       client_datasets_fn=client_datasets_fn,
-      validation_fn=evaluate_fn,
+      validation_fn=validation_fn,
       test_fn=test_fn,
       total_rounds=total_rounds,
       experiment_name=experiment_name,

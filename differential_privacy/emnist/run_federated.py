@@ -161,6 +161,7 @@ def main(argv):
       model_builder=model_builder,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
+  validation_fn = lambda model_weights, round_num: evaluate_fn(model_weights)
 
   logging.info('Training model:')
   logging.info(model_builder().summary())
@@ -171,7 +172,7 @@ def main(argv):
   training_loop.run(
       iterative_process=iterative_process,
       client_datasets_fn=client_datasets_fn,
-      validation_fn=evaluate_fn,
+      validation_fn=validation_fn,
       hparam_dict=hparam_dict,
       **training_loop_dict)
 

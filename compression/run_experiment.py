@@ -185,6 +185,7 @@ def run_experiment():
       model_builder=model_builder,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
+  validation_fn = lambda model_weights, round_num: evaluate_fn(model_weights)
 
   client_optimizer_fn = functools.partial(
       utils_impl.create_optimizer_from_flags, 'client')
@@ -228,7 +229,7 @@ def run_experiment():
   training_loop.run(
       iterative_process=iterative_process,
       client_datasets_fn=client_datasets_fn,
-      validation_fn=evaluate_fn,
+      validation_fn=validation_fn,
       hparam_dict=hparam_dict,
       **training_loop_dict)
 

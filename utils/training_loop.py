@@ -135,7 +135,7 @@ def _check_iterative_process_compatibility(iterative_process):
 
 def run(iterative_process: tff.templates.IterativeProcess,
         client_datasets_fn: Callable[[int], List[tf.data.Dataset]],
-        validation_fn: Callable[[Any], Dict[str, float]],
+        validation_fn: Callable[[Any, int], Dict[str, float]],
         total_rounds: int,
         experiment_name: str,
         test_fn: Optional[Callable[[Any], Dict[str, float]]] = None,
@@ -163,9 +163,9 @@ def run(iterative_process: tff.templates.IterativeProcess,
     client_datasets_fn: Function accepting an integer argument (the round
       number) and returning a list of client datasets to use as federated data
       for that round.
-    validation_fn: A callable accepting a `tff.learning.ModelWeights` and
-      returning a dict of evaluation metrics. Used to compute validation metrics
-      throughout the training process.
+    validation_fn: A callable accepting a `tff.learning.ModelWeights` and the
+      current round number, and returning a dict of evaluation metrics. Used to
+      compute validation metrics throughout the training process.
     total_rounds: The number of federated training rounds to perform.
     experiment_name: The name of the experiment being run. This will be appended
       to the `root_output_dir` for purposes of writing outputs.
@@ -257,7 +257,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
     if round_num % rounds_per_eval == 0:
       # Compute validation metrics
       evaluate_start_time = time.time()
-      validation_metrics = validation_fn(current_model)
+      validation_metrics = validation_fn(current_model, round_num)
       validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
       metrics['eval'] = validation_metrics
 
@@ -269,7 +269,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
 
   # Validation metrics
   evaluate_start_time = time.time()
-  validation_metrics = validation_fn(current_model)
+  validation_metrics = validation_fn(current_model, round_num)
   validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
   metrics['eval'] = validation_metrics
 

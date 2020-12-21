@@ -72,8 +72,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model):
-      del model
+    def validation_fn(model, round_num):
+      del model, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
@@ -90,8 +90,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
     iterative_process = _build_federated_averaging_process()
     client_dataset = [[_batch_fn()]]
 
-    def validation_fn(model):
-      del model
+    def validation_fn(model, round_num):
+      del model, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
@@ -131,8 +131,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model):
-      del model
+    def validation_fn(model, round_num):
+      del model, round_num
       return {}
 
     with self.assertRaises(TypeError):
@@ -164,8 +164,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model):
-      del model
+    def validation_fn(model, round_num):
+      del model, round_num
       return {}
 
     with self.assertRaisesRegex(
@@ -199,8 +199,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model):
-      del model
+    def validation_fn(model, round_num):
+      del model, round_num
       return {}
 
     with self.assertRaisesRegex(
@@ -236,8 +236,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model):
-      del model
+    def validation_fn(model, round_num):
+      del model, round_num
       return {}
 
     with self.assertRaisesRegex(
@@ -263,7 +263,8 @@ class ExperimentRunnerTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model):
+    def validation_fn(model, round_num):
+      del round_num
       keras_model = tff.simulation.models.mnist.create_keras_model(
           compile_model=True)
       model.assign_weights_to(keras_model)
@@ -282,8 +283,8 @@ class ExperimentRunnerTest(tf.test.TestCase):
         root_output_dir=root_output_dir)
     final_model = iterative_process.get_model_weights(final_state)
     self.assertLess(
-        validation_fn(final_model)['loss'],
-        validation_fn(initial_model)['loss'])
+        validation_fn(final_model, 0)['loss'],
+        validation_fn(initial_model, 0)['loss'])
 
   def test_checkpoint_manager_saves_state(self):
     experiment_name = 'checkpoint_manager_saves_state'
@@ -294,8 +295,8 @@ class ExperimentRunnerTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model):
-      del model
+    def validation_fn(model, round_num):
+      del model, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
@@ -338,29 +339,32 @@ class ExperimentRunnerTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def evaluate(model):
+    def test_fn(model):
       keras_model = tff.simulation.models.mnist.create_keras_model(
           compile_model=True)
       model.assign_weights_to(keras_model)
       return {'loss': keras_model.evaluate(batch.x, batch.y)}
 
+    def validation_fn(model, round_num):
+      del model, round_num
+      return {}
+
     root_output_dir = self.get_temp_dir()
     training_loop.run(
         iterative_process=iterative_process,
         client_datasets_fn=client_datasets_fn,
-        validation_fn=evaluate,
+        validation_fn=validation_fn,
         total_rounds=1,
         experiment_name=experiment_name,
         root_output_dir=root_output_dir,
         rounds_per_eval=10,
-        test_fn=evaluate)
+        test_fn=test_fn)
 
     csv_file = os.path.join(root_output_dir, 'results', experiment_name,
                             'experiment.metrics.csv')
     metrics_manager = tff.simulation.CSVMetricsManager(csv_file)
     fieldnames, metrics = metrics_manager.get_metrics()
     self.assertLen(metrics, 2)
-    self.assertIn('eval/loss', fieldnames)
     self.assertIn('test/loss', fieldnames)
 
 

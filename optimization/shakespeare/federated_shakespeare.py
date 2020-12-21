@@ -138,11 +138,13 @@ def run_federated(
       clients_per_round=clients_per_round,
       random_seed=client_datasets_random_seed)
 
-  evaluate_fn = training_utils.build_centralized_evaluate_fn(
+  test_fn = training_utils.build_centralized_evaluate_fn(
       eval_dataset=shakespeare_test,
       model_builder=model_builder,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
+
+  validation_fn = lambda model_weights, round_num: test_fn(model_weights)
 
   logging.info('Training model:')
   logging.info(model_builder().summary())
@@ -150,8 +152,8 @@ def run_federated(
   training_loop.run(
       iterative_process=training_process,
       client_datasets_fn=client_datasets_fn,
-      validation_fn=evaluate_fn,
-      test_fn=evaluate_fn,
+      validation_fn=validation_fn,
+      test_fn=test_fn,
       total_rounds=total_rounds,
       experiment_name=experiment_name,
       root_output_dir=root_output_dir,

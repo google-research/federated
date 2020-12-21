@@ -194,6 +194,7 @@ def main(argv):
       eval_dataset=validation_dataset,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
+  validation_fn = lambda model_weights, round_num: evaluate_fn(model_weights)
 
   test_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
@@ -212,7 +213,7 @@ def main(argv):
   training_loop.run(
       iterative_process=iterative_process,
       client_datasets_fn=client_datasets_fn,
-      validation_fn=evaluate_fn,
+      validation_fn=validation_fn,
       test_fn=test_fn,
       hparam_dict=hparam_dict,
       **training_loop_dict)
