@@ -49,7 +49,7 @@ def convert_to_tuple_dataset(dataset):
 
   """
   example_structure = dataset.element_spec
-  if isinstance(example_structure, collections.Mapping):
+  if isinstance(example_structure, collections.abc.Mapping):
     # We assume the mapping has `x` and `y` keys.
     convert_map_to_tuple = lambda example: (example['x'], example['y'])
     try:
@@ -60,7 +60,7 @@ def convert_to_tuple_dataset(dataset):
   elif isinstance(example_structure, tuple):
 
     if hasattr(example_structure, '_fields') and isinstance(
-        example_structure._fields, collections.Sequence) and all(
+        example_structure._fields, collections.abc.Sequence) and all(
             isinstance(f, str) for f in example_structure._fields):
       # Dataset has namedtuple structure
       convert_tuplelike_to_tuple = lambda x: (x[0], x[1])

@@ -154,7 +154,7 @@ def get_federated_datasets(
     A tuple (cifar_train, cifar_test) of `tff.simulation.ClientData` instances
       representing the federated training and test datasets.
   """
-  if not isinstance(crop_shape, collections.Iterable):
+  if not isinstance(crop_shape, collections.abc.Iterable):
     raise TypeError('Argument crop_shape must be an iterable.')
   crop_shape = tuple(crop_shape)
   if len(crop_shape) != 3:

@@ -72,7 +72,7 @@ class UtilsTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_create_optimizer_from_flags_invalid_overrides(self):
     with flag_sandbox({'{}_optimizer'.format(TEST_CLIENT_FLAG_PREFIX): 'sgd'}):
-      with self.assertRaisesRegex(TypeError, 'type `collections.Mapping`'):
+      with self.assertRaisesRegex(TypeError, 'type `collections.abc.Mapping`'):
         _ = utils_impl.create_optimizer_from_flags(
             TEST_CLIENT_FLAG_PREFIX, overrides=[1, 2, 3])
 

@@ -261,9 +261,9 @@ def create_optimizer_from_flags(
     A `tf.keras.optimizers.Optimizer`.
   """
   if overrides is not None:
-    if not isinstance(overrides, collections.Mapping):
+    if not isinstance(overrides, collections.abc.Mapping):
       raise TypeError(
-          '`overrides` must be a value of type `collections.Mapping`, '
+          '`overrides` must be a value of type `collections.abc.Mapping`, '
           'found type: {!s}'.format(type(overrides)))
   else:
     overrides = {}
