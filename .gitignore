@@ -13,3 +13,6 @@ venv/
 
 # Notebooks
 .ipynb_checkpoints
+
+# PyCharm
+.idea*
