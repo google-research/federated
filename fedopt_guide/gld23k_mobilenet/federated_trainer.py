@@ -119,7 +119,7 @@ def main(argv):
         model_fn=model_fn,
         client_optimizer_fn=client_optimizer_fn,
         server_optimizer_fn=server_optimizer_fn,
-        client_weight_fn=client_weight_fn,
+        client_weighting=client_weight_fn,
         use_experimental_simulation_loop=True)
 
   dataset_type = dataset.DatasetType.GLD23K

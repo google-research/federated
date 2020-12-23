@@ -149,7 +149,7 @@ def main(argv):
   iterative_process = tff.learning.build_federated_averaging_process(
       model_fn=model_fn,
       server_optimizer_fn=server_optimizer_fn,
-      client_weight_fn=client_weight_fn,
+      client_weighting=client_weight_fn,
       client_optimizer_fn=client_optimizer_fn,
       aggregation_process=aggregation_process)
 
