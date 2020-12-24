@@ -23,77 +23,95 @@ from tensorflow.keras import datasets, layers, models
 CIFAR_SHAPE = (32, 32, 3)
 TOTAL_FEATURE_SIZE = 32 * 32 * 3
 NUM_EXAMPLES_PER_CLIENT = 5000
+TEST_SAMPLES_PER_CLIENT = 1000
+NUM_CLASSES = 10
 
 def load_cifar10_federated(
     num_clients: int = 10, 
-    num_classes: int = 10, 
-    alpha: float = 1, 
+    nit: float = 1, 
     train_client_batch_size: int = 20, 
     test_client_batch_size: int = 100):
   '''Construct a synthetic federated CIFAR-10 from its centralized version
-
   Loads the train dataset into a non iid distribution over clients using the
   sampling method based on LDA, taken from this paper:
   Measuring the Effects of Non-Identical Data Distribution for
   Federated Visual Classification (https://arxiv.org/pdf/1909.06335.pdf).
-
   Args:
     num_clients: An integer specifing the total number of clients.
-    num_classes: An integer representing the number of lables in the dataset.
-    alpha: A float controling the data heterogeneity among clients.
+    nit: A float controling the data heterogeneity among clients.
     train_client_batch_size: A float representing the batch size during 
       training.
     test_client_batch_size: A float representing the batch size during
       test.
-
   Returns:
     A tuple of `tff.simulation.ClientData` representing unpreprocessed
     train data and test data.
   '''
   (train_images, train_labels), (test_images, test_labels) \
       = datasets.cifar10.load_data()
-  client_train = collections.OrderedDict()
-  client_test = collections.OrderedDict()
+  train_clients = collections.OrderedDict()
+  test_clients = collections.OrderedDict()
 
-  # The following structure will store the image index for each client
-  idx_batch = [[] for _ in range(num_clients)]
+  nit = 1
+  num_clients = 10
+  proportion_clients_train = []
+  proportion_clients_test = []
+  # each column is a distribution over classes for the client at that index
+  for i in range(num_clients):
+      proportion = np.random.dirichlet(nit*np.ones(NUM_CLASSES,))
+      train_proportion = (5000*proportion).astype(int)
+      proportion_clients_train.append(train_proportion)
+      test_proportion = (1000*proportion).astype(int)
+      proportion_clients_test.append(test_proportion)
+  
+  
+  train_idx_batch = [[] for _ in range(num_clients)]
+  test_idx_batch = [[] for _ in range(num_clients)]
+  proportion_clients_train = np.array(proportion_clients_train)
+  proportion_clients_test = np.array(proportion_clients_test)
 
-  for k in range(num_classes):
-    # For each class(label) sample in a proportion for each client. 
-    # The proportion is determined by a dirichlet distribution.
-    label_k = np.where(train_labels.squeeze()==k)[0]
-    np.random.shuffle(label_k)
-    proportion = np.random.dirichlet(alpha*np.ones((num_clients,)))
-    proportion = proportion*(label_k.shape[0])
-    proportion = np.cumsum(proportion).astype(int)
-    split_labels = np.split(label_k, proportion)
-      
-    idx_batch = [idx_j + splitk.tolist() for idx_j, splitk \
-       in zip(idx_batch, split_labels)]
+  cumsum_client_labels_train = proportion_clients_train.cumsum(axis=0)
+  cumsum_client_labels_test = proportion_clients_test.cumsum(axis=0)
+  for k in range(NUM_CLASSES):
 
-  num_per_client_test = int((len(test_labels) \
-      // (num_clients*test_client_batch_size))*test_client_batch_size)
+    train_label_k = np.where(train_labels==k)[0]
+    np.random.shuffle(train_label_k)
+
+    train_split_labels = np.split(train_label_k, cumsum_client_labels_train[:, k])
+
+    train_idx_batch = [idx_j + splitk.tolist() for idx_j, splitk \
+       in zip(train_idx_batch, train_split_labels)]
+    
+    test_label_k = np.where(test_labels==k)[0]
+    np.random.shuffle(test_label_k)
+
+    test_split_labels = np.split(test_label_k, cumsum_client_labels_test[:, k])
+
+    test_idx_batch = [idx_j + splitk.tolist() for idx_j, splitk \
+       in zip(test_idx_batch, test_split_labels)]
 
   for i in range(num_clients):
     client_name = str(i)
-    x_train = train_images[np.array(idx_batch[i])]
-    y_train = train_labels[np.array(idx_batch[i])].astype('int64').squeeze()
+    x_train = train_images[np.array(train_idx_batch[i])]
+    y_train = train_labels[np.array(train_idx_batch[i])].astype('int64').squeeze()
     train_samples_per_client = (x_train.shape[0] \
         // train_client_batch_size) * train_client_batch_size
     x_train = x_train[:train_samples_per_client]
     y_train = y_train[:train_samples_per_client]
+    train_data = collections.OrderedDict((('image', x_train), ('label', y_train)))
+    train_clients[client_name] = train_data
     
-    data = collections.OrderedDict((('image', x_train), ('label', y_train)))
-    test_idx_start = i*num_per_client_test
-    test_idx_end = (i+1)*num_per_client_test       
-    test_data = collections.OrderedDict(
-        (('image', test_images[test_idx_start:test_idx_end]), 
-        ('label', test_labels[test_idx_start:test_idx_end].astype('int64').squeeze())))
-    client_train[client_name] = data
-    client_test[client_name] = test_data
-
-  train_dataset = tff.simulation.FromTensorSlicesClientData(client_train)
-  test_dataset = tff.simulation.FromTensorSlicesClientData(client_test)
+    x_test = test_images[np.array(test_idx_batch[i])]
+    y_test = test_labels[np.array(test_idx_batch[i])].astype('int64').squeeze()
+    test_samples_per_client = (x_test.shape[0] \
+        // test_client_batch_size) * test_client_batch_size
+    x_test = x_test[:test_samples_per_client]
+    y_test = y_test[:test_samples_per_client]
+    test_data = collections.OrderedDict((('image', x_test), ('label', y_test)))
+    test_clients[client_name] = test_data
+    
+  train_dataset = tff.simulation.FromTensorSlicesClientData(train_clients)
+  test_dataset = tff.simulation.FromTensorSlicesClientData(test_clients)
 
   return train_dataset, test_dataset
 
@@ -286,9 +304,10 @@ def get_centralized_datasets(
       shape for pre-processing. Must be convertable to a tuple of integers
       (CROP_HEIGHT, CROP_WIDTH, NUM_CHANNELS) which cannot have elements that
       exceed (32, 32, 3), element-wise. The element in the last index should be
-      set to 3 to maintain the RGB image structure of the elements.
+      set
   Returns:
-    A tuple (cifar_train, cifar_test) of `tf.data.Dataset` instances
+    A tup
+le (cifar_train, cifar_test) of `tf.data.Dataset` instances
     representing the centralized training and test datasets.
   """
   try:
