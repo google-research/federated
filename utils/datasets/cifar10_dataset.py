@@ -72,20 +72,15 @@ def load_cifar10_federated(
   cumsum_client_labels_test = proportion_clients_test.cumsum(axis=0)
 
   for k in range(NUM_CLASSES):
-    
     train_label_k = np.where(train_labels==k)[0]
     np.random.shuffle(train_label_k)
-
     train_split_labels = np.split(train_label_k, cumsum_client_labels_train[:, k])
-
     train_idx_batch = [idx_j + splitk.tolist() for idx_j, splitk \
        in zip(train_idx_batch, train_split_labels)]
     
     test_label_k = np.where(test_labels==k)[0]
     np.random.shuffle(test_label_k)
-
     test_split_labels = np.split(test_label_k, cumsum_client_labels_test[:, k])
-
     test_idx_batch = [idx_j + splitk.tolist() for idx_j, splitk \
        in zip(test_idx_batch, test_split_labels)]
 
