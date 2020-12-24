@@ -70,8 +70,9 @@ def load_cifar10_federated(
 
   cumsum_client_labels_train = proportion_clients_train.cumsum(axis=0)
   cumsum_client_labels_test = proportion_clients_test.cumsum(axis=0)
-  for k in range(NUM_CLASSES):
 
+  for k in range(NUM_CLASSES):
+    
     train_label_k = np.where(train_labels==k)[0]
     np.random.shuffle(train_label_k)
 
