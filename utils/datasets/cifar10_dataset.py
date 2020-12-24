@@ -38,7 +38,8 @@ def load_cifar10_federated(
   Federated Visual Classification (https://arxiv.org/pdf/1909.06335.pdf).
   Args:
     num_clients: An integer specifing the total number of clients.
-    nit: A float controling the data heterogeneity among clients.
+    nit: A float parametrizing the Dirichlet distribution which samples a 
+      multinomial over classes for each client.
     train_client_batch_size: A float representing the batch size during 
       training.
     test_client_batch_size: A float representing the batch size during
@@ -52,8 +53,6 @@ def load_cifar10_federated(
   train_clients = collections.OrderedDict()
   test_clients = collections.OrderedDict()
 
-  nit = 1
-  num_clients = 10
   proportion_clients_train = []
   proportion_clients_test = []
   # each column is a distribution over classes for the client at that index
@@ -63,7 +62,6 @@ def load_cifar10_federated(
       proportion_clients_train.append(train_proportion)
       test_proportion = (1000*proportion).astype(int)
       proportion_clients_test.append(test_proportion)
-  
   
   train_idx_batch = [[] for _ in range(num_clients)]
   test_idx_batch = [[] for _ in range(num_clients)]
