@@ -213,6 +213,8 @@ def run(iterative_process: tff.templates.IterativeProcess,
     round_num += 1  # Increment to avoid overwriting current checkpoint
     metrics_mngr.clear_rounds_after(last_valid_round_num=round_num - 1)
 
+  current_model = iterative_process.get_model_weights(state)
+
   loop_start_time = time.time()
   while round_num < total_rounds:
     data_prep_start_time = time.time()
@@ -222,7 +224,8 @@ def run(iterative_process: tff.templates.IterativeProcess,
     }
 
     training_start_time = time.time()
-    prev_model = iterative_process.get_model_weights(state)
+    prev_model = current_model
+
     # TODO(b/145604851): This try/except is used to circumvent ambiguous TF
     # errors during training, and should be removed once the root cause is
     # determined (and possibly fixed).
