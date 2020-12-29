@@ -27,8 +27,7 @@ TEST_SAMPLES_PER_CLIENT = 1000
 NUM_CLASSES = 10
 NUM_CLIENTS = 10
 
-def load_cifar10_federated(
-    dirichlet_parameter: float = 1):
+def load_cifar10_federated(dirichlet_parameter: float = 1):
   '''Construct a synthetic federated CIFAR-10 from its centralized version
   Loads the train dataset into a non iid distribution over clients using the
   sampling method based on LDA, taken from this paper:
