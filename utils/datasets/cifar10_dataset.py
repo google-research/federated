@@ -25,25 +25,18 @@ TOTAL_FEATURE_SIZE = 32 * 32 * 3
 NUM_EXAMPLES_PER_CLIENT = 5000
 TEST_SAMPLES_PER_CLIENT = 1000
 NUM_CLASSES = 10
+NUM_CLIENTS = 10
 
 def load_cifar10_federated(
-    num_clients: int = 10, 
-    nit: float = 1, 
-    train_client_batch_size: int = 20, 
-    test_client_batch_size: int = 100):
+    dirichlet_parameter: float = 1):
   '''Construct a synthetic federated CIFAR-10 from its centralized version
   Loads the train dataset into a non iid distribution over clients using the
   sampling method based on LDA, taken from this paper:
   Measuring the Effects of Non-Identical Data Distribution for
   Federated Visual Classification (https://arxiv.org/pdf/1909.06335.pdf).
   Args:
-    num_clients: An integer specifing the total number of clients.
-    nit: A float parametrizing the Dirichlet distribution which samples a 
+    dirichlet_parameter: A float parametrizing the Dirichlet distribution which samples a 
       multinomial over classes for each client.
-    train_client_batch_size: A float representing the batch size during 
-      training.
-    test_client_batch_size: A float representing the batch size during
-      test.
   Returns:
     A tuple of `tff.simulation.ClientData` representing unpreprocessed
     train data and test data.
@@ -53,56 +46,71 @@ def load_cifar10_federated(
   train_clients = collections.OrderedDict()
   test_clients = collections.OrderedDict()
 
-  proportion_clients_train = []
-  proportion_clients_test = []
+  
+  train_multinomial_vals = []
+  test_multinomial_vals = []
   # each column is a distribution over classes for the client at that index
   for i in range(num_clients):
-      proportion = np.random.dirichlet(nit*np.ones(NUM_CLASSES,))
-      train_proportion = (5000*proportion).astype(int)
-      proportion_clients_train.append(train_proportion)
-      test_proportion = (1000*proportion).astype(int)
-      proportion_clients_test.append(test_proportion)
+      proportion = np.random.dirichlet(dirichlet_parameter*np.ones(NUM_CLASSES,))
+      train_multinomial_vals.append(proportion)
+      test_multinomial_vals.append(proportion)
+        
+  train_multinomial_vals = np.array(train_multinomial_vals)
+  test_multinomial_vals = np.array(test_multinomial_vals)
   
-  train_idx_batch = [[] for _ in range(num_clients)]
-  test_idx_batch = [[] for _ in range(num_clients)]
-  proportion_clients_train = np.array(proportion_clients_train)
-  proportion_clients_test = np.array(proportion_clients_test)
-
-  cumsum_client_labels_train = proportion_clients_train.cumsum(axis=0)
-  cumsum_client_labels_test = proportion_clients_test.cumsum(axis=0)
-
+  train_indices = []
+  test_indices = []
   for k in range(NUM_CLASSES):
     train_label_k = np.where(train_labels==k)[0]
     np.random.shuffle(train_label_k)
-    train_split_labels = np.split(train_label_k, cumsum_client_labels_train[:, k])
-    train_idx_batch = [idx_j + splitk.tolist() for idx_j, splitk \
-       in zip(train_idx_batch, train_split_labels)]
-    
+    train_indices.append(train_label_k)
     test_label_k = np.where(test_labels==k)[0]
     np.random.shuffle(test_label_k)
-    test_split_labels = np.split(test_label_k, cumsum_client_labels_test[:, k])
-    test_idx_batch = [idx_j + splitk.tolist() for idx_j, splitk \
-       in zip(test_idx_batch, test_split_labels)]
+    test_indices.append(test_label_k)
 
-  for i in range(num_clients):
+  train_indices = np.array(train_indices)
+  test_indices = np.array(test_indices)
+
+  train_client_samples = [[] for _ in range(NUM_CLIENTS)]
+  test_client_samples = [[] for _ in range(NUM_CLIENTS)]
+  '''
+  sample 5000 images for the current client according 
+  to the multinomial without replacement
+  '''
+  train_count = np.zeros(NUM_CLASSES).astype(int)
+  test_count = np.zeros(NUM_CLASSES).astype(int)
+
+  for k in range(NUM_CLASSES):
+        
+    for i in range(NUM_EXAMPLES_PER_CLIENT):
+      sampled_label = np.argwhere(np.random.multinomial(1, train_multinomial_vals[k,:])==1)[0][0]
+      train_client_samples[k].append(train_indices[sampled_label, train_count[sampled_label]])
+      train_count[sampled_label] += 1
+      if train_count[sampled_label] == NUM_EXAMPLES_PER_CLIENT:
+        train_multinomial_vals[:, sampled_label] = 0
+        train_multinomial_vals = train_multinomial_vals / train_multinomial_vals.sum(axis=1)[:, None]
+
+    for i in range(TEST_SAMPLES_PER_CLIENT):
+      sampled_label = np.argwhere(np.random.multinomial(1, test_multinomial_vals[k,:])==1)[0][0]
+      test_client_samples[k].append(test_indices[sampled_label, test_count[sampled_label]])
+      test_count[sampled_label] += 1
+      if test_count[sampled_label] == TEST_SAMPLES_PER_CLIENT:
+        test_multinomial_vals[:, sampled_label] = 0
+        test_multinomial_vals = test_multinomial_vals / test_multinomial_vals.sum(axis=1)[:, None]
+
+
+  for i in range(NUM_CLIENTS):
     client_name = str(i)
-    x_train = train_images[np.array(train_idx_batch[i])]
-    y_train = train_labels[np.array(train_idx_batch[i])].astype('int64').squeeze()
-    train_samples_per_client = (x_train.shape[0] \
-        // train_client_batch_size) * train_client_batch_size
-    x_train = x_train[:train_samples_per_client]
-    y_train = y_train[:train_samples_per_client]
+    x_train = train_images[np.array(train_client_samples[i])]
+    y_train = train_labels[np.array(train_client_samples[i])].astype('int64').squeeze()
     train_data = collections.OrderedDict((('image', x_train), ('label', y_train)))
     train_clients[client_name] = train_data
     
-    x_test = test_images[np.array(test_idx_batch[i])]
-    y_test = test_labels[np.array(test_idx_batch[i])].astype('int64').squeeze()
-    test_samples_per_client = (x_test.shape[0] \
-        // test_client_batch_size) * test_client_batch_size
-    x_test = x_test[:test_samples_per_client]
-    y_test = y_test[:test_samples_per_client]
+    x_test = test_images[np.array(test_client_samples[i])]
+    y_test = test_labels[np.array(test_client_samples[i])].astype('int64').squeeze()
     test_data = collections.OrderedDict((('image', x_test), ('label', y_test)))
     test_clients[client_name] = test_data
+    
     
   train_dataset = tff.simulation.FromTensorSlicesClientData(train_clients)
   test_dataset = tff.simulation.FromTensorSlicesClientData(test_clients)
@@ -252,9 +260,7 @@ def get_federated_datasets(
   if test_shuffle_buffer_size <= 1:
     test_shuffle_buffer_size = 1
 
-  cifar_train, cifar_test = load_cifar10_federated(
-      train_client_batch_size=train_client_batch_size, 
-      test_client_batch_size=test_client_batch_size)
+  cifar_train, cifar_test = load_cifar10_federated()
   train_crop_shape = (train_client_batch_size,) + crop_shape
   test_crop_shape = (test_client_batch_size,) + crop_shape
 
