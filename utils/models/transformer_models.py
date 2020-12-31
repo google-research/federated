@@ -67,7 +67,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
     self.d_model = d_model  #scalar value of model dimension
 
     if d_model % self.num_heads != 0:
-      raise ValueError('Feature dimension should be divisible by number of heads!')
+      raise ValueError('Feature dimension should be divisible by number of heads! Got {}/{}'.format(d_model, num_heads))
 
     self.depth = d_model // self.num_heads
 
