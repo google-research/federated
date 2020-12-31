@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""The Transformer model for research baselines."""
+"""The Transformer model for research baselines. Reference: https://arxiv.org/abs/1706.03762"""
 
 import tensorflow as tf
 import numpy as np
