@@ -17,6 +17,8 @@ import tensorflow as tf
 import numpy as np
 from utils.models.stackoverflow_models import TransposableEmbedding
 
+DEFAULT_LARGE_NEGATIVE = -1e9
+
 
 def scaled_dot_product_attention(query: tf.Tensor, key: tf.Tensor, value: tf.Tensor, mask: tf.Tensor):
   """Calculate the attention weights.
@@ -39,13 +41,13 @@ def scaled_dot_product_attention(query: tf.Tensor, key: tf.Tensor, value: tf.Ten
 
   matmul_qk = tf.matmul(query, key, transpose_b=True)
 
-  # scale matmul_qk
+  # scale matmul_qk by 1/sqrt(ftr_dim), so that the softmax does not vanish when feature dimension becoming higher.
   ftr_dim = tf.cast(tf.shape(key)[-1], tf.float32)
   scaled_attention_logits = matmul_qk / tf.math.sqrt(ftr_dim)
 
   # add the mask to the scaled tensor.
   if mask is not None:
-    scaled_attention_logits += (mask * -1e9)
+    scaled_attention_logits += (mask * DEFAULT_LARGE_NEGATIVE)
 
   # softmax is normalized on the last axis (seq_len_k) so that the scores
   # add up to 1.
@@ -57,13 +59,15 @@ def scaled_dot_product_attention(query: tf.Tensor, key: tf.Tensor, value: tf.Ten
 
 
 class MultiHeadAttention(tf.keras.layers.Layer):
+  """The multihead attention layer.
+  """
   def __init__(self, d_model, num_heads):
     super(MultiHeadAttention, self).__init__()
     self.num_heads = num_heads
     self.d_model = d_model  #scalar value of model dimension
 
     if d_model % self.num_heads != 0:
-      raise ValueError('blabla')    # Check paper for what to say
+      raise ValueError('Feature dimension should be divisible by number of heads!')
 
     self.depth = d_model // self.num_heads
 
@@ -146,7 +150,7 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 
 def positional_encoding(position, d_model):
-  """Returns all the possible positional encodings.  #add one sentence about why we need positional encoding, probably link to the equation in paper?
+  """Returns all the possible positional encodings. 
   Args:
         position: Maximum number of positions.
         d_model: Dimension of features of MultiHeadAttention layers.
