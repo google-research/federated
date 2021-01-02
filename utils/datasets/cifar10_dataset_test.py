@@ -15,6 +15,7 @@
 import collections
 
 import tensorflow as tf
+import tensorflow_datasets as tfds
 
 from utils.datasets import cifar10_dataset
 
@@ -24,6 +25,31 @@ def _compute_length_of_dataset(ds):
 
 
 class DatasetTest(tf.test.TestCase):
+
+  '''
+  A Test to check the dataset has the correct number 
+  of clients, assuming the number of clients is 10
+  '''
+  def test_num_clients(self):
+    cifar_train, cifar_test = get_federated_datasets(
+        train_client_batch_size = 20,
+        test_client_batch_size = 100
+      )
+    client_list = cifar_train.client_ids
+    num_clients = len(client_list)
+    self.assertEqual(num_clients, 10)
+
+  def test_num_batches_per_client(self):
+    cifar_train, cifar_test = get_federated_datasets(
+        train_client_batch_size = 20,
+        test_client_batch_size = 100
+      )
+    client_local_dataset = tfds.as_numpy(
+        cifar_train.create_tf_dataset_for_client('0'))
+    num_batches = 0
+    for element in client_local_dataset:
+      num_batches += 1
+    self.assertEqual(num_batches, 250)
 
   def test_centralized_cifar_structure(self):
     crop_shape = (24, 24, 3)
