@@ -82,6 +82,12 @@ py_library(
     srcs_version = "PY3",
 )
 
+py_library(
+    name = "cifar10_dataset",
+    srcs = ["cifar10_dataset.py"],
+    srcs_version = "PY3",
+)
+
 py_test(
     name = "stackoverflow_tag_prediction_test",
     size = "large",
@@ -94,4 +100,18 @@ py_test(
         "notap",
     ],
     deps = [":stackoverflow_tag_prediction"],
+)
+
+py_test(
+    name = "cifar10_dataset_test",
+    size = "large",
+    srcs = ["cifar10_dataset_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    tags = [
+        "manual",
+        "nokokoro",
+        "nopresubmit",
+    ],
+    deps = [":cifar10_dataset"],
 )
