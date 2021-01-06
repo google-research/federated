@@ -107,7 +107,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
     output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
 
-    return output, attention_weights
+    return output
 
 
 def point_wise_feed_forward_network(d_model, dff):
@@ -138,7 +138,7 @@ class EncoderLayer(tf.keras.layers.Layer):
     self.dropout2 = tf.keras.layers.Dropout(rate)
 
   def call(self, x, training, mask):
-    attn_output, _ = self.mha(x, x, x, mask)  # (batch_size, input_seq_len, d_model)
+    attn_output = self.mha(x, x, x, mask)  # (batch_size, input_seq_len, d_model)
     attn_output = self.dropout1(attn_output, training=training)
     out1 = self.layernorm1(x + attn_output)  # (batch_size, input_seq_len, d_model)
 
@@ -149,18 +149,18 @@ class EncoderLayer(tf.keras.layers.Layer):
     return out2
 
 
-def positional_encoding(position, d_model):
+def positional_encoding(max_positions, d_model):
   """Returns all the possible positional encodings. 
   Args:
-        position: Maximum number of positions.
+        max_positions: Maximum number of positions.
         d_model: Dimension of features of MultiHeadAttention layers.
   Returns:
       `tf.Tensor`: The position encodings of the input sequence.
   """
   def get_angles(pos, i, d_model):
-    angle_rates = 1 / np.power(position, (2 * (i // 2)) / np.float32(d_model))
+    angle_rates = 1 / np.power(max_positions, (2 * (i // 2)) / np.float32(d_model))
     return pos * angle_rates
-  angle_rads = get_angles(np.arange(position)[:, np.newaxis],
+  angle_rads = get_angles(np.arange(max_positions)[:, np.newaxis],
                           np.arange(d_model)[np.newaxis, :],
                           d_model)
 
