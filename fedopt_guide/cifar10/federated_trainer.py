@@ -27,7 +27,7 @@ from absl import flags
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.cifar10 import federated_cifar10
+from fedopt_guide.cifar10 import federated_cifar10
 
 from optimization.shared import fed_avg_schedule
 from optimization.shared import optimizer_utils
