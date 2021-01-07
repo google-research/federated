@@ -86,3 +86,9 @@ py_test(
     srcs_version = "PY3",
     deps = [":schedule_utils"],
 )
+
+py_library(
+    name = "training_specs",
+    srcs = ["training_specs.py"],
+    srcs_version = "PY3",
+)

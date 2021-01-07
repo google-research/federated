@@ -54,8 +54,10 @@ py_binary(
         "//optimization/shakespeare:federated_shakespeare",
         "//optimization/shared:fed_avg_schedule",
         "//optimization/shared:optimizer_utils",
+        "//optimization/shared:training_specs",
         "//optimization/stackoverflow:federated_stackoverflow",
         "//optimization/stackoverflow_lr:federated_stackoverflow_lr",
+        "//utils:training_loop",
         "//utils:utils_impl",
     ],
 )
@@ -76,8 +78,9 @@ py_test(
         "//optimization/emnist:federated_emnist",
         "//optimization/emnist_ae:federated_emnist_ae",
         "//optimization/shakespeare:federated_shakespeare",
-        "//optimization/shared:fed_avg_schedule",
+        "//optimization/shared:training_specs",
         "//optimization/stackoverflow:federated_stackoverflow",
         "//optimization/stackoverflow_lr:federated_stackoverflow_lr",
+        "//utils:training_loop",
     ],
 )

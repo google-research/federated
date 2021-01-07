@@ -34,8 +34,10 @@ from optimization.emnist_ae import federated_emnist_ae
 from optimization.shakespeare import federated_shakespeare
 from optimization.shared import fed_avg_schedule
 from optimization.shared import optimizer_utils
+from optimization.shared import training_specs
 from optimization.stackoverflow import federated_stackoverflow
 from optimization.stackoverflow_lr import federated_stackoverflow_lr
+from utils import training_loop
 from utils import utils_impl
 
 _SUPPORTED_TASKS = [
@@ -112,15 +114,6 @@ with utils_impl.record_hparam_flags() as so_nwp_flags:
   flags.DEFINE_integer(
       'so_nwp_num_validation_examples', 10000, 'Number of examples '
       'to use from test set for per-round validation.')
-  flags.DEFINE_integer('so_nwp_embedding_size', 96,
-                       'Dimension of word embedding to use.')
-  flags.DEFINE_integer('so_nwp_latent_size', 670,
-                       'Dimension of latent size to use in recurrent cell')
-  flags.DEFINE_integer('so_nwp_num_layers', 1,
-                       'Number of stacked recurrent layers to use.')
-  flags.DEFINE_boolean(
-      'so_nwp_shared_embedding', False,
-      'Boolean indicating whether to tie input and output embeddings.')
 
 with utils_impl.record_hparam_flags() as so_lr_flags:
   # Stack Overflow LR flags
@@ -143,14 +136,6 @@ TASK_FLAGS = collections.OrderedDict(
     stackoverflow_nwp=so_nwp_flags,
     stackoverflow_lr=so_lr_flags)
 
-TASK_FLAG_PREFIXES = collections.OrderedDict(
-    cifar100='cifar100',
-    emnist_cr='emnist_cr',
-    emnist_ae='emnist_ae',
-    shakespeare='shakespeare',
-    stackoverflow_nwp='so_nwp',
-    stackoverflow_lr='so_lr')
-
 
 def _get_hparam_flags():
   """Returns an ordered dictionary of pertinent hyperparameter flags."""
@@ -169,30 +154,6 @@ def _get_hparam_flags():
     hparam_dict.update(task_hparam_dict)
 
   return hparam_dict
-
-
-def _get_task_args():
-  """Returns an ordered dictionary of task-specific arguments.
-
-  This method returns a dict of (arg_name, arg_value) pairs, where the
-  arg_name has had the task name removed as a prefix (if it exists), as well
-  as any leading `-` or `_` characters.
-
-  Returns:
-    An ordered dictionary of (arg_name, arg_value) pairs.
-  """
-  task_name = FLAGS.task
-  task_args = collections.OrderedDict()
-
-  if task_name in TASK_FLAGS:
-    task_flag_list = TASK_FLAGS[task_name]
-    task_flag_dict = utils_impl.lookup_flag_values(task_flag_list)
-    task_flag_prefix = TASK_FLAG_PREFIXES[task_name]
-    for (key, value) in task_flag_dict.items():
-      if key.startswith(task_flag_prefix):
-        key = key[len(task_flag_prefix):].lstrip('_-')
-      task_args[key] = value
-  return task_args
 
 
 def main(argv):
@@ -231,29 +192,56 @@ def main(argv):
         server_lr=server_lr_schedule,
         client_weight_fn=client_weight_fn)
 
-  shared_args = utils_impl.lookup_flag_values(shared_flags)
-  shared_args['iterative_process_builder'] = iterative_process_builder
-  task_args = _get_task_args()
-  hparam_dict = _get_hparam_flags()
+  task_spec = training_specs.TaskSpec(
+      iterative_process_builder=iterative_process_builder,
+      client_epochs_per_round=FLAGS.client_epochs_per_round,
+      client_batch_size=FLAGS.client_batch_size,
+      clients_per_round=FLAGS.clients_per_round,
+      client_datasets_random_seed=FLAGS.client_datasets_random_seed)
 
   if FLAGS.task == 'cifar100':
-    run_federated_fn = federated_cifar100.run_federated
+    runner_spec = federated_cifar100.configure_training(
+        task_spec, crop_size=FLAGS.cifar100_crop_size)
   elif FLAGS.task == 'emnist_cr':
-    run_federated_fn = federated_emnist.run_federated
+    runner_spec = federated_emnist.configure_training(
+        task_spec, model=FLAGS.emnist_cr_model)
   elif FLAGS.task == 'emnist_ae':
-    run_federated_fn = federated_emnist_ae.run_federated
+    runner_spec = federated_emnist_ae.configure_training(task_spec)
   elif FLAGS.task == 'shakespeare':
-    run_federated_fn = federated_shakespeare.run_federated
+    runner_spec = federated_shakespeare.configure_training(
+        task_spec, sequence_length=FLAGS.shakespeare_sequence_length)
   elif FLAGS.task == 'stackoverflow_nwp':
-    run_federated_fn = federated_stackoverflow.run_federated
+    runner_spec = federated_stackoverflow.configure_training(
+        task_spec,
+        vocab_size=FLAGS.so_nwp_vocab_size,
+        num_oov_buckets=FLAGS.so_nwp_num_oov_buckets,
+        sequence_length=FLAGS.so_nwp_sequence_length,
+        max_elements_per_user=FLAGS.so_nwp_max_elements_per_user,
+        num_validation_examples=FLAGS.so_nwp_num_validation_examples)
   elif FLAGS.task == 'stackoverflow_lr':
-    run_federated_fn = federated_stackoverflow_lr.run_federated
+    runner_spec = federated_stackoverflow_lr.configure_training(
+        task_spec,
+        vocab_tokens_size=FLAGS.so_lr_vocab_tokens_size,
+        vocab_tags_size=FLAGS.so_lr_vocab_tags_size,
+        max_elements_per_user=FLAGS.so_lr_max_elements_per_user,
+        num_validation_examples=FLAGS.so_lr_num_validation_examples)
   else:
     raise ValueError(
         '--task flag {} is not supported, must be one of {}.'.format(
             FLAGS.task, _SUPPORTED_TASKS))
 
-  run_federated_fn(**shared_args, **task_args, hparam_dict=hparam_dict)
+  training_loop.run(
+      iterative_process=runner_spec.iterative_process,
+      client_datasets_fn=runner_spec.client_datasets_fn,
+      validation_fn=runner_spec.validation_fn,
+      test_fn=runner_spec.test_fn,
+      total_rounds=FLAGS.total_rounds,
+      experiment_name=FLAGS.experiment_name,
+      root_output_dir=FLAGS.root_output_dir,
+      rounds_per_eval=FLAGS.rounds_per_eval,
+      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint,
+      rounds_per_profile=FLAGS.rounds_per_profile,
+      hparam_dict=_get_hparam_flags())
 
 
 if __name__ == '__main__':

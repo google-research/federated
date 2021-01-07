@@ -14,14 +14,11 @@
 """Federated Stack Overflow tag prediction (via logistic regression) using TFF."""
 
 import functools
-from typing import Callable, Optional
-
-from absl import logging
 
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from utils import training_loop
+from optimization.shared import training_specs
 from utils import training_utils
 from utils.datasets import stackoverflow_tag_prediction
 from utils.models import stackoverflow_lr_models
@@ -35,50 +32,21 @@ def metrics_builder():
   ]
 
 
-def run_federated(
-    iterative_process_builder: Callable[..., tff.templates.IterativeProcess],
-    client_epochs_per_round: int,
-    client_batch_size: int,
-    clients_per_round: int,
-    client_datasets_random_seed: Optional[int] = None,
-    vocab_tokens_size: Optional[int] = 10000,
-    vocab_tags_size: Optional[int] = 500,
-    max_elements_per_user: Optional[int] = 1000,
-    num_validation_examples: Optional[int] = 10000,
-    total_rounds: Optional[int] = 1500,
-    experiment_name: Optional[str] = 'federated_so_lr',
-    root_output_dir: Optional[str] = '/tmp/fed_opt',
-    **kwargs):
-  """Runs an iterative process on the Stack Overflow logistic regression task.
+def configure_training(
+    task_spec: training_specs.TaskSpec,
+    vocab_tokens_size: int = 10000,
+    vocab_tags_size: int = 500,
+    max_elements_per_user: int = 1000,
+    num_validation_examples: int = 10000) -> training_specs.RunnerSpec:
+  """Configures training for the Stack Overflow tag prediction task.
 
-  This method will load and pre-process dataset and construct a model used for
-  the task. It then uses `iterative_process_builder` to create an iterative
-  process that it applies to the task, using
-  `federated_research.utils.training_loop`.
-
-  We assume that the iterative process has the following functional type
-  signatures:
-
-    *   `initialize`: `( -> S@SERVER)` where `S` represents the server state.
-    *   `next`: `<S@SERVER, {B*}@CLIENTS> -> <S@SERVER, T@SERVER>` where `S`
-        represents the server state, `{B*}` represents the client datasets,
-        and `T` represents a python `Mapping` object.
-
-  The iterative process must also have a callable attribute `get_model_weights`
-  that takes as input the state of the iterative process, and returns a
-  `tff.learning.ModelWeights` object.
+  This tag prediction is performed via multi-class one-versus-rest logistic
+  regression. This method will load and pre-process datasets and construct a
+  model used for the task. It then uses `iterative_process_builder` to create an
+  iterative process compatible with `federated_research.utils.training_loop`.
 
   Args:
-    iterative_process_builder: A function that accepts a no-arg `model_fn`, and
-      returns a `tff.templates.IterativeProcess`. The `model_fn` must return a
-      `tff.learning.Model`.
-    client_epochs_per_round: An integer representing the number of epochs of
-      training performed per client in each training round.
-    client_batch_size: An integer representing the batch size used on clients.
-    clients_per_round: An integer representing the number of clients
-      participating in each round.
-    client_datasets_random_seed: An optional int used to seed which clients are
-      sampled at each round. If `None`, no seed is used.
+    task_spec: A `TaskSpec` class for creating federated training tasks.
     vocab_tokens_size: Integer dictating the number of most frequent words to
       use in the vocabulary.
     vocab_tags_size: Integer dictating the number of most frequent tags to use
@@ -86,25 +54,21 @@ def run_federated(
     max_elements_per_user: The maximum number of elements processed for each
       client's dataset.
     num_validation_examples: The number of test examples to use for validation.
-    total_rounds: The number of federated training rounds.
-    experiment_name: The name of the experiment being run. This will be appended
-      to the `root_output_dir` for purposes of writing outputs.
-    root_output_dir: The name of the root output directory for writing
-      experiment outputs.
-    **kwargs: Additional arguments configuring the training loop. For details
-      on supported arguments, see
-      `federated_research/utils/training_utils.py`.
+
+  Returns:
+    A `RunnerSpec` containing attributes used for running the newly created
+    federated task.
   """
 
   stackoverflow_train, _ = stackoverflow_tag_prediction.get_federated_datasets(
       word_vocab_size=vocab_tokens_size,
       tag_vocab_size=vocab_tags_size,
-      train_client_batch_size=client_batch_size,
-      train_client_epochs_per_round=client_epochs_per_round,
+      train_client_batch_size=task_spec.client_batch_size,
+      train_client_epochs_per_round=task_spec.client_epochs_per_round,
       max_elements_per_train_client=max_elements_per_user)
 
   _, stackoverflow_validation, stackoverflow_test = stackoverflow_tag_prediction.get_centralized_datasets(
-      train_batch_size=client_batch_size,
+      train_batch_size=task_spec.client_batch_size,
       word_vocab_size=vocab_tokens_size,
       tag_vocab_size=vocab_tags_size,
       num_validation_examples=num_validation_examples)
@@ -129,12 +93,12 @@ def run_federated(
         loss=loss_builder(),
         metrics=metrics_builder())
 
-  training_process = iterative_process_builder(tff_model_fn)
+  training_process = task_spec.iterative_process_builder(tff_model_fn)
 
   client_datasets_fn = training_utils.build_client_datasets_fn(
       dataset=stackoverflow_train,
-      clients_per_round=clients_per_round,
-      random_seed=client_datasets_random_seed)
+      clients_per_round=task_spec.clients_per_round,
+      random_seed=task_spec.client_datasets_random_seed)
 
   evaluate_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
@@ -152,15 +116,8 @@ def run_federated(
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
 
-  logging.info('Training model:')
-  logging.info(model_builder().summary())
-
-  training_loop.run(
+  return training_specs.RunnerSpec(
       iterative_process=training_process,
       client_datasets_fn=client_datasets_fn,
       validation_fn=validation_fn,
-      test_fn=test_fn,
-      total_rounds=total_rounds,
-      experiment_name=experiment_name,
-      root_output_dir=root_output_dir,
-      **kwargs)
+      test_fn=test_fn)

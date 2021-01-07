@@ -20,7 +20,7 @@ py_library(
     srcs = ["federated_cifar100.py"],
     srcs_version = "PY3",
     deps = [
-        "//utils:training_loop",
+        "//optimization/shared:training_specs",
         "//utils:training_utils",
         "//utils/datasets:cifar100_dataset",
         "//utils/models:resnet_models",
