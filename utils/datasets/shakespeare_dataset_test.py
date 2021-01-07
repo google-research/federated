@@ -22,7 +22,7 @@ def _compute_length_of_dataset(ds):
   return ds.reduce(0, lambda x, _: x + 1)
 
 
-class DatasetPreprocessingTest(tf.test.TestCase):
+class PreprocessFnTest(tf.test.TestCase):
 
   def test_to_ids(self):
     pad, _, bos, eos = shakespeare_dataset.get_special_tokens()
@@ -96,6 +96,9 @@ class DatasetPreprocessingTest(tf.test.TestCase):
         0,
         msg='Not all expected output seen.\nLeft over expectations: {!s}'
         .format(expected_outputs))
+
+
+class FederatedDatasetTest(tf.test.TestCase):
 
   def test_raises_negative_epochs_per_round(self):
     with self.assertRaisesRegex(

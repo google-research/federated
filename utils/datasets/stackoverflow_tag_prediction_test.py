@@ -21,7 +21,55 @@ def _compute_length_of_dataset(ds):
   return ds.reduce(0, lambda x, _: x + 1)
 
 
-class DatasetTest(tf.test.TestCase):
+class PreprocessFnTest(tf.test.TestCase):
+
+  def test_word_tokens_to_ids_without_oov(self):
+    word_vocab = ['A', 'B', 'C']
+    tag_vocab = ['D', 'E', 'F']
+    to_ids_fn = stackoverflow_tag_prediction.build_to_ids_fn(
+        word_vocab, tag_vocab)
+    data = {'tokens': 'A B C', 'title': '', 'tags': ''}
+    processed = to_ids_fn(data)
+    self.assertAllClose(self.evaluate(processed[0]), [1 / 3, 1 / 3, 1 / 3])
+
+  def test_word_tokens_to_ids_with_oov(self):
+    word_vocab = ['A', 'B']
+    tag_vocab = ['D', 'E', 'F']
+    to_ids_fn = stackoverflow_tag_prediction.build_to_ids_fn(
+        word_vocab, tag_vocab)
+    data = {'tokens': 'A B C', 'title': '', 'tags': ''}
+    processed = to_ids_fn(data)
+    self.assertAllClose(self.evaluate(processed[0]), [1 / 3, 1 / 3])
+
+  def test_tag_tokens_to_ids_without_oov(self):
+    word_vocab = ['A', 'B', 'C']
+    tag_vocab = ['D', 'E', 'F']
+    to_ids_fn = stackoverflow_tag_prediction.build_to_ids_fn(
+        word_vocab, tag_vocab)
+    data = {'tokens': '', 'title': '', 'tags': 'D|E|F'}
+    processed = to_ids_fn(data)
+    self.assertAllClose(self.evaluate(processed[1]), [1, 1, 1])
+
+  def test_tag_tokens_to_ids_with_oov(self):
+    word_vocab = ['A', 'B', 'C']
+    tag_vocab = ['D', 'E']
+    to_ids_fn = stackoverflow_tag_prediction.build_to_ids_fn(
+        word_vocab, tag_vocab)
+    data = {'tokens': '', 'title': '', 'tags': 'D|E|F'}
+    processed = to_ids_fn(data)
+    self.assertAllClose(self.evaluate(processed[1]), [1, 1])
+
+  def test_join_word_tokens_with_title(self):
+    word_vocab = ['A', 'B', 'C']
+    tag_vocab = ['D', 'E', 'F']
+    to_ids_fn = stackoverflow_tag_prediction.build_to_ids_fn(
+        word_vocab, tag_vocab)
+    data = {'tokens': 'A B C', 'title': 'A B', 'tags': ''}
+    processed = to_ids_fn(data)
+    self.assertAllClose(self.evaluate(processed[0]), [2 / 5, 2 / 5, 1 / 5])
+
+
+class FederatedDatasetTest(tf.test.TestCase):
 
   def test_federated_dataset_structure(self):
     stackoverflow_train, stackoverflow_test = stackoverflow_tag_prediction.get_federated_datasets(
@@ -42,25 +90,6 @@ class DatasetTest(tf.test.TestCase):
     self.assertEqual(train_batch[1].shape.as_list(), [2, 5])
     self.assertEqual(test_batch[0].shape.as_list(), [3, 100])
     self.assertEqual(test_batch[1].shape.as_list(), [3, 5])
-
-  def test_centralized_dataset_structure(self):
-    global_train, global_val, global_test = stackoverflow_tag_prediction.get_centralized_datasets(
-        word_vocab_size=100,
-        tag_vocab_size=5,
-        train_batch_size=2,
-        validation_batch_size=3,
-        test_batch_size=5,
-        num_validation_examples=10000)
-
-    train_batch = next(iter(global_train))
-    val_batch = next(iter(global_val))
-    test_batch = next(iter(global_test))
-    self.assertEqual(train_batch[0].shape.as_list(), [2, 100])
-    self.assertEqual(train_batch[1].shape.as_list(), [2, 5])
-    self.assertEqual(val_batch[0].shape.as_list(), [3, 100])
-    self.assertEqual(val_batch[1].shape.as_list(), [3, 5])
-    self.assertEqual(test_batch[0].shape.as_list(), [5, 100])
-    self.assertEqual(test_batch[1].shape.as_list(), [5, 5])
 
   def test_raises_negative_train_epochs(self):
     if tf.config.list_logical_devices('GPU'):
@@ -95,6 +124,28 @@ class DatasetTest(tf.test.TestCase):
       batch1 = next(train_iter1)
       batch2 = next(train_iter2)
       self.assertAllClose(batch1, batch2)
+
+
+class CentralizedDatasetTest(tf.test.TestCase):
+
+  def test_centralized_dataset_structure(self):
+    global_train, global_val, global_test = stackoverflow_tag_prediction.get_centralized_datasets(
+        word_vocab_size=100,
+        tag_vocab_size=5,
+        train_batch_size=2,
+        validation_batch_size=3,
+        test_batch_size=5,
+        num_validation_examples=10000)
+
+    train_batch = next(iter(global_train))
+    val_batch = next(iter(global_val))
+    test_batch = next(iter(global_test))
+    self.assertEqual(train_batch[0].shape.as_list(), [2, 100])
+    self.assertEqual(train_batch[1].shape.as_list(), [2, 5])
+    self.assertEqual(val_batch[0].shape.as_list(), [3, 100])
+    self.assertEqual(val_batch[1].shape.as_list(), [3, 5])
+    self.assertEqual(test_batch[0].shape.as_list(), [5, 100])
+    self.assertEqual(test_batch[1].shape.as_list(), [5, 5])
 
   def test_nonpositive_shuffle_buffer_size_in_centralized_datasets(self):
     stackoverflow_train, _, _ = stackoverflow_tag_prediction.get_centralized_datasets(

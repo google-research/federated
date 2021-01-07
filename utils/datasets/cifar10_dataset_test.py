@@ -80,20 +80,37 @@ class PreprocessFnTest(tf.test.TestCase, parameterized.TestCase):
         dtype=tf.float32), tf.ones(shape=(1,), dtype=tf.int32))
     self.assertAllClose(self.evaluate(element), expected_element)
 
+  def test_no_op_crop(self):
+    crop_shape = (1, 1, 3)
+    x = tf.constant([[[1.0, -1.0, 0.0]]])  # Has shape (1, 1, 3), mean 0
+    x = x / tf.math.reduce_std(x)  # x now has variance 1
+    simple_example = collections.OrderedDict(image=x, label=0)
+    image_map = cifar10_dataset.build_image_map(crop_shape, distort=False)
+    cropped_example = image_map(simple_example)
 
-class DatasetTest(tf.test.TestCase):
-  """A Test to check the dataset has the correct number of clients."""
+    self.assertEqual(cropped_example[0].shape, crop_shape)
+    self.assertAllClose(x, cropped_example[0], rtol=1e-03)
+    self.assertEqual(cropped_example[1], 0)
 
-  def test_load_cifar10_federated(self):
+
+class LoadCifarTest(tf.test.TestCase):
+
+  def test_num_clients(self):
     cifar_train, cifar_test = cifar10_dataset.load_cifar10_federated()
     self.assertEqual(len(cifar_train.client_ids), 10)
     self.assertEqual(len(cifar_test.client_ids), 10)
+
+  def test_dataset_length(self):
+    cifar_train, cifar_test = cifar10_dataset.load_cifar10_federated()
     self.assertEqual(
         _compute_length_of_dataset(
             cifar_train.create_tf_dataset_for_client('0')), 5000)
     self.assertEqual(
         _compute_length_of_dataset(
             cifar_test.create_tf_dataset_for_client('0')), 1000)
+
+
+class FederatedDatasetTest(tf.test.TestCase):
 
   def test_get_federated_datasets(self):
     cifar_train, cifar_test = cifar10_dataset.get_federated_datasets(
@@ -106,17 +123,6 @@ class DatasetTest(tf.test.TestCase):
     self.assertEqual(
         _compute_length_of_dataset(
             cifar_test.create_tf_dataset_for_client('0')), 10)
-
-  def test_centralized_cifar_structure(self):
-    crop_shape = (24, 24, 3)
-    cifar_train, cifar_test = cifar10_dataset.get_centralized_datasets(
-        train_batch_size=20, test_batch_size=100, crop_shape=crop_shape)
-    train_batch = next(iter(cifar_train))
-    train_batch_shape = tuple(train_batch[0].shape)
-    self.assertEqual(train_batch_shape, (20, 24, 24, 3))
-    test_batch = next(iter(cifar_test))
-    test_batch_shape = tuple(test_batch[0].shape)
-    self.assertEqual(test_batch_shape, (100, 24, 24, 3))
 
   def test_federated_cifar_structure(self):
     crop_shape = (28, 28, 3)
@@ -137,28 +143,32 @@ class DatasetTest(tf.test.TestCase):
     test_batch_shape = tuple(test_batch[0].shape)
     self.assertEqual(test_batch_shape, (5, 28, 28, 3))
 
-  def test_no_op_crop_process_cifar_example(self):
-    crop_shape = (1, 1, 1, 3)
-    x = tf.constant([[[[1.0, -1.0, 0.0]]]])  # Has shape (1, 1, 1, 3), mean 0
-    x = x / tf.math.reduce_std(x)  # x now has variance 1
-    simple_example = collections.OrderedDict(image=x, label=0)
-    image_map = cifar10_dataset.build_image_map(crop_shape, distort=False)
-    cropped_example = image_map(simple_example)
-
-    self.assertEqual(cropped_example[0].shape, crop_shape)
-    self.assertAllClose(x, cropped_example[0], rtol=1e-03)
-    self.assertEqual(cropped_example[1], 0)
-
   def test_raises_length_2_crop(self):
     with self.assertRaises(ValueError):
       cifar10_dataset.get_federated_datasets(crop_shape=(32, 32))
-    with self.assertRaises(ValueError):
-      cifar10_dataset.get_centralized_datasets(crop_shape=(32, 32))
 
   def test_raises_negative_epochs(self):
     with self.assertRaisesRegex(
         ValueError, 'client_epochs_per_round must be a positive integer.'):
       cifar10_dataset.get_federated_datasets(train_client_epochs_per_round=-1)
+
+
+class CentralizedDatasetTest(tf.test.TestCase):
+
+  def test_raises_length_2_crop(self):
+    with self.assertRaises(ValueError):
+      cifar10_dataset.get_centralized_datasets(crop_shape=(32, 32))
+
+  def test_centralized_cifar_structure(self):
+    crop_shape = (24, 24, 3)
+    cifar_train, cifar_test = cifar10_dataset.get_centralized_datasets(
+        train_batch_size=20, test_batch_size=100, crop_shape=crop_shape)
+    train_batch = next(iter(cifar_train))
+    train_batch_shape = tuple(train_batch[0].shape)
+    self.assertEqual(train_batch_shape, (20, 24, 24, 3))
+    test_batch = next(iter(cifar_test))
+    test_batch_shape = tuple(test_batch[0].shape)
+    self.assertEqual(test_batch_shape, (100, 24, 24, 3))
 
 
 if __name__ == '__main__':

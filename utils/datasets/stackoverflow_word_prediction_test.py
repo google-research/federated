@@ -35,7 +35,7 @@ def _compute_length_of_dataset(ds):
   return ds.reduce(0, lambda x, _: x + 1)
 
 
-class DatasetTest(tf.test.TestCase):
+class ConvertToTokensTest(tf.test.TestCase):
 
   def test_split_input_target(self):
     tokens = tf.constant([[0, 1, 2, 3, 4]], dtype=tf.int64)
@@ -196,7 +196,7 @@ class DatasetPreprocessFnTest(tf.test.TestCase):
 STACKOVERFLOW_MODULE = 'tensorflow_federated.simulation.datasets.stackoverflow'
 
 
-class CreateFederatedDatasets(tf.test.TestCase):
+class FederatedDatasetTest(tf.test.TestCase):
 
   @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
   @mock.patch(STACKOVERFLOW_MODULE + '.load_data')
@@ -257,7 +257,7 @@ class CreateFederatedDatasets(tf.test.TestCase):
           num_oov_buckets=1)
 
 
-class CreateCentralizedDatasets(tf.test.TestCase):
+class CentralizedDatasetTest(tf.test.TestCase):
 
   @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
   @mock.patch(STACKOVERFLOW_MODULE + '.load_data')

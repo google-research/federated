@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
+
 import tensorflow as tf
 
 from utils.datasets import emnist_dataset
@@ -20,8 +22,75 @@ NUM_ONLY_DIGITS_CLIENTS = 3383
 TOTAL_NUM_CLIENTS = 3400
 
 
+TEST_DATA = collections.OrderedDict(
+    pixels=([tf.zeros((28, 28), dtype=tf.float32)]),
+    label=([tf.constant(0, dtype=tf.int32)]),
+)
+
+
 def _compute_length_of_dataset(ds):
   return ds.reduce(0, lambda x, _: x + 1)
+
+
+class DigitRecognitionPreprocessFnTest(tf.test.TestCase):
+
+  def test_preprocess_element_spec(self):
+    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
+    preprocess_fn = emnist_dataset.create_preprocess_fn(
+        num_epochs=1,
+        batch_size=20,
+        shuffle_buffer_size=1,
+        mapping_fn=emnist_dataset._reshape_for_digit_recognition)
+    preprocessed_ds = preprocess_fn(ds)
+    self.assertEqual(preprocessed_ds.element_spec,
+                     (tf.TensorSpec(shape=(None, 28, 28, 1), dtype=tf.float32),
+                      tf.TensorSpec(shape=(None,), dtype=tf.int32)))
+
+  def test_preprocess_returns_correct_element(self):
+    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
+    preprocess_fn = emnist_dataset.create_preprocess_fn(
+        num_epochs=1,
+        batch_size=20,
+        shuffle_buffer_size=1,
+        mapping_fn=emnist_dataset._reshape_for_digit_recognition)
+    preprocessed_ds = preprocess_fn(ds)
+
+    element = next(iter(preprocessed_ds))
+    expected_element = (tf.zeros(shape=(1, 28, 28, 1), dtype=tf.float32),
+                        tf.zeros(shape=(1,), dtype=tf.int32))
+    self.assertAllClose(self.evaluate(element), expected_element)
+
+
+class AutoencoderPreprocessFnTest(tf.test.TestCase):
+
+  def test_preprocess_element_spec(self):
+    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
+    preprocess_fn = emnist_dataset.create_preprocess_fn(
+        num_epochs=1,
+        batch_size=20,
+        shuffle_buffer_size=1,
+        mapping_fn=emnist_dataset._reshape_for_autoencoder)
+    preprocessed_ds = preprocess_fn(ds)
+    self.assertEqual(preprocessed_ds.element_spec,
+                     (tf.TensorSpec(shape=(None, 784), dtype=tf.float32),
+                      tf.TensorSpec(shape=(None, 784), dtype=tf.float32)))
+
+  def test_preprocess_returns_correct_element(self):
+    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
+    preprocess_fn = emnist_dataset.create_preprocess_fn(
+        num_epochs=1,
+        batch_size=20,
+        shuffle_buffer_size=1,
+        mapping_fn=emnist_dataset._reshape_for_autoencoder)
+    preprocessed_ds = preprocess_fn(ds)
+    self.assertEqual(preprocessed_ds.element_spec,
+                     (tf.TensorSpec(shape=(None, 784), dtype=tf.float32),
+                      tf.TensorSpec(shape=(None, 784), dtype=tf.float32)))
+
+    element = next(iter(preprocessed_ds))
+    expected_element = (tf.ones(shape=(1, 784), dtype=tf.float32),
+                        tf.ones(shape=(1, 784), dtype=tf.float32))
+    self.assertAllClose(self.evaluate(element), expected_element)
 
 
 class FederatedDatasetTest(tf.test.TestCase):
