@@ -14,13 +14,72 @@
 
 import collections
 
+from absl.testing import parameterized
 import tensorflow as tf
 
 from utils.datasets import cifar100_dataset
 
 
+TEST_DATA = collections.OrderedDict(
+    coarse_label=([tf.constant(1, dtype=tf.int64)]),
+    image=([tf.zeros((32, 32, 3), dtype=tf.uint8)]),
+    label=([tf.constant(1, dtype=tf.int64)]),
+)
+
+
 def _compute_length_of_dataset(ds):
   return ds.reduce(0, lambda x, _: x + 1)
+
+
+class PreprocessFnTest(tf.test.TestCase, parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      ('crop_shape_1_no_distort', (32, 32, 3), False),
+      ('crop_shape_2_no_distort', (28, 28, 3), False),
+      ('crop_shape_3_no_distort', (24, 26, 3), False),
+      ('crop_shape_1_distort', (32, 32, 3), True),
+      ('crop_shape_2_distort', (28, 28, 3), True),
+      ('crop_shape_3_distort', (24, 26, 3), True),
+  )
+  def test_preprocess_element_spec(self, crop_shape, distort_image):
+    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
+    preprocess_fn = cifar100_dataset.create_preprocess_fn(
+        num_epochs=1,
+        batch_size=1,
+        shuffle_buffer_size=1,
+        crop_shape=crop_shape,
+        distort_image=distort_image)
+    preprocessed_ds = preprocess_fn(ds)
+    expected_element_shape = (None,) + crop_shape
+    self.assertEqual(
+        preprocessed_ds.element_spec,
+        (tf.TensorSpec(shape=expected_element_shape, dtype=tf.float32),
+         tf.TensorSpec(shape=(None,), dtype=tf.int64)))
+
+  @parameterized.named_parameters(
+      ('crop_shape_1_no_distort', (32, 32, 3), False),
+      ('crop_shape_2_no_distort', (28, 28, 3), False),
+      ('crop_shape_3_no_distort', (24, 26, 3), False),
+      ('crop_shape_1_distort', (32, 32, 3), True),
+      ('crop_shape_2_distort', (28, 28, 3), True),
+      ('crop_shape_3_distort', (24, 26, 3), True),
+  )
+  def test_preprocess_returns_correct_element(self, crop_shape, distort_image):
+    ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
+    preprocess_fn = cifar100_dataset.create_preprocess_fn(
+        num_epochs=1,
+        batch_size=20,
+        shuffle_buffer_size=1,
+        crop_shape=crop_shape,
+        distort_image=distort_image)
+    preprocessed_ds = preprocess_fn(ds)
+
+    expected_element_shape = (1,) + crop_shape
+    element = next(iter(preprocessed_ds))
+    expected_element = (tf.zeros(
+        shape=expected_element_shape,
+        dtype=tf.float32), tf.ones(shape=(1,), dtype=tf.int32))
+    self.assertAllClose(self.evaluate(element), expected_element)
 
 
 class DatasetTest(tf.test.TestCase):

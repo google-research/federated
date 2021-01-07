@@ -14,7 +14,7 @@
 """Library for loading and preprocessing CIFAR-100 training and testing data."""
 
 import collections
-from typing import Tuple
+from typing import Callable, Sequence, Tuple, Union
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -24,7 +24,10 @@ TOTAL_FEATURE_SIZE = 32 * 32 * 3
 NUM_EXAMPLES_PER_CLIENT = 500
 
 
-def build_image_map(crop_shape, distort=False):
+def build_image_map(
+    crop_shape: Union[tf.Tensor, Sequence[int]],
+    distort: bool = False
+) -> Callable[[tf.Tensor], Tuple[tf.Tensor, tf.Tensor]]:
   """Builds a function that crops and normalizes CIFAR-100 elements.
 
   The image is first converted to a `tf.float32`, then cropped (according to
@@ -32,17 +35,17 @@ def build_image_map(crop_shape, distort=False):
   `tf.image.per_image_standardization`.
 
   Args:
-    crop_shape: A tuple (crop_height, crop_width, num_channels) specifying the
-      desired crop shape for pre-processing. This tuple cannot have elements
-      exceeding (32, 32, 3), element-wise. The element in the last index should
-      be set to 3 to maintain the RGB image structure of the elements.
+    crop_shape: A tuple (crop_height, crop_width, channels)
+      specifying the desired crop shape for pre-processing batches. This cannot
+      exceed (32, 32, 3) element-wise. The element in the last index should be
+      set to 3 to maintain the RGB image structure of the elements.
     distort: A boolean indicating whether to distort the image via random crops
       and flips. If set to False, the image is resized to the `crop_shape` via
       `tf.image.resize_with_crop_or_pad`.
 
   Returns:
-    A callable accepting a tensor of shape (32, 32, 3), and performing the
-    crops and normalization discussed above.
+    A callable accepting a tensor and performing the crops and normalization
+    discussed above.
   """
 
   if distort:
@@ -56,7 +59,7 @@ def build_image_map(crop_shape, distort=False):
 
     def crop_fn(image):
       return tf.image.resize_with_crop_or_pad(
-          image, target_height=crop_shape[1], target_width=crop_shape[2])
+          image, target_height=crop_shape[0], target_width=crop_shape[1])
 
   def image_map(example):
     image = tf.cast(example['image'], tf.float32)
@@ -108,8 +111,13 @@ def create_preprocess_fn(
 
   @tff.tf_computation(tff.SequenceType(feature_dtypes))
   def preprocess_fn(dataset):
-    return (dataset.shuffle(shuffle_buffer_size).repeat(num_epochs).batch(
-        batch_size).map(image_map_fn, num_parallel_calls=num_parallel_calls))
+    return (
+        dataset.shuffle(shuffle_buffer_size).repeat(num_epochs)
+        # We map before batching to ensure that the cropping occurs
+        # at an image level (eg. we do not perform the same crop on
+        # every image within a batch)
+        .map(image_map_fn,
+             num_parallel_calls=num_parallel_calls).batch(batch_size))
 
   return preprocess_fn
 
@@ -175,21 +183,19 @@ def get_federated_datasets(
     test_shuffle_buffer_size = 1
 
   cifar_train, cifar_test = tff.simulation.datasets.cifar100.load_data()
-  train_crop_shape = (train_client_batch_size,) + crop_shape
-  test_crop_shape = (test_client_batch_size,) + crop_shape
 
   train_preprocess_fn = create_preprocess_fn(
       num_epochs=train_client_epochs_per_round,
       batch_size=train_client_batch_size,
       shuffle_buffer_size=train_shuffle_buffer_size,
-      crop_shape=train_crop_shape,
+      crop_shape=crop_shape,
       distort_image=not serializable)
 
   test_preprocess_fn = create_preprocess_fn(
       num_epochs=test_client_epochs_per_round,
       batch_size=test_client_batch_size,
       shuffle_buffer_size=test_shuffle_buffer_size,
-      crop_shape=test_crop_shape,
+      crop_shape=crop_shape,
       distort_image=False)
 
   cifar_train = cifar_train.preprocess(train_preprocess_fn)
@@ -242,14 +248,11 @@ def get_centralized_datasets(
   cifar_train = cifar_train.create_tf_dataset_from_all_clients()
   cifar_test = cifar_test.create_tf_dataset_from_all_clients()
 
-  train_crop_shape = (train_batch_size,) + crop_shape
-  test_crop_shape = (test_batch_size,) + crop_shape
-
   train_preprocess_fn = create_preprocess_fn(
       num_epochs=1,
       batch_size=train_batch_size,
       shuffle_buffer_size=train_shuffle_buffer_size,
-      crop_shape=train_crop_shape,
+      crop_shape=crop_shape,
       distort_image=True)
   cifar_train = train_preprocess_fn(cifar_train)
 
@@ -257,7 +260,7 @@ def get_centralized_datasets(
       num_epochs=1,
       batch_size=test_batch_size,
       shuffle_buffer_size=test_shuffle_buffer_size,
-      crop_shape=test_crop_shape,
+      crop_shape=crop_shape,
       distort_image=False)
   cifar_test = test_preprocess_fn(cifar_test)
 
