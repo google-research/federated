@@ -131,15 +131,32 @@ def configure_training(
   iterative_process = task_spec.iterative_process_builder(
       tff_model_fn, client_weight_fn=client_weight_fn)
 
-  training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-      train_dataset_preprocess_comp, iterative_process)
+  if hasattr(train_clientdata, 'dataset_computation'):
+
+    @tff.tf_computation(tf.string)
+    def train_dataset_computation(client_id):
+      client_train_data = train_clientdata.dataset_computation(client_id)
+      return train_dataset_preprocess_comp(client_train_data)
+
+    training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
+        train_dataset_computation, iterative_process)
+    client_ids_fn = training_utils.build_sample_fn(
+        train_clientdata.client_ids,
+        size=task_spec.clients_per_round,
+        replace=False,
+        random_seed=task_spec.client_datasets_random_seed)
+    # We convert the output to a list (instead of an np.ndarray) so that it can
+    # be used as input to the iterative process.
+    client_sampling_fn = lambda x: list(client_ids_fn(x))
+  else:
+    training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
+        train_dataset_preprocess_comp, iterative_process)
+    client_sampling_fn = training_utils.build_client_datasets_fn(
+        dataset=train_clientdata,
+        clients_per_round=task_spec.clients_per_round,
+        random_seed=task_spec.client_datasets_random_seed)
 
   training_process.get_model_weights = iterative_process.get_model_weights
-
-  client_datasets_fn = training_utils.build_client_datasets_fn(
-      dataset=train_clientdata,
-      clients_per_round=task_spec.clients_per_round,
-      random_seed=task_spec.client_datasets_random_seed)
 
   evaluate_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
@@ -159,6 +176,6 @@ def configure_training(
 
   return training_specs.RunnerSpec(
       iterative_process=training_process,
-      client_datasets_fn=client_datasets_fn,
+      client_datasets_fn=client_sampling_fn,
       validation_fn=validation_fn,
       test_fn=test_fn)
