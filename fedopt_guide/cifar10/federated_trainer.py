@@ -159,13 +159,12 @@ def main(argv):
       A `tff.templates.IterativeProcess`.
     """
 
-    return fed_avg_schedule.build_fed_avg_process(
+    return tff.learning.build_federated_averaging_process(
         model_fn=model_fn,
         client_optimizer_fn=client_optimizer_fn,
-        client_lr=client_lr_schedule,
         server_optimizer_fn=server_optimizer_fn,
-        server_lr=server_lr_schedule,
-        client_weight_fn=client_weight_fn)
+        client_weight_fn=client_weight_fn, 
+        use_experimental_simulation_loop=True)
 
   shared_args = utils_impl.lookup_flag_values(shared_flags)
   shared_args['iterative_process_builder'] = iterative_process_builder

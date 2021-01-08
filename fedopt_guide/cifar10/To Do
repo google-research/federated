@@ -1,0 +1,5 @@
+To Do
+
+Change the build avg process to tff.learning.build averaging process and figure out the lr input
+add the testing code for federated and centralized both
+Add the BUIlD files and run with basel on gcp instance
