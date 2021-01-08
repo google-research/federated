@@ -86,7 +86,7 @@ def _split_target(sequence_batch: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
 def create_preprocess_fn(
     num_epochs: int,
     batch_size: int,
-    shuffle_buffer_size: int,
+    shuffle_buffer_size: int = 50,
     sequence_length: int = SEQUENCE_LENGTH,
     num_parallel_calls: int = tf.data.experimental.AUTOTUNE) -> tff.Computation:
   """Creates a preprocessing function for Shakespeare client datasets.

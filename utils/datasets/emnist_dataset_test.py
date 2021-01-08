@@ -40,7 +40,7 @@ class DigitRecognitionPreprocessFnTest(tf.test.TestCase):
         num_epochs=1,
         batch_size=20,
         shuffle_buffer_size=1,
-        mapping_fn=emnist_dataset._reshape_for_digit_recognition)
+        emnist_task='digit_recognition')
     preprocessed_ds = preprocess_fn(ds)
     self.assertEqual(preprocessed_ds.element_spec,
                      (tf.TensorSpec(shape=(None, 28, 28, 1), dtype=tf.float32),
@@ -52,7 +52,7 @@ class DigitRecognitionPreprocessFnTest(tf.test.TestCase):
         num_epochs=1,
         batch_size=20,
         shuffle_buffer_size=1,
-        mapping_fn=emnist_dataset._reshape_for_digit_recognition)
+        emnist_task='digit_recognition')
     preprocessed_ds = preprocess_fn(ds)
 
     element = next(iter(preprocessed_ds))
@@ -69,7 +69,7 @@ class AutoencoderPreprocessFnTest(tf.test.TestCase):
         num_epochs=1,
         batch_size=20,
         shuffle_buffer_size=1,
-        mapping_fn=emnist_dataset._reshape_for_autoencoder)
+        emnist_task='autoencoder')
     preprocessed_ds = preprocess_fn(ds)
     self.assertEqual(preprocessed_ds.element_spec,
                      (tf.TensorSpec(shape=(None, 784), dtype=tf.float32),
@@ -81,7 +81,7 @@ class AutoencoderPreprocessFnTest(tf.test.TestCase):
         num_epochs=1,
         batch_size=20,
         shuffle_buffer_size=1,
-        mapping_fn=emnist_dataset._reshape_for_autoencoder)
+        emnist_task='autoencoder')
     preprocessed_ds = preprocess_fn(ds)
     self.assertEqual(preprocessed_ds.element_spec,
                      (tf.TensorSpec(shape=(None, 784), dtype=tf.float32),

@@ -88,6 +88,10 @@ with utils_impl.record_hparam_flags() as cifar100_flags:
   # CIFAR-100 flags
   flags.DEFINE_integer('cifar100_crop_size', 24, 'The height and width of '
                        'images after preprocessing.')
+  flags.DEFINE_bool(
+      'cifar100_distort_train_images', True, 'If set to True, '
+      'train images will be randomly cropped. Otherwise, all '
+      'images will simply be resized.')
 
 with utils_impl.record_hparam_flags() as emnist_cr_flags:
   # EMNIST CR flags
@@ -201,7 +205,9 @@ def main(argv):
 
   if FLAGS.task == 'cifar100':
     runner_spec = federated_cifar100.configure_training(
-        task_spec, crop_size=FLAGS.cifar100_crop_size)
+        task_spec,
+        crop_size=FLAGS.cifar100_crop_size,
+        distort_train_images=FLAGS.cifar100_distort_train_images)
   elif FLAGS.task == 'emnist_cr':
     runner_spec = federated_emnist.configure_training(
         task_spec, model=FLAGS.emnist_cr_model)

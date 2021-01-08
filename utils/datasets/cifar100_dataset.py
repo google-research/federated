@@ -73,7 +73,7 @@ def build_image_map(
 def create_preprocess_fn(
     num_epochs: int,
     batch_size: int,
-    shuffle_buffer_size: int,
+    shuffle_buffer_size: int = NUM_EXAMPLES_PER_CLIENT,
     crop_shape: Tuple[int, int, int] = CIFAR_SHAPE,
     distort_image=False,
     num_parallel_calls: int = tf.data.experimental.AUTOTUNE) -> tff.Computation:

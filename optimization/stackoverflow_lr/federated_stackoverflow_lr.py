@@ -60,12 +60,7 @@ def configure_training(
     federated task.
   """
 
-  stackoverflow_train, _ = stackoverflow_tag_prediction.get_federated_datasets(
-      word_vocab_size=vocab_tokens_size,
-      tag_vocab_size=vocab_tags_size,
-      train_client_batch_size=task_spec.client_batch_size,
-      train_client_epochs_per_round=task_spec.client_epochs_per_round,
-      max_elements_per_train_client=max_elements_per_user)
+  stackoverflow_train, _, _ = tff.simulation.datasets.stackoverflow.load_data()
 
   _, stackoverflow_validation, stackoverflow_test = stackoverflow_tag_prediction.get_centralized_datasets(
       train_batch_size=task_spec.client_batch_size,
@@ -73,8 +68,16 @@ def configure_training(
       tag_vocab_size=vocab_tags_size,
       num_validation_examples=num_validation_examples)
 
-  input_spec = stackoverflow_train.create_tf_dataset_for_client(
-      stackoverflow_train.client_ids[0]).element_spec
+  word_vocab = stackoverflow_tag_prediction.create_word_vocab(vocab_tokens_size)
+  tag_vocab = stackoverflow_tag_prediction.create_tag_vocab(vocab_tags_size)
+
+  train_preprocess_fn = stackoverflow_tag_prediction.create_preprocess_fn(
+      word_vocab=word_vocab,
+      tag_vocab=tag_vocab,
+      client_batch_size=task_spec.client_batch_size,
+      client_epochs_per_round=task_spec.client_epochs_per_round,
+      max_elements_per_client=max_elements_per_user)
+  input_spec = train_preprocess_fn.type_signature.result.element
 
   model_builder = functools.partial(
       stackoverflow_lr_models.create_logistic_model,
@@ -93,12 +96,35 @@ def configure_training(
         loss=loss_builder(),
         metrics=metrics_builder())
 
-  training_process = task_spec.iterative_process_builder(tff_model_fn)
+  iterative_process = task_spec.iterative_process_builder(tff_model_fn)
 
-  client_datasets_fn = training_utils.build_client_datasets_fn(
-      dataset=stackoverflow_train,
-      clients_per_round=task_spec.clients_per_round,
-      random_seed=task_spec.client_datasets_random_seed)
+  if hasattr(stackoverflow_train, 'dataset_computation'):
+
+    @tff.tf_computation(tf.string)
+    def build_train_dataset_from_client_id(client_id):
+      client_dataset = stackoverflow_train.dataset_computation(client_id)
+      return train_preprocess_fn(client_dataset)
+
+    training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
+        build_train_dataset_from_client_id, iterative_process)
+    client_ids_fn = training_utils.build_sample_fn(
+        stackoverflow_train.client_ids,
+        size=task_spec.clients_per_round,
+        replace=False,
+        random_seed=task_spec.client_datasets_random_seed)
+    # We convert the output to a list (instead of an np.ndarray) so that it can
+    # be used as input to the iterative process.
+    client_sampling_fn = lambda x: list(client_ids_fn(x))
+
+  else:
+    training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
+        train_preprocess_fn, iterative_process)
+    client_sampling_fn = training_utils.build_client_datasets_fn(
+        dataset=stackoverflow_train,
+        clients_per_round=task_spec.clients_per_round,
+        random_seed=task_spec.client_datasets_random_seed)
+
+  training_process.get_model_weights = iterative_process.get_model_weights
 
   evaluate_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
@@ -118,6 +144,6 @@ def configure_training(
 
   return training_specs.RunnerSpec(
       iterative_process=training_process,
-      client_datasets_fn=client_datasets_fn,
+      client_datasets_fn=client_sampling_fn,
       validation_fn=validation_fn,
       test_fn=test_fn)
