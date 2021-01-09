@@ -11,6 +11,7 @@ This is a shared folder for developing a field guide to federated optimization.
 *   Consider creating a subfolder for each task by `dataset_model`, for example,
     `fedopt_guide/gld23k_mobilenet`.
 *   Re-use the shared code in `optimization/shared/` and `utils/` whenever
-    possible, for example, `utils.training_loop` is recommended for the training
-    loop. Use `tff.learning.build_federated_averaging_process` instead of
+    possible. Use `training_loop` in this folder instead of
+    `utils.training_loop` for your federated traning module. Use
+    `tff.learning.build_federated_averaging_process` instead of
     `optimization.shared.fed_avg_schedule` to build your TFF iterative process.
