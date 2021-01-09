@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""End-to-end tests for centralized trainer tasks."""
+"""End-to-end tests for centralized CIFAR-10 training."""
 
 import os.path
 

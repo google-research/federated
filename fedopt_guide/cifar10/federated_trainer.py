@@ -15,8 +15,9 @@
 Specifically, we create (according to flags) an iterative processes that allows
 for client and server learning rate schedules, as well as various client and
 server optimization methods. For more details on the learning rate scheduling
-and optimization methods, see `shared/optimizer_utils.py`. For details on the
-iterative process, see `shared/fed_avg_schedule.py`.
+and optimization methods, see `shared/optimizer_utils.py`.
+Uses the tff.learning.build_federated_averaging_process to perform federated
+averaging on the clients.
 """
 
 import collections
@@ -28,10 +29,7 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from fedopt_guide.cifar10 import federated_cifar10
-
-from optimization.shared import fed_avg_schedule
 from optimization.shared import optimizer_utils
-
 from utils import utils_impl
 
 _SUPPORTED_TASKS = [
