@@ -33,9 +33,11 @@ def load_cifar10_federated(
     dirichlet_parameter: float = 1
 ) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
   """Construct a federated dataset from the centralized CIFAR-10.
+
   Sampling based on Dirichlet distribution over categories, following the paper
   Measuring the Effects of Non-Identical Data Distribution for
   Federated Visual Classification (https://arxiv.org/abs/1909.06335).
+
   Args:
     dirichlet_parameter: Parameter of Dirichlet distribution. Each client
       samples from this Dirichlet to get a multinomial distribution over
@@ -43,6 +45,7 @@ def load_cifar10_federated(
       then each client only have data from a single category label. If
       approaches infinity, then the client distribution will approach IID
       partitioning.
+
   Returns:
     A tuple of `tff.simulation.ClientData` representing unpreprocessed
     train data and test data.
@@ -146,9 +149,11 @@ def build_image_map(
     distort: bool = False
 ) -> Callable[[tf.Tensor], Tuple[tf.Tensor, tf.Tensor]]:
   """Builds a function that crops and normalizes CIFAR-10 elements.
+
   The image is first converted to a `tf.float32`, then cropped (according to
   the `distort` argument). Finally, its values are normalized via
   `tf.image.per_image_standardization`.
+
   Args:
     crop_shape: A tuple (crop_height, crop_width, channels) specifying the
       desired crop shape for pre-processing batches. This cannot exceed (32, 32,
@@ -157,6 +162,7 @@ def build_image_map(
     distort: A boolean indicating whether to distort the image via random crops
       and flips. If set to False, the image is resized to the `crop_shape` via
       `tf.image.resize_with_crop_or_pad`.
+
   Returns:
     A callable accepting a tensor and performing the crops and normalization
     discussed above.
@@ -192,6 +198,7 @@ def create_preprocess_fn(
     distort_image=False,
     num_parallel_calls: int = tf.data.experimental.AUTOTUNE) -> tff.Computation:
   """Creates a preprocessing function for CIFAR-10 client datasets.
+
   Args:
     num_epochs: An integer representing the number of epochs to repeat the
       client datasets.
@@ -206,6 +213,7 @@ def create_preprocess_fn(
       includes image distortion, including random crops and flips.
     num_parallel_calls: An integer representing the number of parallel calls
       used when performing `tf.data.Dataset.map`.
+
   Returns:
     A `tff.Computation` performing the preprocessing described above.
   """
@@ -243,6 +251,7 @@ def get_federated_datasets(
     crop_shape: Tuple[int, int, int] = CIFAR_SHAPE,
     serializable: bool = False):
   """Loads and preprocesses federated CIFAR10 training and testing sets.
+
   Args:
     train_client_batch_size: The batch size for all train clients.
     test_client_batch_size: The batch size for all test clients.
@@ -267,6 +276,7 @@ def get_federated_datasets(
     serializable: Boolean indicating whether the returned datasets are intended
       to be serialized and shipped across RPC channels. If `True`, stateful
       transformations will be disallowed.
+
   Returns:
     A tuple (cifar_train, cifar_test) of `tff.simulation.ClientData` instances
       representing the federated training and test datasets.
@@ -320,6 +330,7 @@ def get_centralized_datasets(
     crop_shape: Tuple[int, int, int] = CIFAR_SHAPE
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
   """Loads and preprocesses centralized CIFAR10 training and testing sets.
+
   Args:
     train_batch_size: The batch size for the training dataset.
     test_batch_size: The batch size for the test dataset.
@@ -334,6 +345,7 @@ def get_centralized_datasets(
       CROP_WIDTH, NUM_CHANNELS) which cannot have elements that exceed (32, 32,
       3), element-wise. The element in the last index should be set to 3 to
       maintain the RGB image structure of the elements.
+
   Returns:
     A tuple (cifar_train, cifar_test) of `tf.data.Dataset` instances
     representing the centralized training and test datasets.
