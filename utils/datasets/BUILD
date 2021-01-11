@@ -12,6 +12,7 @@ py_library(
 
 py_test(
     name = "cifar10_dataset_test",
+    size = "large",
     srcs = ["cifar10_dataset_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
