@@ -265,7 +265,7 @@ def main(argv):
                                                   FLAGS.mul_factor,
                                                   FLAGS.num_clients_per_round)
   dp_aggregate_fn = tff.utils.build_dp_aggregate_process(
-      tff.learning.framework.weights_type_from_model(model_fn), query)
+      tff.learning.framework.weights_type_from_model(model_fn).trainable, query)
   iterative_process = attacked_fedavg.build_federated_averaging_process_attacked(
       model_fn=model_fn,
       aggregation_process=dp_aggregate_fn,
