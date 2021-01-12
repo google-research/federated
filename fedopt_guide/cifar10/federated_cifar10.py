@@ -20,7 +20,7 @@ from absl import logging
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from utils import training_loop
+from fedopt_guide import training_loop
 from utils import training_utils
 from utils.datasets import cifar10_dataset
 from utils.models import resnet_models
@@ -40,6 +40,7 @@ def run_federated(
     experiment_name: Optional[str] = 'federated_cifar10',
     root_output_dir: Optional[str] = '/tmp/fed_opt',
     **kwargs):
+    
   """Runs an iterative process on the CIFAR-10 classification task.
   This method will load and pre-process dataset and construct a model used for
   the task. It then uses `iterative_process_builder` to create an iterative
@@ -54,6 +55,7 @@ def run_federated(
   The iterative process must also have a callable attribute `get_model_weights`
   that takes as input the state of the iterative process, and returns a
   `tff.learning.ModelWeights` object.
+
   Args:
     iterative_process_builder: A function that accepts a no-arg `model_fn`, and
       returns a `tff.templates.IterativeProcess`. The `model_fn` must return a
@@ -126,8 +128,8 @@ def run_federated(
 
   training_loop.run(
       iterative_process=training_process,
-      client_datasets_fn=client_datasets_fn,
-      validation_fn=validation_fn,
+      train_client_datasets_fn=client_datasets_fn,
+      evaluation_fn=validation_fn,
       test_fn=test_fn,
       total_rounds=total_rounds,
       experiment_name=experiment_name,

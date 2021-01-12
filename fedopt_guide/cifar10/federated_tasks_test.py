@@ -32,7 +32,6 @@ def iterative_process_builder(model_fn, client_weight_fn=None):
       server_lr=1.0,
       client_weight_fn=client_weight_fn)
 
-
 class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(

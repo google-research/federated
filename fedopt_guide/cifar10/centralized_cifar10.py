@@ -14,7 +14,7 @@
 """Baseline experiment on centralized CIFAR-10 data."""
 
 from typing import Any, Mapping, Optional
-
+from tensorflow.keras import datasets
 import tensorflow as tf
 
 from utils import centralized_training_loop
@@ -37,6 +37,7 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
                     hparams_dict: Optional[Mapping[str, Any]] = None,
                     crop_size: Optional[int] = 24,
                     max_batches: Optional[int] = None):
+
   """Trains a ResNet-18 on CIFAR-10 using a given optimizer.
   Args:
     optimizer: A `tf.keras.optimizers.Optimizer` used to perform training.
@@ -58,6 +59,7 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
       that many batches. If set to None or a nonpositive integer, the full
       datasets are used.
   """
+
   crop_shape = (crop_size, crop_size, NUM_CHANNELS)
 
   cifar_train, cifar_test = cifar10_dataset.get_centralized_datasets(

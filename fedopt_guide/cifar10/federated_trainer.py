@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Runs federated training on various tasks using a generalized form of FedAvg.
 Specifically, we create (according to flags) an iterative processes that allows
 for client and server learning rate schedules, as well as various client and
@@ -69,11 +70,6 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_integer(
       'rounds_per_profile', 0,
       '(Experimental) How often to run the experimental TF profiler, if >0.')
-
-with utils_impl.record_hparam_flags() as task_flags:
-  # Task specification
-  flags.DEFINE_enum('task', None, _SUPPORTED_TASKS,
-                    'Which task to perform federated training on.')
 
 with utils_impl.record_hparam_flags() as cifar10_flags:
   # CIFAR-10 flags
@@ -146,13 +142,16 @@ def main(argv):
       model_fn: Callable[[], tff.learning.Model],
       client_weight_fn: Optional[Callable[[Any], tf.Tensor]] = None,
   ) -> tff.templates.IterativeProcess:
+
     """Creates an iterative process using a given TFF `model_fn`.
+
     Args:
       model_fn: A no-arg function returning a `tff.learning.Model`.
       client_weight_fn: Optional function that takes the output of
         `model.report_local_outputs` and returns a tensor providing the weight
         in the federated average of model deltas. If not provided, the default
         is the total number of examples processed on device.
+
     Returns:
       A `tff.templates.IterativeProcess`.
     """
@@ -161,7 +160,7 @@ def main(argv):
         model_fn=model_fn,
         client_optimizer_fn=client_optimizer_fn,
         server_optimizer_fn=server_optimizer_fn,
-        client_weight_fn=client_weight_fn, 
+        client_weighting=client_weight_fn, 
         use_experimental_simulation_loop=True)
 
   shared_args = utils_impl.lookup_flag_values(shared_flags)
@@ -169,12 +168,7 @@ def main(argv):
   task_args = _get_task_args()
   hparam_dict = _get_hparam_flags()
 
-  if FLAGS.task == 'cifar10':
-    run_federated_fn = federated_cifar10.run_federated
-  else:
-    raise ValueError(
-        '--task flag {} is not supported, must be one of {}.'.format(
-            FLAGS.task, _SUPPORTED_TASKS))
+  run_federated_fn = federated_cifar10.run_federated
 
   run_federated_fn(**shared_args, **task_args, hparam_dict=hparam_dict)
 

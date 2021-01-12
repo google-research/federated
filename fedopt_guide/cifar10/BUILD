@@ -29,7 +29,7 @@ py_library(
     srcs = ["federated_cifar10.py"],
     srcs_version = "PY3",
     deps = [
-        "//utils:training_loop",
+        "//fedopt_guide:training_loop",
         "//utils:training_utils",
         "//utils/datasets:cifar10_dataset",
         "//utils/models:resnet_models"
