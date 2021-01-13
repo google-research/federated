@@ -31,10 +31,6 @@ TEST_DATA = collections.OrderedDict(
 )
 
 
-def _compute_length_of_dataset(ds):
-  return ds.reduce(0, lambda x, _: x + 1)
-
-
 class ConvertToTokensTest(tf.test.TestCase):
 
   def test_split_input_target(self):

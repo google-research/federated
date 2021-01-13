@@ -13,13 +13,12 @@
 # limitations under the License.
 
 import collections
+from unittest import mock
+
 import tensorflow as tf
+import tensorflow_federated as tff
 
 from utils.datasets import shakespeare_dataset
-
-
-def _compute_length_of_dataset(ds):
-  return ds.reduce(0, lambda x, _: x + 1)
 
 
 class PreprocessFnTest(tf.test.TestCase):
@@ -98,14 +97,69 @@ class PreprocessFnTest(tf.test.TestCase):
         .format(expected_outputs))
 
 
+SHAKESPEARE_LOAD_DATA = 'tensorflow_federated.simulation.datasets.shakespeare.load_data'
+
+
 class FederatedDatasetTest(tf.test.TestCase):
 
-  def test_raises_negative_epochs_per_round(self):
-    with self.assertRaisesRegex(
-        ValueError,
-        'train_client_epochs_per_round must be a positive integer.'):
-      shakespeare_dataset.get_federated_datasets(
-          train_client_batch_size=10, train_client_epochs_per_round=-1)
+  @mock.patch(SHAKESPEARE_LOAD_DATA)
+  def test_preprocess_applied(self, mock_load_data):
+    if tf.config.list_logical_devices('GPU'):
+      self.skipTest('skip GPU test')
+    # Mock out the actual data loading from disk. Assert that the preprocessing
+    # function is applied to the client data, and that only the ClientData
+    # objects we desired are used.
+    #
+    # The correctness of the preprocessing function is tested in other tests.
+    mock_train = mock.create_autospec(tff.simulation.ClientData)
+    mock_test = mock.create_autospec(tff.simulation.ClientData)
+    mock_load_data.return_value = (mock_train, mock_test)
+
+    _, _ = shakespeare_dataset.get_federated_datasets()
+
+    mock_load_data.assert_called_once()
+
+    # Assert the training and testing data are preprocessed.
+    self.assertEqual(mock_train.mock_calls,
+                     mock.call.preprocess(mock.ANY).call_list())
+    self.assertEqual(mock_test.mock_calls,
+                     mock.call.preprocess(mock.ANY).call_list())
+
+
+class CentralizedDatasetTest(tf.test.TestCase):
+
+  @mock.patch(SHAKESPEARE_LOAD_DATA)
+  def test_preprocess_applied(self, mock_load_data):
+    if tf.config.list_logical_devices('GPU'):
+      self.skipTest('skip GPU test')
+    # Mock out the actual data loading from disk. Assert that the preprocessing
+    # function is applied to the client data, and that only the ClientData
+    # objects we desired are used.
+    #
+    # The correctness of the preprocessing function is tested in other tests.
+    sample_ds = tf.data.Dataset.from_tensor_slices(
+        collections.OrderedDict(snippets=['a snippet', 'different snippet']))
+
+    mock_train = mock.create_autospec(tff.simulation.ClientData)
+    mock_train.create_tf_dataset_from_all_clients = mock.Mock(
+        return_value=sample_ds)
+
+    mock_test = mock.create_autospec(tff.simulation.ClientData)
+    mock_test.create_tf_dataset_from_all_clients = mock.Mock(
+        return_value=sample_ds)
+
+    mock_load_data.return_value = (mock_train, mock_test)
+
+    _, _ = shakespeare_dataset.get_centralized_datasets()
+
+    mock_load_data.assert_called_once()
+
+    # Assert the validation ClientData isn't used, and the train and test
+    # are amalgamated into datasets single datasets over all clients.
+    self.assertEqual(mock_train.mock_calls,
+                     mock.call.create_tf_dataset_from_all_clients().call_list())
+    self.assertEqual(mock_test.mock_calls,
+                     mock.call.create_tf_dataset_from_all_clients().call_list())
 
 
 if __name__ == '__main__':
