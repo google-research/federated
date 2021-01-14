@@ -201,7 +201,7 @@ def main(argv):
       client_epochs_per_round=FLAGS.client_epochs_per_round,
       client_batch_size=FLAGS.client_batch_size,
       clients_per_round=FLAGS.clients_per_round,
-      client_datasets_random_seed=FLAGS.client_datasets_random_seed)
+      sampling_random_seed=FLAGS.client_datasets_random_seed)
 
   if FLAGS.task == 'cifar100':
     runner_spec = federated_cifar100.configure_training(

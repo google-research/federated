@@ -56,9 +56,9 @@ class TaskSpec(object):
       training performed per client in each training round.
     client_batch_size: An integer representing the batch size used on clients.
     clients_per_round: An integer representing the number of clients
-      participating in each round.
-    client_datasets_random_seed: An optional int used to seed which clients are
-      sampled at each round. If `None`, no seed is used.
+      participating in each training round.
+    sampling_random_seed: An optional int used to seed which clients are sampled
+      at each training round. If `None`, no seed is used.
   """
   iterative_process_builder: Callable[
       ..., tff.templates.IterativeProcess] = attr.ib()
@@ -71,7 +71,52 @@ class TaskSpec(object):
   clients_per_round: int = attr.ib(
       validator=[attr.validators.instance_of(int), _check_positive],
       converter=int)
-  client_datasets_random_seed: Optional[int] = attr.ib(
+  sampling_random_seed: Optional[int] = attr.ib(
+      default=None,
+      validator=attr.validators.optional(attr.validators.instance_of(int)),
+      converter=attr.converters.optional(int))
+
+
+@attr.s(eq=False, order=False, frozen=True)
+class EvalSpec(object):
+  """Contains information for configuring federated evaluation.
+
+  This class contains a callable `iterative_process_builder` for building a
+  `tff.templates.IterativeProcess`, as well as hyperparameters governing
+  how to perform federated training using the resulting iterative process.
+
+  Attributes:
+    client_batch_size: An integer representing the batch size used on evaluation
+      clients.
+    clients_per_validation_round: An optional integer representing the number of
+      clients participating in each federated validation round. By convention,
+      setting this to `None` indicates that all validation clients should
+      participate in each validation round.
+    clients_per_test_round: An optional integer representing the number of
+      clients participating in each federated test round. By convention, setting
+      this to `None` indicates that all test clients should participate in each
+      test round.
+    sampling_random_seed: An optional int used to seed which clients are sampled
+      at each evaluation round. If `None`, no seed is used.
+  """
+  client_batch_size: int = attr.ib(
+      validator=[attr.validators.instance_of(int), _check_positive],
+      converter=int)
+  clients_per_validation_round: Optional[int] = attr.ib(
+      default=None,
+      validator=[
+          attr.validators.optional(attr.validators.instance_of(int)),
+          attr.validators.optional(_check_positive)
+      ],
+      converter=attr.converters.optional(int))
+  clients_per_test_round: Optional[int] = attr.ib(
+      default=None,
+      validator=[
+          attr.validators.optional(attr.validators.instance_of(int)),
+          attr.validators.optional(_check_positive)
+      ],
+      converter=attr.converters.optional(int))
+  sampling_random_seed: Optional[int] = attr.ib(
       default=None,
       validator=attr.validators.optional(attr.validators.instance_of(int)),
       converter=attr.converters.optional(int))

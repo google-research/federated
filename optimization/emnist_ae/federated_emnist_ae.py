@@ -79,7 +79,7 @@ def configure_training(
         emnist_train.client_ids,
         size=task_spec.clients_per_round,
         replace=False,
-        random_seed=task_spec.client_datasets_random_seed)
+        random_seed=task_spec.sampling_random_seed)
     # We convert the output to a list (instead of an np.ndarray) so that it can
     # be used as input to the iterative process.
     client_sampling_fn = lambda x: list(client_ids_fn(x))
@@ -90,7 +90,7 @@ def configure_training(
     client_sampling_fn = training_utils.build_client_datasets_fn(
         dataset=emnist_train,
         clients_per_round=task_spec.clients_per_round,
-        random_seed=task_spec.client_datasets_random_seed)
+        random_seed=task_spec.sampling_random_seed)
 
   training_process.get_model_weights = iterative_process.get_model_weights
 

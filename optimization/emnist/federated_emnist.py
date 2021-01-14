@@ -14,6 +14,7 @@
 """Federated EMNIST character recognition library using TFF."""
 
 import functools
+from typing import Optional
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -24,9 +25,12 @@ from utils.datasets import emnist_dataset
 from utils.models import emnist_models
 
 EMNIST_MODELS = ['cnn', '2nn']
+TOTAL_NUM_TRAIN_CLIENTS = 3400
+TOTAL_NUM_TEST_CLIENTS = 3400
 
 
 def configure_training(task_spec: training_specs.TaskSpec,
+                       eval_spec: Optional[training_specs.EvalSpec] = None,
                        model: str = 'cnn') -> training_specs.RunnerSpec:
   """Configures training for the EMNIST character recognition task.
 
@@ -36,6 +40,9 @@ def configure_training(task_spec: training_specs.TaskSpec,
 
   Args:
     task_spec: A `TaskSpec` class for creating federated training tasks.
+    eval_spec: An `EvalSpec` class for configuring federated evaluation. If set
+      to None, centralized evaluation is used for validation and testing
+      instead.
     model: A string specifying the model used for character recognition. Can be
       one of `cnn` and `2nn`, corresponding to a CNN model and a densely
       connected 2-layer model (respectively).
@@ -45,9 +52,9 @@ def configure_training(task_spec: training_specs.TaskSpec,
     federated task.
   """
   emnist_task = 'digit_recognition'
-  emnist_train, _ = tff.simulation.datasets.emnist.load_data(only_digits=False)
-  _, emnist_test = emnist_dataset.get_centralized_datasets(
-      only_digits=False, emnist_task=emnist_task)
+
+  emnist_train, emnist_test = tff.simulation.datasets.emnist.load_data(
+      only_digits=False)
 
   train_preprocess_fn = emnist_dataset.create_preprocess_fn(
       num_epochs=task_spec.client_epochs_per_round,
@@ -79,6 +86,9 @@ def configure_training(task_spec: training_specs.TaskSpec,
 
   iterative_process = task_spec.iterative_process_builder(tff_model_fn)
 
+  clients_per_train_round = min(task_spec.clients_per_round,
+                                TOTAL_NUM_TRAIN_CLIENTS)
+
   if hasattr(emnist_train, 'dataset_computation'):
 
     @tff.tf_computation(tf.string)
@@ -90,9 +100,9 @@ def configure_training(task_spec: training_specs.TaskSpec,
         build_train_dataset_from_client_id, iterative_process)
     client_ids_fn = training_utils.build_sample_fn(
         emnist_train.client_ids,
-        size=task_spec.clients_per_round,
+        size=clients_per_train_round,
         replace=False,
-        random_seed=task_spec.client_datasets_random_seed)
+        random_seed=task_spec.sampling_random_seed)
     # We convert the output to a list (instead of an np.ndarray) so that it can
     # be used as input to the iterative process.
     client_sampling_fn = lambda x: list(client_ids_fn(x))
@@ -102,18 +112,71 @@ def configure_training(task_spec: training_specs.TaskSpec,
         train_preprocess_fn, iterative_process)
     client_sampling_fn = training_utils.build_client_datasets_fn(
         dataset=emnist_train,
-        clients_per_round=task_spec.clients_per_round,
-        random_seed=task_spec.client_datasets_random_seed)
+        clients_per_round=clients_per_train_round,
+        random_seed=task_spec.sampling_random_seed)
 
   training_process.get_model_weights = iterative_process.get_model_weights
 
-  test_fn = training_utils.build_centralized_evaluate_fn(
-      eval_dataset=emnist_test,
-      model_builder=model_builder,
-      loss_builder=loss_builder,
-      metrics_builder=metrics_builder)
+  if eval_spec:
 
-  validation_fn = lambda model_weights, round_num: test_fn(model_weights)
+    if eval_spec.clients_per_validation_round is None:
+      clients_per_validation_round = TOTAL_NUM_TEST_CLIENTS
+    else:
+      clients_per_validation_round = min(eval_spec.clients_per_validation_round,
+                                         TOTAL_NUM_TEST_CLIENTS)
+
+    if eval_spec.clients_per_test_round is None:
+      clients_per_test_round = TOTAL_NUM_TEST_CLIENTS
+    else:
+      clients_per_test_round = min(eval_spec.clients_per_test_round,
+                                   TOTAL_NUM_TEST_CLIENTS)
+
+    test_preprocess_fn = emnist_dataset.create_preprocess_fn(
+        num_epochs=1,
+        batch_size=eval_spec.client_batch_size,
+        shuffle_buffer_size=1,
+        emnist_task=emnist_task)
+    emnist_test = emnist_test.preprocess(test_preprocess_fn)
+
+    def eval_metrics_builder():
+      return [
+          tf.keras.metrics.SparseCategoricalCrossentropy(),
+          tf.keras.metrics.SparseCategoricalAccuracy()
+      ]
+
+    federated_eval_fn = training_utils.build_federated_evaluate_fn(
+        model_builder=model_builder, metrics_builder=eval_metrics_builder)
+
+    validation_client_sampling_fn = training_utils.build_client_datasets_fn(
+        emnist_test,
+        clients_per_validation_round,
+        random_seed=eval_spec.sampling_random_seed)
+    test_client_sampling_fn = training_utils.build_client_datasets_fn(
+        emnist_test,
+        clients_per_test_round,
+        random_seed=eval_spec.sampling_random_seed)
+
+    def validation_fn(model_weights, round_num):
+      validation_clients = validation_client_sampling_fn(round_num)
+      return federated_eval_fn(model_weights, validation_clients)
+
+    def test_fn(model_weights):
+      # We fix the round number to get deterministic behavior
+      test_round_num = 0
+      test_clients = test_client_sampling_fn(test_round_num)
+      return federated_eval_fn(model_weights, test_clients)
+
+  else:
+    _, central_emnist_test = emnist_dataset.get_centralized_datasets(
+        only_digits=False, emnist_task=emnist_task)
+
+    test_fn = training_utils.build_centralized_evaluate_fn(
+        eval_dataset=central_emnist_test,
+        model_builder=model_builder,
+        loss_builder=loss_builder,
+        metrics_builder=metrics_builder)
+
+    validation_fn = lambda model_weights, round_num: test_fn(model_weights)
 
   return training_specs.RunnerSpec(
       iterative_process=training_process,
