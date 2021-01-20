@@ -165,7 +165,7 @@ def _build_client_evaluate_fn(model, mean_metrics, sum_metrics):
       for metric in mean_metrics:
         metric.update_state(y_batch, output)
       for metric in sum_metrics:
-        metric.update_state(output)
+        metric.update_state(y_batch, output)
       num_examples += tf.shape(output)[0]
 
     # Record metrics
@@ -197,6 +197,10 @@ def build_federated_evaluate_fn(
   based metrics (such as mean squared error), we compute both example-weighted
   and uniform-weighted versions of the metric, while for sum-based metrics
   (such as the number of examples in a client dataset) we compute the sum.
+
+  The `tf.keras.metrics.Metric` objects in `metrics_builder()` must have a
+  callable attribute `update_state` accepting both the true label and the
+  predicted label of a model.
 
   The resulting nested structure is an ordered dictionary with keys given by
   metric names, and values given by nested structure of the metric value,
