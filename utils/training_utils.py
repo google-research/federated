@@ -133,7 +133,7 @@ def build_centralized_evaluate_fn(
   return evaluate_fn
 
 
-def _build_client_evaluate_fn(model, mean_metrics, sum_metrics):
+def _build_client_evaluate_fn(model, metrics):
   """Creates a client evaluation function for a given model and metrics.
 
   This evaluation function is intended to be re-used for multiple clients during
@@ -141,8 +141,7 @@ def _build_client_evaluate_fn(model, mean_metrics, sum_metrics):
 
   Args:
     model: A `tf.keras.Model` used to compute metrics.
-    mean_metrics: A list of `tf.keras.metrics.Mean` metrics.
-    sum_metrics: A list of `tf.keras.metrics.Sum` metrics.
+    metrics: A list of `tf.keras.metrics.Mean` metrics.
 
   Returns:
     A function that takes as input a `tf.data.Dataset`, and returns an ordered
@@ -153,32 +152,25 @@ def _build_client_evaluate_fn(model, mean_metrics, sum_metrics):
   def get_client_eval_metrics(dataset):
 
     # Reset metrics
-    for metric in mean_metrics:
-      metric.reset_states()
-    for metric in sum_metrics:
+    for metric in metrics:
       metric.reset_states()
 
     # Compute metrics
     num_examples = tf.constant(0, dtype=tf.int32)
     for x_batch, y_batch in dataset:
       output = model(x_batch, training=False)
-      for metric in mean_metrics:
-        metric.update_state(y_batch, output)
-      for metric in sum_metrics:
+      for metric in metrics:
         metric.update_state(y_batch, output)
       num_examples += tf.shape(output)[0]
 
     # Record metrics
-    mean_metric_results = collections.OrderedDict()
-    for metric in mean_metrics:
-      mean_metric_results[metric.name] = metric.result()
+    metric_results = collections.OrderedDict()
+    for metric in metrics:
+      metric_results[metric.name] = metric.result()
 
-    sum_metric_results = collections.OrderedDict()
-    for metric in sum_metrics:
-      sum_metric_results[metric.name] = metric.result()
-    sum_metric_results['num_examples'] = num_examples
+    metric_results['num_examples'] = num_examples
 
-    return mean_metric_results, sum_metric_results
+    return metric_results
 
   return get_client_eval_metrics
 
@@ -193,12 +185,8 @@ def build_federated_evaluate_fn(
 
   The evaluation function takes as input a `tff.learning.ModelWeights`, and
   computes metrics on a `tff.learning.Model` with the same weights. This method
-  returns a nested structure of (metric_name, metric_value) pairs. For mean-
-  based metrics (such as mean squared error), we compute both example-weighted
-  and uniform-weighted versions of the metric, while for sum-based metrics
-  (such as the number of examples in a client dataset) we compute the sum.
-
-  The `tf.keras.metrics.Metric` objects in `metrics_builder()` must have a
+  returns a nested structure of (metric_name, metric_value) pairs.  The
+  `tf.keras.metrics.Metric` objects in `metrics_builder()` must have a
   callable attribute `update_state` accepting both the true label and the
   predicted label of a model.
 
@@ -216,7 +204,7 @@ def build_federated_evaluate_fn(
     ('quantiles', ...)
   ]),
   ('num_examples', [
-    ('summed', ...),
+    ('example_weighted', ...),
     ('uniform_weighted', ...),
     ('quantiles', ...)
   ]),
@@ -225,8 +213,9 @@ def build_federated_evaluate_fn(
   Args:
     model_builder: A no-arg function returning an uncompiled `tf.keras.Model`.
     metrics_builder: A no-arg function that returns a list of
-      `tf.keras.metrics.Metric` objects. These metrics must either be instances
-      of `tf.keras.metrics.Mean` or `tf.keras.metrics.Sum`.
+      `tf.keras.metrics.Metric` objects. These metrics must have a callable
+      `update_state` accepting `y_true` and `y_pred` arguments, corresponding
+      to the true and predicted label, respectively.
     quantiles: Which quantiles to compute of mean-based metrics. Must be an
       iterable of float values between 0 and 1.
 
@@ -239,20 +228,7 @@ def build_federated_evaluate_fn(
   keras_model = model_builder()
   metrics = metrics_builder()
 
-  mean_metrics = []
-  sum_metrics = []
-
-  for keras_metric in metrics:
-    if isinstance(keras_metric, tf.keras.metrics.Mean):
-      mean_metrics.append(keras_metric)
-    elif isinstance(keras_metric, tf.keras.metrics.Sum):
-      sum_metrics.append(keras_metric)
-    else:
-      raise ValueError('Unsupported metric {}, metrics must be an instance of '
-                       'tf.keras.metrics.Mean or tf.keras.metrics.Sum.')
-
-  client_eval_fn = _build_client_evaluate_fn(keras_model, mean_metrics,
-                                             sum_metrics)
+  client_eval_fn = _build_client_evaluate_fn(keras_model, metrics)
 
   def evaluate_fn(model_weights: tff.learning.ModelWeights,
                   client_datasets: List[tf.data.Dataset]) -> Dict[str, Any]:
@@ -262,27 +238,23 @@ def build_federated_evaluate_fn(
         non_trainable=list(model_weights.non_trainable))
     model_weights_as_list.assign_weights_to(keras_model)
 
-    mean_metrics_at_clients = collections.defaultdict(list)
-    sum_metrics_at_clients = collections.defaultdict(list)
+    metrics_at_clients = collections.defaultdict(list)
 
     # Record all client metrics
     for client_ds in client_datasets:
       tuple_ds = convert_to_tuple_dataset(client_ds)
-      client_mean_metrics, client_sum_metrics = client_eval_fn(tuple_ds)
-
-      for (metric_name, metric_value) in client_mean_metrics.items():
-        mean_metrics_at_clients[metric_name].append(metric_value)
-      for (metric_name, metric_value) in client_sum_metrics.items():
-        sum_metrics_at_clients[metric_name].append(metric_value)
+      client_metrics = client_eval_fn(tuple_ds)
+      for (metric_name, metric_value) in client_metrics.items():
+        metrics_at_clients[metric_name].append(metric_value)
 
     # Aggregate metrics across clients
     aggregate_metrics = collections.OrderedDict()
 
     num_examples_at_clients = tf.cast(
-        sum_metrics_at_clients['num_examples'], dtype=tf.float32)
+        metrics_at_clients['num_examples'], dtype=tf.float32)
     total_num_examples = tf.reduce_sum(num_examples_at_clients)
 
-    for (metric_name, metric_at_clients) in mean_metrics_at_clients.items():
+    for (metric_name, metric_at_clients) in metrics_at_clients.items():
       metric_as_float = tf.cast(metric_at_clients, dtype=tf.float32)
 
       uniform_weighted_value = tf.reduce_mean(metric_as_float).numpy()
@@ -298,17 +270,6 @@ def build_federated_evaluate_fn(
           uniform_weighted=uniform_weighted_value,
           quantiles=quantile_values)
 
-    for (metric_name, metric_at_clients) in sum_metrics_at_clients.items():
-      summed_value = tf.reduce_sum(metric_at_clients).numpy()
-      metric_as_float = tf.cast(metric_at_clients, dtype=tf.float32)
-      uniform_weighted_value = tf.reduce_mean(metric_as_float).numpy()
-      quantile_values = np.quantile(metric_as_float, quantiles)
-      quantile_values = collections.OrderedDict(zip(quantiles, quantile_values))
-
-      aggregate_metrics[metric_name] = collections.OrderedDict(
-          summed=summed_value,
-          uniform_weighted=uniform_weighted_value,
-          quantiles=quantile_values)
     return aggregate_metrics
 
   return evaluate_fn

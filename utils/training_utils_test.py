@@ -318,17 +318,15 @@ class FederatedEvaluationTest(tf.test.TestCase):
     self.assertCountEqual(eval_metrics.keys(),
                           ['mean_squared_error', 'num_examples'])
 
-    # Testing correctness of sum-based metrics
-    expected_sum_keys = ['summed', 'uniform_weighted', 'quantiles']
-    self.assertCountEqual(eval_metrics['num_examples'].keys(),
-                          expected_sum_keys)
-    self.assertEqual(eval_metrics['num_examples']['summed'], 6)
-    self.assertEqual(eval_metrics['num_examples']['uniform_weighted'], 3.0)
-
-    # Testing correctness of mean-based metrics
     expected_keys = ['example_weighted', 'uniform_weighted', 'quantiles']
+    self.assertCountEqual(eval_metrics['num_examples'].keys(), expected_keys)
     self.assertCountEqual(eval_metrics['mean_squared_error'].keys(),
                           expected_keys)
+
+    self.assertNear(
+        eval_metrics['num_examples']['uniform_weighted'], 3.0, err=1e-6)
+    self.assertNear(
+        eval_metrics['num_examples']['example_weighted'], 3.0, err=1e-6)
 
     expected_mse = 0.875
     self.assertNear(
@@ -352,21 +350,18 @@ class FederatedEvaluationTest(tf.test.TestCase):
     self.assertCountEqual(eval_metrics.keys(),
                           ['mean_squared_error', 'num_examples'])
 
-    # Testing correctness of sum-based metrics
-    expected_sum_keys = ['summed', 'uniform_weighted', 'quantiles']
-    self.assertCountEqual(eval_metrics['num_examples'].keys(),
-                          expected_sum_keys)
-    self.assertEqual(eval_metrics['num_examples']['summed'], 5)
-    self.assertEqual(eval_metrics['num_examples']['uniform_weighted'], 2.5)
-
-    # Testing correctness of mean-based metrics
     expected_keys = ['example_weighted', 'uniform_weighted', 'quantiles']
+    self.assertCountEqual(eval_metrics['num_examples'].keys(), expected_keys)
     self.assertCountEqual(eval_metrics['mean_squared_error'].keys(),
                           expected_keys)
 
+    self.assertNear(
+        eval_metrics['num_examples']['uniform_weighted'], 2.5, err=1e-6)
+    self.assertNear(
+        eval_metrics['num_examples']['example_weighted'], 2.6, err=1e-6)
+
     expected_uniform_mse = 1.5
     expected_example_mse = 1.8
-
     self.assertNear(
         eval_metrics['mean_squared_error']['uniform_weighted'],
         expected_uniform_mse,
@@ -400,7 +395,7 @@ class FederatedEvaluationTest(tf.test.TestCase):
     expected_quantile_values = [0.0, 1.0, 4.0, 9.0, 16.0]
     expected_quantiles = collections.OrderedDict(
         zip(quantiles, expected_quantile_values))
-    self.assertEqual(mse_quantiles, expected_quantiles)
+    self.assertAllClose(mse_quantiles, expected_quantiles)
 
   def test_quantile_aggregation_for_num_examples(self):
     client_ids = [0, 1, 2, 3, 4]
@@ -426,7 +421,7 @@ class FederatedEvaluationTest(tf.test.TestCase):
     expected_quantile_values = [1.0, 2.0, 3.0, 4.0, 5.0]
     expected_quantiles = collections.OrderedDict(
         zip(quantiles, expected_quantile_values))
-    self.assertEqual(num_examples_quantiles, expected_quantiles)
+    self.assertAllClose(num_examples_quantiles, expected_quantiles)
 
 
 if __name__ == '__main__':
