@@ -55,7 +55,7 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
         client_epochs_per_round=1,
         client_batch_size=10,
         clients_per_round=1,
-        sampling_random_seed=1)
+        client_datasets_random_seed=1)
     runner_spec = config_fn(task_spec)
 
     total_rounds = 1
