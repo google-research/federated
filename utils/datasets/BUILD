@@ -32,14 +32,10 @@ py_library(
 
 py_test(
     name = "cifar100_dataset_test",
+    size = "medium",
     srcs = ["cifar100_dataset_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = [
-        "manual",
-        "nokokoro",
-        "nopresubmit",
-    ],
     deps = [":cifar100_dataset"],
 )
 
@@ -51,14 +47,10 @@ py_library(
 
 py_test(
     name = "emnist_dataset_test",
+    size = "medium",
     srcs = ["emnist_dataset_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = [
-        "manual",
-        "nokokoro",
-        "nopresubmit",
-    ],
     deps = [":emnist_dataset"],
 )
 
@@ -70,14 +62,10 @@ py_library(
 
 py_test(
     name = "shakespeare_dataset_test",
+    size = "medium",
     srcs = ["shakespeare_dataset_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = [
-        "manual",
-        "nokokoro",
-        "nopresubmit",
-    ],
     deps = [":shakespeare_dataset"],
 )
 
@@ -93,7 +81,8 @@ py_test(
     srcs = ["stackoverflow_word_prediction_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    deps = [":stackoverflow_word_prediction"],
+    deps = [":stackoverflow_word_predi
+ction"],
 )
 
 py_library(
@@ -104,14 +93,9 @@ py_library(
 
 py_test(
     name = "stackoverflow_tag_prediction_test",
-    size = "large",
+    size = "medium",
     srcs = ["stackoverflow_tag_prediction_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = [
-        "manual",
-        "nokokoro",
-        "notap",
-    ],
     deps = [":stackoverflow_tag_prediction"],
 )
