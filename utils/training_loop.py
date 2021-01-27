@@ -216,6 +216,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
   current_model = iterative_process.get_model_weights(state)
 
   loop_start_time = time.time()
+  loop_start_round = round_num
   while round_num < total_rounds:
     data_prep_start_time = time.time()
     federated_train_data = client_datasets_fn(round_num)
@@ -245,8 +246,10 @@ def run(iterative_process: tff.templates.IterativeProcess,
         current_model, prev_model)
     train_metrics.update(round_metrics)
 
+    loop_time = time.time() - loop_start_time
+    loop_rounds = (round_num - loop_start_round + 1)
     logging.info('Round {:2d}, {:.2f}s per round in average.'.format(
-        round_num, (time.time() - loop_start_time) / (round_num + 1)))
+        round_num, loop_time / loop_rounds))
 
     if (round_num % rounds_per_checkpoint == 0 or
         round_num == total_rounds - 1):
