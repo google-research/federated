@@ -81,8 +81,7 @@ py_test(
     srcs = ["stackoverflow_word_prediction_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    deps = [":stackoverflow_word_predi
-ction"],
+    deps = [":stackoverflow_word_prediction"],
 )
 
 py_library(
