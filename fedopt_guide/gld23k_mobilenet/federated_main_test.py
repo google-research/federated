@@ -23,7 +23,7 @@ def iterative_process_builder(model_fn, client_weight_fn=None):
       model_fn=model_fn,
       client_optimizer_fn=lambda: tf.keras.optimizers.SGD(0.1),
       server_optimizer_fn=lambda: tf.keras.optimizers.SGD(1.0),
-      client_weight_fn=client_weight_fn)
+      client_weighting=client_weight_fn)
 
 
 class FederatedMainTest(tf.test.TestCase):
