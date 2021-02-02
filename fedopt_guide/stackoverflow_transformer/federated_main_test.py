@@ -62,7 +62,7 @@ class FederatedMainTest(tf.test.TestCase):
     self.assertIn(
         'eval/loss',
         fieldnames,
-        msg='The output metrics should have a `train/loss` column if validation'
+        msg='The output metrics should have a `eval/loss` column if validation'
         ' metrics computation is successful.')
     self.assertIn(
         'test/loss',
