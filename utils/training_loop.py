@@ -24,7 +24,6 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from utils import tensorboard_manager
 from utils import utils_impl
 
 
@@ -60,14 +59,12 @@ def _setup_outputs(root_output_dir,
   metrics_mngr = tff.simulation.CSVMetricsManager(csv_file)
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
-  tb_mngr = tensorboard_manager.TensorBoardManager(summary_dir=summary_logdir)
+  tb_mngr = tff.simulation.TensorBoardManager(summary_dir=summary_logdir)
 
   if hparam_dict:
     hparam_dict['metrics_file'] = metrics_mngr.metrics_filename
     hparams_file = os.path.join(results_dir, 'hparams.csv')
     utils_impl.atomic_write_to_csv(pd.Series(hparam_dict), hparams_file)
-    tb_mngr.update_hparams(
-        {k: v for k, v in hparam_dict.items() if v is not None})
 
   logging.info('Writing...')
   logging.info('    checkpoints to: %s', checkpoint_dir)
