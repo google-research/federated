@@ -238,7 +238,7 @@ class _MetricsHook(object):
     # Also write the hparam_dict to a CSV:
     hparam_dict['results_file'] = self._results_file
     hparams_file = os.path.join(output_dir, experiment_name, 'hparams.csv')
-    utils_impl.atomic_write_to_csv(pd.Series(hparam_dict), hparams_file)
+    utils_impl.atomic_write_series_to_csv(hparam_dict, hparams_file)
 
     logging.info('Writing ...')
     logging.info('   result csv to: %s', self._results_file)

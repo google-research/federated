@@ -208,11 +208,6 @@ class CentralizedTrainingLoopTest(tf.test.TestCase):
     hparams_file = os.path.join(results_dir, 'hparams.csv')
     self.assertTrue(tf.io.gfile.exists(hparams_file))
 
-    hparams_csv = pd.read_csv(hparams_file, index_col=0)
-    expected_csv = pd.DataFrame(hparams_dict, index=[0])
-
-    pd.testing.assert_frame_equal(hparams_csv, expected_csv)
-
 
 if __name__ == '__main__':
   tf.test.main()

@@ -20,7 +20,6 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 from absl import logging
-import pandas as pd
 import tensorflow as tf
 import tensorflow_federated as tff
 
@@ -64,7 +63,7 @@ def _setup_outputs(root_output_dir,
   if hparam_dict:
     hparam_dict['metrics_file'] = metrics_mngr.metrics_filename
     hparams_file = os.path.join(results_dir, 'hparams.csv')
-    utils_impl.atomic_write_to_csv(pd.Series(hparam_dict), hparams_file)
+    utils_impl.atomic_write_series_to_csv(hparam_dict, hparams_file)
 
   logging.info('Writing...')
   logging.info('    checkpoints to: %s', checkpoint_dir)

@@ -23,7 +23,7 @@ import os.path
 import shutil
 import subprocess
 import tempfile
-from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Union
 
 from absl import flags
 from absl import logging
@@ -67,9 +67,16 @@ def atomic_write_to_csv(dataframe: pd.DataFrame,
     dataframe: A `pandas.Dataframe`.
     output_file: The final output file to write. The output will be compressed
       depending on the filename, see documentation for
-      pandas.DateFrame.to_csv(compression='infer').
-    overwrite: Whether to overwrite output_file if it exists.
+      `pandas.DateFrame.to_csv(compression='infer')`.
+    overwrite: Whether to overwrite `output_file` if it exists.
+
+  Raises:
+    ValueError: If `dataframe` is not an instance of `pandas.DataFrame`.
   """
+  if not isinstance(dataframe, pd.DataFrame):
+    raise ValueError(
+        'dataframe must be an instance of `pandas.DataFrame`, received a `{}`'
+        .format(type(dataframe)))
   # Exporting via to_hdf() is an appealing option, because we could perhaps
   # maintain more type information, and also write both hyperparameters and
   # results to the same HDF5 file. However, to_hdf() call uses pickle under the
@@ -100,6 +107,30 @@ def atomic_write_to_csv(dataframe: pd.DataFrame,
   # Finally, do an atomic rename and clean up:
   tf.io.gfile.rename(tmp_gfile_name, output_file, overwrite=overwrite)
   shutil.rmtree(tmp_dir)
+
+
+def atomic_write_series_to_csv(series_data: Any,
+                               output_file: str,
+                               overwrite: bool = True) -> None:
+  """Writes series data to `output_file` as a (possibly zipped) CSV file.
+
+  The series data will be written to a CSV with two columns, an unlabeled
+  column with the indices of `series_data` (the keys if it is a `dict`), and a
+  column with label `0` containing the associated values in `series_data`. Note
+  that if `series_data` has non-scalar values, these will be written via their
+  string representation.
+
+  Args:
+    series_data: A structure that can be converted to a `pandas.Series`,
+      typically an array-like, iterable, dictionary, or scalar value. For more
+      details, see documentation for `pandas.Series`.
+    output_file: The final output file to write. The output will be compressed
+      depending on the filename, see documentation for
+      `pandas.DateFrame.to_csv(compression='infer')`.
+    overwrite: Whether to overwrite `output_file` if it exists.
+  """
+  dataframe = pd.DataFrame(pd.Series(series_data))
+  atomic_write_to_csv(dataframe, output_file, overwrite)
 
 
 def atomic_read_from_csv(csv_file):

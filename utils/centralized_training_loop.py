@@ -17,7 +17,6 @@ import os
 from typing import Any, Dict, Optional
 
 from absl import logging
-import pandas as pd
 import tensorflow as tf
 
 from optimization.shared import keras_callbacks
@@ -68,8 +67,7 @@ def run(
   if hparams_dict:
     hparams_file = os.path.join(results_dir, 'hparams.csv')
     logging.info('Saving hyper parameters to: [%s]', hparams_file)
-    hparams_df = pd.DataFrame(hparams_dict, index=[0])
-    utils_impl.atomic_write_to_csv(hparams_df, hparams_file)
+    utils_impl.atomic_write_series_to_csv(hparams_dict, hparams_file)
 
   csv_logger_callback = keras_callbacks.AtomicCSVLogger(results_dir)
   tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_dir)
