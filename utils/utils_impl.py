@@ -32,6 +32,14 @@ import pandas as pd
 import tensorflow as tf
 
 
+def create_directory_if_not_exists(path: str):
+  """Creates a directory if it does not already exist."""
+  try:
+    tf.io.gfile.makedirs(path)
+  except tf.errors.OpError:
+    logging.info('Skipping creation of directory [%s], already exists', path)
+
+
 def iter_grid(
     grid_dict: Mapping[str, Sequence[Union[int, float, str]]]
 ) -> Iterator[Dict[str, Union[int, float, str]]]:

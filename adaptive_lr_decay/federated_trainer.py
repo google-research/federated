@@ -187,8 +187,6 @@ def main(argv):
         server_optimizer_fn=server_optimizer_fn,
         client_weight_fn=client_weight_fn)
 
-  hparam_dict = utils_impl.lookup_flag_values(utils_impl.get_hparam_flags())
-
   task_spec = training_specs.TaskSpec(
       iterative_process_builder=iterative_process_builder,
       client_epochs_per_round=FLAGS.client_epochs_per_round,
@@ -237,8 +235,7 @@ def main(argv):
       root_output_dir=FLAGS.root_output_dir,
       rounds_per_eval=FLAGS.rounds_per_eval,
       rounds_per_checkpoint=FLAGS.rounds_per_checkpoint,
-      rounds_per_profile=FLAGS.rounds_per_profile,
-      hparam_dict=hparam_dict)
+      rounds_per_profile=FLAGS.rounds_per_profile)
 
 
 if __name__ == '__main__':

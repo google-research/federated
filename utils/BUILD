@@ -55,7 +55,6 @@ py_library(
     name = "training_loop",
     srcs = ["training_loop.py"],
     srcs_version = "PY3",
-    deps = [":utils_impl"],
 )
 
 py_test(

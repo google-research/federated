@@ -21,6 +21,7 @@ iterative process, see `shared/fed_avg_schedule.py`.
 """
 
 import collections
+import os.path
 from typing import Any, Callable, Optional
 
 from absl import app
@@ -141,8 +142,8 @@ TASK_FLAGS = collections.OrderedDict(
     stackoverflow_lr=so_lr_flags)
 
 
-def _get_hparam_flags():
-  """Returns an ordered dictionary of pertinent hyperparameter flags."""
+def _write_hparam_flags():
+  """Creates an ordered dictionary of hyperparameter flags and writes to CSV."""
   hparam_dict = utils_impl.lookup_flag_values(shared_flags)
 
   # Update with optimizer flags corresponding to the chosen optimizers.
@@ -157,7 +158,11 @@ def _get_hparam_flags():
     task_hparam_dict = utils_impl.lookup_flag_values(TASK_FLAGS[task_name])
     hparam_dict.update(task_hparam_dict)
 
-  return hparam_dict
+  results_dir = os.path.join(FLAGS.root_output_dir, 'results',
+                             FLAGS.experiment_name)
+  utils_impl.create_directory_if_not_exists(results_dir)
+  hparam_file = os.path.join(results_dir, 'hparams.csv')
+  utils_impl.atomic_write_series_to_csv(hparam_dict, hparam_file)
 
 
 def main(argv):
@@ -236,6 +241,8 @@ def main(argv):
         '--task flag {} is not supported, must be one of {}.'.format(
             FLAGS.task, _SUPPORTED_TASKS))
 
+  _write_hparam_flags()
+
   training_loop.run(
       iterative_process=runner_spec.iterative_process,
       client_datasets_fn=runner_spec.client_datasets_fn,
@@ -246,8 +253,7 @@ def main(argv):
       root_output_dir=FLAGS.root_output_dir,
       rounds_per_eval=FLAGS.rounds_per_eval,
       rounds_per_checkpoint=FLAGS.rounds_per_checkpoint,
-      rounds_per_profile=FLAGS.rounds_per_profile,
-      hparam_dict=_get_hparam_flags())
+      rounds_per_profile=FLAGS.rounds_per_profile)
 
 
 if __name__ == '__main__':

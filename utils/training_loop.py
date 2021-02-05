@@ -23,8 +23,6 @@ from absl import logging
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from utils import utils_impl
-
 
 class IterativeProcessCompatibilityError(TypeError):
   pass
@@ -39,7 +37,6 @@ def create_if_not_exists(path):
 
 def _setup_outputs(root_output_dir,
                    experiment_name,
-                   hparam_dict,
                    rounds_per_profile=0):
   """Set up directories for experiment loops, write hyperparameters to disk."""
 
@@ -59,11 +56,6 @@ def _setup_outputs(root_output_dir,
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
   tb_mngr = tff.simulation.TensorBoardManager(summary_dir=summary_logdir)
-
-  if hparam_dict:
-    hparam_dict['metrics_file'] = metrics_mngr.metrics_filename
-    hparams_file = os.path.join(results_dir, 'hparams.csv')
-    utils_impl.atomic_write_series_to_csv(hparam_dict, hparams_file)
 
   logging.info('Writing...')
   logging.info('    checkpoints to: %s', checkpoint_dir)
@@ -136,7 +128,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
         experiment_name: str,
         test_fn: Optional[Callable[[Any], Dict[str, float]]] = None,
         root_output_dir: Optional[str] = '/tmp/fed_opt',
-        hparam_dict: Optional[Dict[str, Any]] = None,
         rounds_per_eval: Optional[int] = 1,
         rounds_per_checkpoint: Optional[int] = 50,
         rounds_per_profile: Optional[int] = 0):
@@ -170,8 +161,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
       end of the training process.
     root_output_dir: The name of the root output directory for writing
       experiment outputs.
-    hparam_dict: An optional dictionary specifying hyperparameters of the
-      experiment. If provided, the hyperparameters will be written to CSV.
     rounds_per_eval: How often to compute validation metrics.
     rounds_per_checkpoint: How often to checkpoint the iterative process state.
       If you expect the job to restart frequently, this should be small. If no
@@ -194,7 +183,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
   initial_state = iterative_process.initialize()
 
   checkpoint_mngr, metrics_mngr, tb_mngr, profiler = _setup_outputs(
-      root_output_dir, experiment_name, hparam_dict, rounds_per_profile)
+      root_output_dir, experiment_name, rounds_per_profile)
 
   logging.info('Asking checkpoint manager to load checkpoint.')
   state, round_num = checkpoint_mngr.load_latest_checkpoint(initial_state)

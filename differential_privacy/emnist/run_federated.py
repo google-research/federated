@@ -14,6 +14,7 @@
 """Trains and evaluates an EMNIST classification model with DP-FedAvg."""
 
 import functools
+import os.path
 
 from absl import app
 from absl import flags
@@ -166,15 +167,24 @@ def main(argv):
   logging.info('Training model:')
   logging.info(model_builder().summary())
 
+  # Log hyperparameters to CSV
   hparam_dict = utils_impl.lookup_flag_values(utils_impl.get_hparam_flags())
-  training_loop_dict = utils_impl.lookup_flag_values(training_loop_flags)
+  results_dir = os.path.join(FLAGS.root_output_dir, 'results',
+                             FLAGS.experiment_name)
+  utils_impl.create_directory_if_not_exists(results_dir)
+  hparam_file = os.path.join(results_dir, 'hparams.csv')
+  utils_impl.atomic_write_series_to_csv(hparam_dict, hparam_file)
 
   training_loop.run(
       iterative_process=iterative_process,
       client_datasets_fn=client_datasets_fn,
       validation_fn=validation_fn,
-      hparam_dict=hparam_dict,
-      **training_loop_dict)
+      total_rounds=FLAGS.total_rounds,
+      experiment_name=FLAGS.experiment_name,
+      root_output_dir=FLAGS.root_output_dir,
+      rounds_per_eval=FLAGS.rounds_per_eval,
+      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint,
+      rounds_per_profile=FLAGS.rounds_per_profile)
 
 
 if __name__ == '__main__':
