@@ -28,7 +28,7 @@ def iterative_process_builder(model_fn, client_weight_fn=None):
 
 class FederatedMainTest(tf.test.TestCase):
 
-  def test_run_federated(self, run_federated_fn):
+  def test_run_federated(self):
     root_output_dir = self.create_tempdir()
     exp_name = 'test_run_federated'
     total_rounds = 1
