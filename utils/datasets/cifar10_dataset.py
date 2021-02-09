@@ -138,8 +138,12 @@ def load_cifar10_federated(
     test_data = collections.OrderedDict((('image', x_test), ('label', y_test)))
     test_clients[client_name] = test_data
 
-  train_dataset = tff.simulation.FromTensorSlicesClientData(train_clients)
-  test_dataset = tff.simulation.FromTensorSlicesClientData(test_clients)
+  train_dataset = tff.simulation.ClientData.from_clients_and_fn(
+      [str(i) for i in range(NUM_CLIENTS)],
+      lambda client: tf.data.Dataset.from_tensor_slices(train_clients[client]))
+  test_dataset = tff.simulation.ClientData.from_clients_and_fn(
+      [str(i) for i in range(NUM_CLIENTS)],
+      lambda client: tf.data.Dataset.from_tensor_slices(test_clients[client]))
 
   return train_dataset, test_dataset
 
