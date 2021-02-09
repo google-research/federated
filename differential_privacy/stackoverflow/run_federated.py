@@ -41,11 +41,13 @@ with utils_impl.record_new_flags():
   flags.DEFINE_integer('sequence_length', 20, 'Max sequence length to use.')
   flags.DEFINE_integer('max_elements_per_user', 1000, 'Max number of training '
                        'sentences to use per user.')
-  flags.DEFINE_integer('num_validation_examples', 10000, 'Number of examples '
-                       'to use from test set for per-round validation.')
-  flags.DEFINE_boolean('uniform_weighting', False,
-                       'Whether to weigh clients uniformly. If false, clients '
-                       'are weighted by the number of tokens.')
+  flags.DEFINE_integer(
+      'num_validation_examples', 10000, 'Number of examples '
+      'to use from test set for per-round validation.')
+  flags.DEFINE_boolean(
+      'uniform_weighting', False,
+      'Whether to weigh clients uniformly. If false, clients '
+      'are weighted by the number of tokens.')
 
   # Optimizer configuration (this defines one or more flags per optimizer).
   utils_impl.define_optimizer_flags('server')
@@ -143,12 +145,9 @@ def main(argv):
       num_validation_examples=FLAGS.num_validation_examples)
 
   if FLAGS.uniform_weighting:
-    def client_weight_fn(local_outputs):
-      del local_outputs
-      return 1.0
+    client_weighting = tff.learning.ClientWeighting.UNIFORM
   else:
-    def client_weight_fn(local_outputs):
-      return tf.cast(tf.squeeze(local_outputs['num_tokens']), tf.float32)
+    client_weighting = tff.learning.ClientWeighting.NUM_EXAMPLES
 
   def model_fn():
     return tff.learning.from_keras_model(
@@ -161,21 +160,31 @@ def main(argv):
     if not FLAGS.uniform_weighting:
       raise ValueError(
           'Differential privacy is only implemented for uniform weighting.')
+    if FLAGS.noise_multiplier <= 0:
+      raise ValueError('noise_multiplier must be positive if DP is enabled.')
+    if FLAGS.clip is None or FLAGS.clip <= 0:
+      raise ValueError('clip must be positive if DP is enabled.')
 
-    dp_query = tff.utils.build_dp_query(
-        clip=FLAGS.clip,
-        noise_multiplier=FLAGS.noise_multiplier,
-        expected_total_weight=FLAGS.clients_per_round,
-        adaptive_clip_learning_rate=FLAGS.adaptive_clip_learning_rate,
-        target_unclipped_quantile=FLAGS.target_unclipped_quantile,
-        clipped_count_budget_allocation=FLAGS.clipped_count_budget_allocation,
-        expected_clients_per_round=FLAGS.clients_per_round)
-
-    weights_type = tff.learning.framework.weights_type_from_model(model_fn)
-    aggregation_process = tff.utils.build_dp_aggregate_process(
-        weights_type.trainable, dp_query)
+    if not FLAGS.adaptive_clip_learning_rate:
+      aggregation_factory = tff.aggregators.DifferentiallyPrivateFactory.gaussian_fixed(
+          noise_multiplier=FLAGS.noise_multiplier,
+          clients_per_round=FLAGS.clients_per_round,
+          clip=FLAGS.clip)
+    else:
+      if FLAGS.adaptive_clip_learning_rate <= 0:
+        raise ValueError('adaptive_clip_learning_rate must be positive if '
+                         'adaptive clipping is enabled.')
+      aggregation_factory = tff.aggregators.DifferentiallyPrivateFactory.gaussian_adaptive(
+          noise_multiplier=FLAGS.noise_multiplier,
+          clients_per_round=FLAGS.clients_per_round,
+          initial_l2_norm_clip=FLAGS.clip,
+          target_unclipped_quantile=FLAGS.target_unclipped_quantile,
+          learning_rate=FLAGS.adaptive_clip_learning_rate)
   else:
-    aggregation_process = None
+    if FLAGS.uniform_weighting:
+      aggregation_factory = tff.aggregators.UnweightedMeanFactory()
+    else:
+      aggregation_factory = tff.aggregators.MeanFactory()
 
   server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
   client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
@@ -183,9 +192,9 @@ def main(argv):
   iterative_process = tff.learning.build_federated_averaging_process(
       model_fn=model_fn,
       server_optimizer_fn=server_optimizer_fn,
-      client_weighting=client_weight_fn,
+      client_weighting=client_weighting,
       client_optimizer_fn=client_optimizer_fn,
-      aggregation_process=aggregation_process)
+      model_update_aggregation_factory=aggregation_factory)
 
   client_datasets_fn = training_utils.build_client_datasets_fn(
       train_dataset, FLAGS.clients_per_round)
