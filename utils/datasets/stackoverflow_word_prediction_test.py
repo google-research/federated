@@ -23,9 +23,9 @@ from utils.datasets import stackoverflow_word_prediction
 
 TEST_DATA = collections.OrderedDict(
     creation_date=(['unused date']),
-    title=(['unused title']),
     score=([tf.constant(0, dtype=tf.int64)]),
     tags=(['unused test tag']),
+    title=(['unused title']),
     tokens=(['one must imagine']),
     type=(['unused type']),
 )

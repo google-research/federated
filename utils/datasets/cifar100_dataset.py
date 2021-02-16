@@ -102,6 +102,8 @@ def create_preprocess_fn(
   if shuffle_buffer_size <= 1:
     shuffle_buffer_size = 1
 
+  # Features are intentionally sorted lexicographically by key for consistency
+  # across datasets.
   feature_dtypes = collections.OrderedDict(
       coarse_label=tff.TensorType(tf.int64),
       image=tff.TensorType(tf.uint8, shape=(32, 32, 3)),
