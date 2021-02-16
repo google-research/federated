@@ -123,13 +123,7 @@ def configure_training(
         loss=loss_builder(),
         metrics=metrics_builder())
 
-  def client_weight_fn(local_outputs):
-    # Num_tokens is a tensor with type int64[1], to use as a weight need
-    # a float32 scalar.
-    return tf.cast(tf.squeeze(local_outputs['num_tokens']), tf.float32)
-
-  iterative_process = task_spec.iterative_process_builder(
-      tff_model_fn, client_weight_fn=client_weight_fn)
+  iterative_process = task_spec.iterative_process_builder(tff_model_fn)
 
   if hasattr(train_clientdata, 'dataset_computation'):
 

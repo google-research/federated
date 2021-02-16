@@ -19,6 +19,7 @@ import attr
 import tensorflow as tf
 import tensorflow_federated as tff
 
+ModelFnType = Callable[[], tff.learning.Model]
 ValidationFnType = Optional[Callable[[Any, int], Dict[str, float]]]
 TestFnType = EvaluationFnType = Optional[Callable[[Any], Dict[str, float]]]
 
@@ -50,8 +51,8 @@ class TaskSpec(object):
 
   Attributes:
     iterative_process_builder: A function that accepts a no-arg `model_fn`, and
-      a `client_weight_fn`, and returns a `tff.templates.IterativeProcess`. The
-      `model_fn` must return a `tff.learning.Model`.
+      returns a `tff.templates.IterativeProcess`. The `model_fn` must return a
+      `tff.learning.Model`.
     client_epochs_per_round: An integer representing the number of epochs of
       training performed per client in each training round.
     client_batch_size: An integer representing the batch size used on clients.
@@ -61,7 +62,7 @@ class TaskSpec(object):
       sampled at each round. If `None`, no seed is used.
   """
   iterative_process_builder: Callable[
-      ..., tff.templates.IterativeProcess] = attr.ib()
+      [ModelFnType], tff.templates.IterativeProcess] = attr.ib()
   client_epochs_per_round: int = attr.ib(
       validator=[attr.validators.instance_of(int), _check_positive],
       converter=int)

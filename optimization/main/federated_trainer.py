@@ -22,7 +22,7 @@ iterative process, see `shared/fed_avg_schedule.py`.
 
 import collections
 import os.path
-from typing import Any, Callable, Optional
+from typing import Callable
 
 from absl import app
 from absl import flags
@@ -177,21 +177,22 @@ def main(argv):
   server_lr_schedule = optimizer_utils.create_lr_schedule_from_flags('server')
 
   def iterative_process_builder(
-      model_fn: Callable[[], tff.learning.Model],
-      client_weight_fn: Optional[Callable[[Any], tf.Tensor]] = None,
-  ) -> tff.templates.IterativeProcess:
+      model_fn: Callable[[],
+                         tff.learning.Model]) -> tff.templates.IterativeProcess:
     """Creates an iterative process using a given TFF `model_fn`.
 
     Args:
       model_fn: A no-arg function returning a `tff.learning.Model`.
-      client_weight_fn: Optional function that takes the output of
-        `model.report_local_outputs` and returns a tensor providing the weight
-        in the federated average of model deltas. If not provided, the default
-        is the total number of examples processed on device.
 
     Returns:
       A `tff.templates.IterativeProcess`.
     """
+    if FLAGS.task == 'shakespeare' or FLAGS.task == 'stackoverflow_nwp':
+
+      def client_weight_fn(local_outputs):
+        return tf.cast(tf.squeeze(local_outputs['num_tokens']), tf.float32)
+    else:
+      client_weight_fn = None
 
     return fed_avg_schedule.build_fed_avg_process(
         model_fn=model_fn,

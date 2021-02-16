@@ -19,11 +19,10 @@ encountered throughout training. For more details on the learning rate decay,
 see `callbacks.py` and `adaptive_fed_avg.py`.
 """
 
-from typing import Any, Callable, Optional
+from typing import Callable
 
 from absl import app
 from absl import flags
-import tensorflow as tf
 import tensorflow_federated as tff
 
 from adaptive_lr_decay import adaptive_fed_avg
@@ -164,16 +163,11 @@ def main(argv):
 
   def iterative_process_builder(
       model_fn: Callable[[], tff.learning.Model],
-      client_weight_fn: Optional[Callable[[Any], tf.Tensor]] = None,
   ) -> tff.templates.IterativeProcess:
     """Creates an iterative process using a given TFF `model_fn`.
 
     Args:
       model_fn: A no-arg function returning a `tff.learning.Model`.
-      client_weight_fn: Optional function that takes the output of
-        `model.report_local_outputs` and returns a tensor providing the weight
-        in the federated average of model deltas. If not provided, the default
-        is the total number of examples processed on device.
 
     Returns:
       A `tff.templates.IterativeProcess`.
@@ -184,8 +178,7 @@ def main(argv):
         client_lr_callback,
         server_lr_callback,
         client_optimizer_fn=client_optimizer_fn,
-        server_optimizer_fn=server_optimizer_fn,
-        client_weight_fn=client_weight_fn)
+        server_optimizer_fn=server_optimizer_fn)
 
   task_spec = training_specs.TaskSpec(
       iterative_process_builder=iterative_process_builder,

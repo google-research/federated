@@ -29,12 +29,11 @@ from optimization.stackoverflow_lr import federated_stackoverflow_lr
 from utils import training_loop
 
 
-def iterative_process_builder(model_fn, client_weight_fn=None):
+def iterative_process_builder(model_fn):
   return tff.learning.build_federated_averaging_process(
       model_fn=model_fn,
       client_optimizer_fn=tf.keras.optimizers.SGD,
-      server_optimizer_fn=tf.keras.optimizers.SGD,
-      client_weighting=client_weight_fn)
+      server_optimizer_fn=tf.keras.optimizers.SGD)
 
 
 class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
