@@ -93,10 +93,13 @@ class GanFnsAndTypes(object):
   client_real_data_type = attr.ib(init=False, type=tff.FederatedType)
   server_gen_input_type = attr.ib(init=False, type=tff.FederatedType)
 
-  # The stateful averaging function that will track differential privacy (DP).
-  # If not using DP, this is `None`.
-  dp_averaging_fn = attr.ib(
-      init=False, type=tff.templates.MeasuredProcess, default=None)
+  # The aggregation process. If `train_discriminator_dp_average_query` is
+  # specified, this will be used to perform the aggregation steps (clipping,
+  # noising) necessary for differential privacy (DP). If
+  # `train_discriminator_dp_average_query` (i.e., no DP), this will be a simple
+  # stateless mean.
+  aggregation_process = attr.ib(
+      init=False, type=tff.templates.AggregationProcess, default=None)
 
   # Sample generator and discriminator.
   _generator = attr.ib(init=False)
@@ -137,15 +140,14 @@ class GanFnsAndTypes(object):
     self.server_gen_input_type = tff.type_at_server(
         tff.SequenceType(self.gen_input_type))
 
-    # Right now, the logic in this library is effectively "if DP use stateful
-    # aggregator, else don't use stateful aggregator". An alternative
-    # formulation would be to always use a stateful aggregator, but when not
-    # using DP default the aggregator to be a stateless mean, e.g.,
-    # https://github.com/tensorflow/federated/blob/master/tensorflow_federated/python/learning/framework/optimizer_utils.py#L283.
     if self.train_discriminator_dp_average_query is not None:
-      self.dp_averaging_fn = tff.utils.build_dp_aggregate_process(
+      self.aggregation_process = tff.aggregators.DifferentiallyPrivateFactory(
+          query=self.train_discriminator_dp_average_query).create(
+              value_type=tff.to_type(self.discriminator_weights_type))
+    else:
+      self.aggregation_process = tff.aggregators.MeanFactory().create(
           value_type=tff.to_type(self.discriminator_weights_type),
-          query=self.train_discriminator_dp_average_query)
+          weight_type=tff.to_type(tf.float32))
 
 
 def build_server_initial_state_comp(gan: GanFnsAndTypes):
@@ -157,7 +159,7 @@ def build_server_initial_state_comp(gan: GanFnsAndTypes):
      gan: A `GanFnsAndTypes` object.
 
   Returns:
-    A `tff.federated_computation` that returns `ServerState@SERVER`.
+    A `tff.tf_computation` that returns `ServerState@SERVER`.
   """
 
   @tff.tf_computation
@@ -198,7 +200,8 @@ def build_client_computation(gan: GanFnsAndTypes):
 
 
 def build_server_computation(gan: GanFnsAndTypes, server_state_type: tff.Type,
-                             client_output_type: tff.Type):
+                             client_output_type: tff.Type,
+                             aggregation_state_type: tff.Type):
   """Returns a `tff.tf_computation` for the `server_computation`.
 
   This is a thin wrapper around `gan_training_tf_fns.server_computation`.
@@ -207,15 +210,17 @@ def build_server_computation(gan: GanFnsAndTypes, server_state_type: tff.Type,
     gan: A `GanFnsAndTypes` object.
     server_state_type: The `tff.Type` of the ServerState.
     client_output_type: The `tff.Type` of the ClientOutput.
+    aggregation_state_type: The `tff.Type` of the state of the
+      tff.templates.AggregationProcess.
 
   Returns:
     A `tff.tf_computation.`
   """
 
   @tff.tf_computation(server_state_type, tff.SequenceType(gan.gen_input_type),
-                      client_output_type, server_state_type.dp_averaging_state)
+                      client_output_type, aggregation_state_type)
   def server_computation(server_state, gen_inputs, client_output,
-                         new_dp_averaging_state):
+                         new_aggregation_state):
     """The wrapped server_computation."""
     return gan_training_tf_fns.server_computation(
         server_state=server_state,
@@ -225,7 +230,7 @@ def build_server_computation(gan: GanFnsAndTypes, server_state_type: tff.Type,
         discriminator=gan.discriminator_model_fn(),
         server_disc_update_optimizer=gan.server_disc_update_optimizer_fn(),
         train_generator_fn=gan.train_generator_fn,
-        new_dp_averaging_state=new_dp_averaging_state)
+        new_aggregation_state=new_aggregation_state)
 
   return server_computation
 
@@ -249,15 +254,12 @@ def build_gan_training_process(gan: GanFnsAndTypes):
   @tff.federated_computation
   def fed_server_initial_state():
     state = tff.federated_eval(build_server_initial_state_comp(gan), tff.SERVER)
-    dp_averaging_state = (
-        state.dp_averaging_state
-        if gan.dp_averaging_fn is None else gan.dp_averaging_fn.initialize())
     server_initial_state = tff.federated_zip(
         gan_training_tf_fns.ServerState(
             state.generator_weights,
             state.discriminator_weights,
             state.counters,
-            dp_averaging_state=dp_averaging_state))
+            aggregation_state=gan.aggregation_process.initialize()))
     return server_initial_state
 
   @tff.federated_computation(fed_server_initial_state.type_signature.result,
@@ -274,23 +276,21 @@ def build_gan_training_process(gan: GanFnsAndTypes):
     client_outputs = tff.federated_map(
         client_computation, (client_gen_inputs, client_real_data, client_input))
 
-    if gan.dp_averaging_fn is None:
-      # Not using differential privacy.
-      new_dp_averaging_state = server_state.dp_averaging_state
-      averaged_discriminator_weights_delta = tff.federated_mean(
+    # Note that weight goes unused here if the aggregation is involving
+    # Differential Privacy; the underlying AggregationProcess doesn't take the
+    # parameter, as it just uniformly weights the clients.
+    if len(gan.aggregation_process.next.type_signature.parameter) == 3:
+      aggregation_output = gan.aggregation_process.next(
+          server_state.aggregation_state,
           client_outputs.discriminator_weights_delta,
-          weight=client_outputs.update_weight)
+          client_outputs.update_weight)
     else:
-      # Using differential privacy. Note that the weight argument is set to
-      # a constant 1.0 here, however the underlying AggregationProcess ignores
-      # the parameter and performs no weighting.
-      ignored_weight = tff.federated_value(1.0, tff.CLIENTS)
-      aggregation_output = gan.dp_averaging_fn.next(
-          server_state.dp_averaging_state,
-          client_outputs.discriminator_weights_delta,
-          weight=ignored_weight)
-      new_dp_averaging_state = aggregation_output.state
-      averaged_discriminator_weights_delta = aggregation_output.result
+      aggregation_output = gan.aggregation_process.next(
+          server_state.aggregation_state,
+          client_outputs.discriminator_weights_delta)
+
+    new_aggregation_state = aggregation_output.state
+    averaged_discriminator_weights_delta = aggregation_output.result
 
     # TODO(b/131085687): Perhaps reconsider the choice to also use
     # ClientOutput to hold the aggregated client output.
@@ -304,10 +304,11 @@ def build_gan_training_process(gan: GanFnsAndTypes):
         counters=tff.federated_sum(client_outputs.counters))
 
     server_computation = build_server_computation(
-        gan, server_state.type_signature.member, client_output_type)
+        gan, server_state.type_signature.member, client_output_type,
+        gan.aggregation_process.state_type.member)
     server_state = tff.federated_map(
         server_computation, (server_state, server_gen_inputs,
-                             aggregated_client_output, new_dp_averaging_state))
+                             aggregated_client_output, new_aggregation_state))
     return server_state
 
   return tff.templates.IterativeProcess(fed_server_initial_state, run_one_round)

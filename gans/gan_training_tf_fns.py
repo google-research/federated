@@ -64,12 +64,15 @@ class ServerState(object):
     discriminator_weights: Weights for the discriminator model, in the order of
       `tf.keras.Model.weights`.
     counters: Aggregated training counters.
-    dp_averaging_state: State (possibly empty) of the dp_averaging_fn.
+    aggregation_state: State of the aggregation process. This aggregation
+      process could be used to handle Differential Privacy aggregation, or could
+      be set to a simple stateless mean for a non-Differentially Private
+      approach.
   """
   generator_weights = attr.ib()
   discriminator_weights = attr.ib()
   counters = attr.ib()
-  dp_averaging_state = attr.ib(default=())
+  aggregation_state = attr.ib(default=())
 
 
 # Set cmp=False to get a default hash function for tf.function.
@@ -154,7 +157,7 @@ def client_computation(
       counters={'num_discriminator_train_examples': num_examples})
 
 
-def server_initial_state(generator, discriminator, dp_averaging_state=()):
+def server_initial_state(generator, discriminator):
   """Returns the initial state of the server."""
   return ServerState(
       generator_weights=_weights(generator),
@@ -164,7 +167,7 @@ def server_initial_state(generator, discriminator, dp_averaging_state=()):
           'num_generator_train_examples': tf.constant(0),
           'num_discriminator_train_examples': tf.constant(0)
       },
-      dp_averaging_state=dp_averaging_state)
+      aggregation_state=())
 
 
 @tf.function
@@ -178,10 +181,7 @@ def server_computation(
     discriminator: tf.keras.Model,
     server_disc_update_optimizer: tf.keras.optimizers.Optimizer,
     train_generator_fn,
-    # Not an argument bound at TFF computation construction time, but placed
-    # last so that it can be defaulted to empty tuple (for non-DP use cases).
-    new_dp_averaging_state=()
-) -> ServerState:
+    new_aggregation_state=()) -> ServerState:
   """The computation to run on the server, training the generator.
 
   Args:
@@ -194,7 +194,8 @@ def server_computation(
       the client_output delta.
     train_generator_fn: A function which takes the two networks and generator
       input and trains the generator.
-    new_dp_averaging_state: The updated state of the DP averaging aggregator.
+    new_aggregation_state: The updated state of the (possibly DP) averaging
+      aggregator.
 
   Returns:
     An updated `ServerState` object.
@@ -219,8 +220,8 @@ def server_computation(
   for k, v in client_output.counters.items():
     server_state.counters[k] += v
 
-  # Update the state of the DP averaging aggregator.
-  server_state.dp_averaging_state = new_dp_averaging_state
+  # Update the state of the (possibly DP) averaging aggregator.
+  server_state.aggregation_state = new_aggregation_state
 
   gen_examples_this_round = tf.constant(0)
 

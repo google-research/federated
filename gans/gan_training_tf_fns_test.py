@@ -19,8 +19,7 @@ from gans import gan_training_tf_fns
 from gans import one_dim_gan
 
 GAN_LOSS_FNS = gan_losses.get_gan_loss_fns('wasserstein')
-INIT_DP_AVERAGING_STATE = ['foo']
-NEW_DP_AVERAGING_STATE = ['bar']
+NEW_DP_AVERAGING_STATE = ['foo']
 
 
 def _get_train_generator_and_discriminator_fns():
@@ -60,11 +59,13 @@ class GanTrainingTfFnsTest(tf.test.TestCase):
     real_data = one_dim_gan.create_real_data()
 
     server_state = gan_training_tf_fns.server_initial_state(
-        generator, discriminator, INIT_DP_AVERAGING_STATE)
+        generator, discriminator)
 
-    # DP averaging aggregation state is initialized properly in
-    # server_initial_state().
-    self.assertEqual(server_state.dp_averaging_state, INIT_DP_AVERAGING_STATE)
+    # The aggregation state (e.g., used for handling DP averaging) is
+    # initialized to be empty. A user of the `server_initial_state` is expected
+    # to take the output `ServerState` object and populate this field, most
+    # likely via an instance of tff.templates.AggregationProcess.
+    self.assertEmpty(server_state.aggregation_state)
 
     client_output = gan_training_tf_fns.client_computation(
         gen_inputs.take(3), real_data.take(3),
@@ -89,7 +90,7 @@ class GanTrainingTfFnsTest(tf.test.TestCase):
         })
 
     # DP averaging aggregation state updates properly in server_computation().
-    self.assertEqual(server_state.dp_averaging_state, NEW_DP_AVERAGING_STATE)
+    self.assertEqual(server_state.aggregation_state, NEW_DP_AVERAGING_STATE)
 
 
 if __name__ == '__main__':

@@ -86,17 +86,9 @@ class TffGansTest(tf.test.TestCase, parameterized.TestCase):
             'num_discriminator_train_examples': 0
         })
 
-    if with_dp:
-      # Check DP averaging aggregation initial state is correct.
-      dp_averaging_state = server_state.dp_averaging_state
-      self.assertAlmostEqual(
-          dp_averaging_state.numerator_state.sum_state.l2_norm_clip,
-          BEFORE_DP_L2_NORM_CLIP,
-          places=5)
-      self.assertAlmostEqual(
-          dp_averaging_state.numerator_state.sum_state.stddev,
-          BEFORE_DP_STD_DEV,
-          places=5)
+    # Check that the aggregation state (where DP parameters might be tracked,
+    # depending on setup) is initialized to empty.
+    self.assertEmpty(server_state.aggregation_state)
 
   @parameterized.named_parameters(('no_dp', False), ('dp', True))
   def test_client_computation(self, with_dp):
@@ -135,10 +127,11 @@ class TffGansTest(tf.test.TestCase, parameterized.TestCase):
           update_weight=1.0,
           counters={'num_discriminator_train_examples': 13})
 
-    def _update_dp_averaging_state(with_dp, dp_averaging_state):
+    def _update_aggregation_state(with_dp, aggregation_state):
       if not with_dp:
-        return dp_averaging_state
+        return aggregation_state
 
+      dp_averaging_state = aggregation_state[0]
       new_sum_state = tff.utils.update_state(
           dp_averaging_state.numerator_state.sum_state,
           l2_norm_clip=UPDATE_DP_L2_NORM_CLIP)
@@ -146,21 +139,23 @@ class TffGansTest(tf.test.TestCase, parameterized.TestCase):
           dp_averaging_state.numerator_state, sum_state=new_sum_state)
       new_dp_averaging_state = tff.utils.update_state(
           dp_averaging_state, numerator_state=new_numerator_state)
-      return new_dp_averaging_state
+      return (new_dp_averaging_state, ())
 
     server_comp = tff_gans.build_server_computation(
         gan, initial_state_comp.type_signature.result,
-        client_output_fn.type_signature.result)
+        client_output_fn.type_signature.result,
+        gan.aggregation_process.state_type.member)
 
     server_state = initial_state_comp()
+    server_state.aggregation_state = gan.aggregation_process.initialize()
 
     client_output = client_output_fn()
-    new_dp_averaging_state = _update_dp_averaging_state(
-        with_dp, server_state.dp_averaging_state)
+    new_aggregation_state = _update_aggregation_state(
+        with_dp, server_state.aggregation_state)
     final_server_state = server_comp(
         server_state,
         one_dim_gan.create_generator_inputs().take(7), client_output,
-        new_dp_averaging_state)
+        new_aggregation_state)
 
     # Check that server counters have incremented (compare before and after).
     self.assertDictEqual(
@@ -179,11 +174,11 @@ class TffGansTest(tf.test.TestCase, parameterized.TestCase):
     if with_dp:
       # Check that DP averaging aggregator state reflects the new state that was
       # passed as argument to server computation (compare before and after).
-      initial_dp_averaging_state = server_state.dp_averaging_state
+      initial_dp_averaging_state = server_state.aggregation_state[0]
       self.assertAlmostEqual(
           initial_dp_averaging_state.numerator_state.sum_state.l2_norm_clip,
           BEFORE_DP_L2_NORM_CLIP)
-      new_dp_averaging_state = final_server_state.dp_averaging_state
+      new_dp_averaging_state = final_server_state.aggregation_state[0]
       self.assertAlmostEqual(
           new_dp_averaging_state.numerator_state.sum_state.l2_norm_clip,
           UPDATE_DP_L2_NORM_CLIP)
@@ -196,7 +191,7 @@ class TffGansTest(tf.test.TestCase, parameterized.TestCase):
 
     if with_dp:
       # Check that initial DP averaging aggregator state is correct.
-      dp_averaging_state = server_state.dp_averaging_state
+      dp_averaging_state = server_state.aggregation_state[0]
       self.assertAlmostEqual(
           dp_averaging_state.numerator_state.sum_state.l2_norm_clip,
           BEFORE_DP_L2_NORM_CLIP,
@@ -237,7 +232,7 @@ class TffGansTest(tf.test.TestCase, parameterized.TestCase):
     if with_dp:
       # Check that DP averaging aggregator state has updated properly over the
       # above rounds.
-      dp_averaging_state = server_state.dp_averaging_state
+      dp_averaging_state = server_state.aggregation_state[0]
       self.assertAlmostEqual(
           dp_averaging_state.numerator_state.sum_state.l2_norm_clip,
           AFTER_2_RDS_DP_L2_NORM_CLIP,

@@ -51,12 +51,6 @@ py_test(
     srcs = ["tff_gans_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    # TODO(b/158558930): re-enable tests after removing change dectection.
-    tags = [
-        "manual",
-        "nokokoro",
-        "notap",
-    ],
     deps = [
         ":gan_losses",
         ":gan_training_tf_fns",
