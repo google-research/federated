@@ -45,7 +45,7 @@ def create_generator_inputs(batch_size=BATCH_SIZE, noise_dim=NOISE_DIM):
 
 def create_generator(noise_dim=NOISE_DIM):
   return tf.keras.Sequential([
-      layers.Input(shape=[noise_dim]),
+      layers.InputLayer(input_shape=[noise_dim]),
       layers.Dense(16, activation='relu'),
       layers.BatchNormalization(momentum=0.999, epsilon=0.001),
       layers.Dense(1, activation='linear')
@@ -55,7 +55,7 @@ def create_generator(noise_dim=NOISE_DIM):
 
 def create_discriminator():
   return tf.keras.Sequential([
-      layers.Input(shape=[1]),
+      layers.InputLayer(input_shape=[1]),
       layers.Dense(16, activation='relu'),
       layers.BatchNormalization(momentum=0.999, epsilon=0.001),
       layers.Dense(1, activation='linear')

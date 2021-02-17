@@ -25,6 +25,7 @@ def get_gan_discriminator_model(weight_decay=2.5e-5):
   input_shape = (28, 28, 1)
 
   model = tf.keras.Sequential()
+  model.add(layers.InputLayer(input_shape=input_shape))
 
   model.add(
       layers.Conv2D(
@@ -33,8 +34,7 @@ def get_gan_discriminator_model(weight_decay=2.5e-5):
           strides=(2, 2),
           padding='same',
           kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * weight_decay),
-          bias_regularizer=tf.keras.regularizers.l2(l=0.5 * weight_decay),
-          input_shape=input_shape))
+          bias_regularizer=tf.keras.regularizers.l2(l=0.5 * weight_decay)))
   model.add(layers.LeakyReLU(alpha=0.01))
 
   model.add(
@@ -71,13 +71,13 @@ def get_gan_generator_model(latent_dim=64, weight_decay=2.5e-5):
   input_shape = (latent_dim,)
 
   model = tf.keras.Sequential()
+  model.add(layers.InputLayer(input_shape=input_shape))
 
   model.add(
       layers.Dense(
           1024,
           use_bias=False,
-          kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * weight_decay),
-          input_shape=input_shape))
+          kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * weight_decay)))
   _batch_norm_with_reshape_to_4d(model, n_channels=1024)
   model.add(layers.ReLU())
 
