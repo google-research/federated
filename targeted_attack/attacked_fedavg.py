@@ -91,6 +91,7 @@ def _get_norm(weights):
 
   Args:
     weights: a OrderedDict specifying weight matrices at different layers.
+
   Returns:
     The norm of all layer weight matrices.
   """
@@ -358,8 +359,8 @@ def build_run_one_round_fn_attacked(server_update_fn, client_update_fn,
   Args:
     server_update_fn: A function for updates in the server.
     client_update_fn: A function for updates in the clients.
-    aggregation_process: A 'tff.templates.MeasuredProcess' that takes in model
-      deltas placed@CLIENTS to an aggregated model delta placed@SERVER.
+    aggregation_process: A 'tff.templates.AggregationProcess' that takes in
+      model deltas placed@CLIENTS to an aggregated model delta placed@SERVER.
     dummy_model_for_metadata: A dummy `tff.learning.Model`.
     federated_server_state_type: type_signature of federated server state.
     federated_dataset_type: type_signature of federated dataset.
@@ -397,10 +398,17 @@ def build_run_one_round_fn_attacked(server_update_fn, client_update_fn,
 
     weight_denom = client_outputs.weights_delta_weight
 
-    aggregate_output = aggregation_process.next(
-        server_state.delta_aggregate_state,
-        client_outputs.weights_delta,
-        weight=weight_denom)
+    # If the aggregation process' next function takes three arguments it is
+    # weighted, otherwise, unweighted. Unfortunately there is no better way
+    # to determine this.
+    if len(aggregation_process.next.type_signature.parameter) == 3:
+      aggregate_output = aggregation_process.next(
+          server_state.delta_aggregate_state,
+          client_outputs.weights_delta,
+          weight=weight_denom)
+    else:
+      aggregate_output = aggregation_process.next(
+          server_state.delta_aggregate_state, client_outputs.weights_delta)
     new_delta_aggregate_state = aggregate_output.state
     round_model_delta = aggregate_output.result
 
