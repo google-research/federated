@@ -46,8 +46,8 @@ is not promised to be a stable API and the code may change in any time.
 This repository contains Google-affiliated research projects related to
 federated learning and analytics. If you are working with Google collaborators
 and would like to feature your research project here, please review the
-[contribution guidelines](CONTRIBUTING.md#code-style-guidelines-and-best-practices)
-for guidelines on coding style, best practices, etc.
+[contribution guidelines](CONTRIBUTING.md) for coding style, best practices,
+etc.
 
 ### Pull Requests
 
