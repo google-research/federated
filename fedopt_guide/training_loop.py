@@ -56,9 +56,10 @@ def _setup_outputs(root_output_dir, experiment_name, hparam_dict):
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
   create_if_not_exists(summary_logdir)
-  summary_writer = tf.summary.create_file_writer(summary_logdir)
+  tensorboard_mngr = tff.simulation.TensorBoardManager(summary_logdir)
 
   if hparam_dict:
+    summary_writer = tf.summary.create_file_writer(summary_logdir)
     hparam_dict['metrics_file'] = metrics_mngr.metrics_filename
     hparams_file = os.path.join(results_dir, 'hparams.csv')
     utils_impl.atomic_write_series_to_csv(hparam_dict, hparams_file)
@@ -70,24 +71,19 @@ def _setup_outputs(root_output_dir, experiment_name, hparam_dict):
   logging.info('    metrics csv to: %s', metrics_mngr.metrics_filename)
   logging.info('    summaries to: %s', summary_logdir)
 
-  return checkpoint_mngr, metrics_mngr, summary_writer
+  return checkpoint_mngr, metrics_mngr, tensorboard_mngr
 
 
-def _write_metrics(metrics_mngr, summary_writer, metrics, round_num):
+def _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num):
   """Atomic metrics writer which inlines logic from MetricsHook class."""
   if not isinstance(metrics, dict):
     raise TypeError('metrics should be type `dict`.')
   if not isinstance(round_num, int):
     raise TypeError('round_num should be type `int`.')
-
-  flat_metrics = metrics_mngr.update_metrics(round_num, metrics)
-  logging.info('Evaluation at round {:d}:\n{!s}'.format(
-      round_num, pprint.pformat(flat_metrics)))
-
-  # Also write metrics to a tf.summary logdir
-  with summary_writer.as_default():
-    for name, val in flat_metrics.items():
-      tf.summary.scalar(name, val, step=round_num)
+  logging.info('Metrics at round {:d}:\n{!s}'.format(round_num,
+                                                     pprint.pformat(metrics)))
+  metrics_mngr.update_metrics(round_num, metrics)
+  tensorboard_mngr.update_metrics(round_num, metrics)
 
 
 def _compute_numpy_l2_difference(model, previous_model):
@@ -191,7 +187,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
   if not hasattr(initial_state, 'model'):
     raise TypeError('The server state must have a model attribute.')
 
-  checkpoint_mngr, metrics_mngr, summary_writer = _setup_outputs(
+  checkpoint_mngr, metrics_mngr, tensorboard_mngr = _setup_outputs(
       root_output_dir, experiment_name, hparam_dict)
 
   logging.info('Asking checkpoint manager to load checkpoint.')
@@ -244,7 +240,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
       validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
       metrics['eval'] = validation_metrics
 
-    _write_metrics(metrics_mngr, summary_writer, metrics, round_num)
+    _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num)
     round_num += 1
 
   # Final metrics evaluation once the training has completed
@@ -262,6 +258,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
     test_metrics = test_fn(current_model)
     test_metrics['evaluate_secs'] = time.time() - test_start_time
     metrics['test'] = test_metrics
-  _write_metrics(metrics_mngr, summary_writer, metrics, total_rounds)
+  _write_metrics(metrics_mngr, tensorboard_mngr, metrics, total_rounds)
 
   return state

@@ -80,10 +80,11 @@ def _write_metrics(metrics_mngr, tb_mngr, metrics, round_num):
   if not isinstance(round_num, int):
     raise TypeError('round_num should be type `int`.')
 
-  flat_metrics = metrics_mngr.update_metrics(round_num, metrics)
+  logging.info('Metrics at round {:d}:\n{!s}'.format(round_num,
+                                                     pprint.pformat(metrics)))
+
+  metrics_mngr.update_metrics(round_num, metrics)
   tb_mngr.update_metrics(round_num, metrics)
-  logging.info('Evaluation at round {:d}:\n{!s}'.format(
-      round_num, pprint.pformat(flat_metrics)))
 
 
 def _compute_numpy_l2_difference(model, previous_model):
