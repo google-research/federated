@@ -201,7 +201,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
   else:
     logging.info('Restarted from checkpoint round %d', round_num)
     round_num += 1  # Increment to avoid overwriting current checkpoint
-    metrics_mngr.clear_rounds_after(last_valid_round_num=round_num - 1)
+    metrics_mngr.clear_rounds_after(round_num - 1)
 
   loop_start_time = time.time()
   while round_num < total_rounds:
