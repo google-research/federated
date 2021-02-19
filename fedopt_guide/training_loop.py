@@ -82,8 +82,8 @@ def _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num):
     raise TypeError('round_num should be type `int`.')
   logging.info('Metrics at round {:d}:\n{!s}'.format(round_num,
                                                      pprint.pformat(metrics)))
-  metrics_mngr.update_metrics(round_num, metrics)
-  tensorboard_mngr.update_metrics(round_num, metrics)
+  metrics_mngr.save_metrics(round_num, metrics)
+  tensorboard_mngr.save_metrics(round_num, metrics)
 
 
 def _compute_numpy_l2_difference(model, previous_model):
@@ -197,11 +197,10 @@ def run(iterative_process: tff.templates.IterativeProcess,
     logging.info('Initializing experiment from scratch.')
     state = initial_state
     round_num = 0
-    metrics_mngr.clear_all_rounds()
   else:
     logging.info('Restarted from checkpoint round %d', round_num)
     round_num += 1  # Increment to avoid overwriting current checkpoint
-    metrics_mngr.clear_rounds_after(round_num - 1)
+  metrics_mngr.clear_metrics(round_num)
 
   loop_start_time = time.time()
   while round_num < total_rounds:
