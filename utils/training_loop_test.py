@@ -367,6 +367,45 @@ class ExperimentRunnerTest(tf.test.TestCase):
     self.assertLen(metrics, 2)
     self.assertIn('test/loss', fieldnames)
 
+  def test_training_loop_works_on_restart(self):
+    experiment_name = 'test_metrics'
+    iterative_process = _build_federated_averaging_process()
+    batch = _batch_fn()
+    federated_data = [[batch]]
+
+    def client_datasets_fn(round_num):
+      del round_num
+      return federated_data
+
+    def validation_fn(model, round_num):
+      del model, round_num
+      return {}
+
+    root_output_dir = self.get_temp_dir()
+    training_loop.run(
+        iterative_process=iterative_process,
+        client_datasets_fn=client_datasets_fn,
+        validation_fn=validation_fn,
+        total_rounds=2,
+        experiment_name=experiment_name,
+        root_output_dir=root_output_dir)
+
+    training_loop.run(
+        iterative_process=iterative_process,
+        client_datasets_fn=client_datasets_fn,
+        validation_fn=validation_fn,
+        total_rounds=4,
+        experiment_name=experiment_name,
+        root_output_dir=root_output_dir)
+
+    csv_file = os.path.join(root_output_dir, 'results', experiment_name,
+                            'experiment.metrics.csv')
+    metrics_manager = tff.simulation.CSVMetricsManager(csv_file)
+    _, metrics = metrics_manager.get_metrics()
+    # Test that 4 rounds of metrics are logged (the CSV length adds one for
+    # the header).
+    self.assertLen(metrics, 5)
+
 
 if __name__ == '__main__':
   tf.test.main()
