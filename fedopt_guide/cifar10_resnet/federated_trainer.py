@@ -61,6 +61,10 @@ with utils_impl.record_hparam_flags() as cifar10_flags:
   # CIFAR-10 flags
   flags.DEFINE_integer('crop_size', 24, 'The height and width of '
                        'images after preprocessing.')
+  flags.DEFINE_boolean(
+      'uniform_weighting', False,
+      'Whether to weigh clients uniformly. If false, clients '
+      'are weighted by the number of samples.')
 
 FLAGS = flags.FLAGS
 
@@ -126,6 +130,7 @@ def main(argv):
       client_datasets_random_seed=FLAGS.client_datasets_random_seed,
       crop_size=FLAGS.crop_size,
       total_rounds=FLAGS.total_rounds,
+      uniform_weighting=FLAGS.uniform_weighting,
       experiment_name=FLAGS.experiment_name,
       root_output_dir=FLAGS.root_output_dir,
       rounds_per_eval=FLAGS.rounds_per_eval,

@@ -39,6 +39,7 @@ def run_federated(
     total_rounds: Optional[int] = 1500,
     experiment_name: Optional[str] = 'federated_cifar10',
     root_output_dir: Optional[str] = '/tmp/fed_opt',
+    uniform_weighting: Optional[bool] = False,
     **kwargs):
   """Runs an iterative process on the CIFAR-10 classification task.
 
@@ -74,6 +75,8 @@ def run_federated(
       to the `root_output_dir` for purposes of writing outputs.
     root_output_dir: The name of the root output directory for writing
       experiment outputs.
+    uniform_weighting: Whether to weigh clients uniformly. If false, clients are
+      weighted by the number of samples.
     **kwargs: Additional arguments configuring the training loop. For details on
       supported arguments, see `federated_research/utils/training_utils.py`.
   """
@@ -106,7 +109,12 @@ def run_federated(
         loss=loss_builder(),
         metrics=metrics_builder())
 
-  training_process = iterative_process_builder(tff_model_fn)
+  if uniform_weighting:
+    client_weight_fn = tff.learning.ClientWeighting.UNIFORM
+  else:
+    client_weight_fn = tff.learning.ClientWeighting.NUM_EXAMPLES
+
+  training_process = iterative_process_builder(tff_model_fn, client_weight_fn)
 
   client_datasets_fn = training_utils.build_client_datasets_fn(
       dataset=cifar_train,
