@@ -23,6 +23,7 @@ py_test(
     srcs = ["triehh_tff_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
+    tags = ["nokokoro"],
     deps = [
         ":triehh_tf",
         ":triehh_tff",
@@ -35,6 +36,7 @@ py_test(
     srcs = ["triehh_tf_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
+    tags = ["nokokoro"],
     deps = [
         ":triehh_tf",
         "//analytics/heavy_hitters:heavy_hitters_testcase",
