@@ -98,31 +98,21 @@ def configure_training(
 
   iterative_process = task_spec.iterative_process_builder(tff_model_fn)
 
-  if hasattr(stackoverflow_train, 'dataset_computation'):
+  @tff.tf_computation(tf.string)
+  def build_train_dataset_from_client_id(client_id):
+    client_dataset = stackoverflow_train.dataset_computation(client_id)
+    return train_preprocess_fn(client_dataset)
 
-    @tff.tf_computation(tf.string)
-    def build_train_dataset_from_client_id(client_id):
-      client_dataset = stackoverflow_train.dataset_computation(client_id)
-      return train_preprocess_fn(client_dataset)
-
-    training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-        build_train_dataset_from_client_id, iterative_process)
-    client_ids_fn = training_utils.build_sample_fn(
-        stackoverflow_train.client_ids,
-        size=task_spec.clients_per_round,
-        replace=False,
-        random_seed=task_spec.client_datasets_random_seed)
-    # We convert the output to a list (instead of an np.ndarray) so that it can
-    # be used as input to the iterative process.
-    client_sampling_fn = lambda x: list(client_ids_fn(x))
-
-  else:
-    training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-        train_preprocess_fn, iterative_process)
-    client_sampling_fn = training_utils.build_client_datasets_fn(
-        dataset=stackoverflow_train,
-        clients_per_round=task_spec.clients_per_round,
-        random_seed=task_spec.client_datasets_random_seed)
+  training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
+      build_train_dataset_from_client_id, iterative_process)
+  client_ids_fn = training_utils.build_sample_fn(
+      stackoverflow_train.client_ids,
+      size=task_spec.clients_per_round,
+      replace=False,
+      random_seed=task_spec.client_datasets_random_seed)
+  # We convert the output to a list (instead of an np.ndarray) so that it can
+  # be used as input to the iterative process.
+  client_sampling_fn = lambda x: list(client_ids_fn(x))
 
   training_process.get_model_weights = iterative_process.get_model_weights
 
