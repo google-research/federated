@@ -165,7 +165,7 @@ def main(argv):
       model_builder=model_builder,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
-  validation_fn = lambda model_weights, round_num: evaluate_fn(model_weights)
+  validation_fn = lambda state, round_num: evaluate_fn(state.model)
 
   logging.info('Training model:')
   logging.info(model_builder().summary())

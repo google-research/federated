@@ -97,13 +97,18 @@ def configure_training(task_spec: training_specs.TaskSpec,
 
   training_process.get_model_weights = iterative_process.get_model_weights
 
-  test_fn = training_utils.build_centralized_evaluate_fn(
+  centralized_eval_fn = training_utils.build_centralized_evaluate_fn(
       eval_dataset=emnist_test,
       model_builder=model_builder,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
 
-  validation_fn = lambda model_weights, round_num: test_fn(model_weights)
+  def test_fn(state):
+    return centralized_eval_fn(iterative_process.get_model_weights(state))
+
+  def validation_fn(state, round_num):
+    del round_num
+    return test_fn(state)
 
   return training_specs.RunnerSpec(
       iterative_process=training_process,

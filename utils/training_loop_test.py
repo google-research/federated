@@ -24,14 +24,6 @@ from utils import training_loop
 
 _Batch = collections.namedtuple('Batch', ['x', 'y'])
 
-_COMPATIBILITY_ERROR_MESSAGE = (
-    'The iterative_process argument must be of '
-    'type`tff.templates.IterativeProcess`, and must have an '
-    'attribute `get_model_weights`, which must be a `tff.Computation`. This '
-    'computation must accept as input the state of `iterative_process`, and '
-    'its output must be a nested structure of tensors matching the input '
-    'shape of `validation_fn`.')
-
 
 def _build_federated_averaging_process():
   return tff.learning.build_federated_averaging_process(
@@ -72,8 +64,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model, round_num):
-      del model, round_num
+    def validation_fn(state, round_num):
+      del state, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
@@ -90,8 +82,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
     iterative_process = _build_federated_averaging_process()
     client_dataset = [[_batch_fn()]]
 
-    def validation_fn(model, round_num):
-      del model, round_num
+    def validation_fn(state, round_num):
+      del state, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
@@ -131,8 +123,8 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model, round_num):
-      del model, round_num
+    def validation_fn(state, round_num):
+      del state, round_num
       return {}
 
     with self.assertRaises(TypeError):
@@ -143,113 +135,6 @@ class TrainingLoopArgumentsTest(tf.test.TestCase):
           total_rounds=10,
           experiment_name='non_str_output_dir',
           root_output_dir=1)
-
-  def test_raises_no_get_model_weights_attribute_in_state(self):
-
-    class BadIterativeProcess(tff.templates.IterativeProcess):
-
-      def __init__(self):
-        pass
-
-      def initialize(self):
-        return {}
-
-      def next(self, state, data):
-        return {}
-
-    iterative_process = BadIterativeProcess()
-    federated_data = [[_batch_fn()]]
-
-    def client_datasets_fn(round_num):
-      del round_num
-      return federated_data
-
-    def validation_fn(model, round_num):
-      del model, round_num
-      return {}
-
-    with self.assertRaisesRegex(
-        training_loop.IterativeProcessCompatibilityError,
-        _COMPATIBILITY_ERROR_MESSAGE):
-      training_loop.run(
-          iterative_process=iterative_process,
-          client_datasets_fn=client_datasets_fn,
-          validation_fn=validation_fn,
-          total_rounds=10,
-          experiment_name='bad_iterative_process')
-
-  def test_raises_non_callable_get_model_weights_attribute(self):
-
-    class BadIterativeProcess(tff.templates.IterativeProcess):
-
-      def __init__(self):
-        pass
-
-      def initialize(self):
-        return {}
-
-      def next(self, state, data):
-        return {}
-
-    iterative_process = BadIterativeProcess()
-    iterative_process.get_model_weights = 2
-    federated_data = [[_batch_fn()]]
-
-    def client_datasets_fn(round_num):
-      del round_num
-      return federated_data
-
-    def validation_fn(model, round_num):
-      del model, round_num
-      return {}
-
-    with self.assertRaisesRegex(
-        training_loop.IterativeProcessCompatibilityError,
-        _COMPATIBILITY_ERROR_MESSAGE):
-      training_loop.run(
-          iterative_process=iterative_process,
-          client_datasets_fn=client_datasets_fn,
-          validation_fn=validation_fn,
-          total_rounds=10,
-          experiment_name='bad_iterative_process')
-
-  def test_raises_non_tff_computation_get_model_weights_attribute(self):
-
-    class BadIterativeProcess(tff.templates.IterativeProcess):
-
-      def __init__(self):
-        pass
-
-      def initialize(self):
-        return {}
-
-      def next(self, state, data):
-        return {}
-
-      def get_model_weights(self, state):
-        return {}
-
-    iterative_process = BadIterativeProcess()
-    federated_data = [[_batch_fn()]]
-
-    def client_datasets_fn(round_num):
-      del round_num
-      return federated_data
-
-    def validation_fn(model, round_num):
-      del model, round_num
-      return {}
-
-    with self.assertRaisesRegex(
-        training_loop.IterativeProcessCompatibilityError,
-        _COMPATIBILITY_ERROR_MESSAGE):
-
-      training_loop.run(
-          iterative_process=iterative_process,
-          client_datasets_fn=client_datasets_fn,
-          validation_fn=validation_fn,
-          total_rounds=10,
-          experiment_name='bad_iterative_process')
 
 
 class ExperimentRunnerTest(tf.test.TestCase):
@@ -263,7 +148,8 @@ class ExperimentRunnerTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model, round_num):
+    def validation_fn(state, round_num):
+      model = state.model
       del round_num
       keras_model = tff.simulation.models.mnist.create_keras_model(
           compile_model=True)
@@ -271,7 +157,6 @@ class ExperimentRunnerTest(tf.test.TestCase):
       return {'loss': keras_model.evaluate(batch.x, batch.y)}
 
     initial_state = iterative_process.initialize()
-    initial_model = iterative_process.get_model_weights(initial_state)
 
     root_output_dir = self.get_temp_dir()
     final_state = training_loop.run(
@@ -281,10 +166,9 @@ class ExperimentRunnerTest(tf.test.TestCase):
         total_rounds=1,
         experiment_name='fedavg_decreases_loss',
         root_output_dir=root_output_dir)
-    final_model = iterative_process.get_model_weights(final_state)
     self.assertLess(
-        validation_fn(final_model, 0)['loss'],
-        validation_fn(initial_model, 0)['loss'])
+        validation_fn(final_state, 0)['loss'],
+        validation_fn(initial_state, 0)['loss'])
 
   def test_checkpoint_manager_saves_state(self):
     experiment_name = 'checkpoint_manager_saves_state'
@@ -295,8 +179,8 @@ class ExperimentRunnerTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model, round_num):
-      del model, round_num
+    def validation_fn(state, round_num):
+      del state, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
@@ -307,7 +191,7 @@ class ExperimentRunnerTest(tf.test.TestCase):
         total_rounds=1,
         experiment_name=experiment_name,
         root_output_dir=root_output_dir)
-    final_model = iterative_process.get_model_weights(final_state)
+    final_model = final_state.model
 
     ckpt_manager = tff.simulation.FileCheckpointManager(
         os.path.join(root_output_dir, 'checkpoints', experiment_name))
@@ -318,7 +202,7 @@ class ExperimentRunnerTest(tf.test.TestCase):
 
     keras_model = tff.simulation.models.mnist.create_keras_model(
         compile_model=True)
-    restored_model = iterative_process.get_model_weights(restored_state)
+    restored_model = restored_state.model
 
     restored_model.assign_weights_to(keras_model)
     restored_loss = keras_model.test_on_batch(federated_data[0][0].x,
@@ -339,14 +223,15 @@ class ExperimentRunnerTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def test_fn(model):
+    def test_fn(state):
+      model = state.model
       keras_model = tff.simulation.models.mnist.create_keras_model(
           compile_model=True)
       model.assign_weights_to(keras_model)
       return {'loss': keras_model.evaluate(batch.x, batch.y)}
 
-    def validation_fn(model, round_num):
-      del model, round_num
+    def validation_fn(state, round_num):
+      del state, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()
@@ -377,8 +262,8 @@ class ExperimentRunnerTest(tf.test.TestCase):
       del round_num
       return federated_data
 
-    def validation_fn(model, round_num):
-      del model, round_num
+    def validation_fn(state, round_num):
+      del state, round_num
       return {}
 
     root_output_dir = self.get_temp_dir()

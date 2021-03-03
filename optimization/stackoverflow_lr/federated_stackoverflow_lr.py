@@ -116,21 +116,28 @@ def configure_training(
 
   training_process.get_model_weights = iterative_process.get_model_weights
 
-  evaluate_fn = training_utils.build_centralized_evaluate_fn(
+  centralized_validation_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       eval_dataset=stackoverflow_validation,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
 
-  validation_fn = lambda model_weights, round_num: evaluate_fn(model_weights)
+  def validation_fn(server_state, round_num):
+    del round_num
+    return centralized_validation_fn(
+        iterative_process.get_model_weights(server_state))
 
-  test_fn = training_utils.build_centralized_evaluate_fn(
+  centralized_test_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       # Use both val and test for symmetry with other experiments, which
       # evaluate on the entire test set.
       eval_dataset=stackoverflow_validation.concatenate(stackoverflow_test),
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
+
+  def test_fn(server_state):
+    return centralized_test_fn(
+        iterative_process.get_model_weights(server_state))
 
   return training_specs.RunnerSpec(
       iterative_process=training_process,

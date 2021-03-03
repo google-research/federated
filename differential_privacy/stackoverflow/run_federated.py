@@ -204,15 +204,16 @@ def main(argv):
       eval_dataset=validation_dataset,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
-  validation_fn = lambda model_weights, round_num: evaluate_fn(model_weights)
+  validation_fn = lambda state, round_num: evaluate_fn(state.model)
 
-  test_fn = training_utils.build_centralized_evaluate_fn(
+  evaluate_test_fn = training_utils.build_centralized_evaluate_fn(
       model_builder=model_builder,
       # Use both val and test for symmetry with other experiments, which
       # evaluate on the entire test set.
       eval_dataset=validation_dataset.concatenate(test_dataset),
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
+  test_fn = lambda state: evaluate_test_fn(state.model)
 
   logging.info('Training model:')
   logging.info(model_builder().summary())

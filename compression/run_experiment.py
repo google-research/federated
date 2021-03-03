@@ -186,7 +186,10 @@ def run_experiment():
       model_builder=model_builder,
       loss_builder=loss_builder,
       metrics_builder=metrics_builder)
-  validation_fn = lambda model_weights, round_num: evaluate_fn(model_weights)
+
+  def validation_fn(state, round_num):
+    del round_num
+    return evaluate_fn(state.model)
 
   client_optimizer_fn = functools.partial(
       utils_impl.create_optimizer_from_flags, 'client')

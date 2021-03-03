@@ -246,10 +246,12 @@ def run_federated(
   # Create final evaluation functions to pass to `training_loop`.
   val_fn = federated_trainer_utils.build_eval_fn(
       evaluation_computation=val_computation,
-      client_datasets_fn=val_client_datasets_fn)
+      client_datasets_fn=val_client_datasets_fn,
+      get_model=training_process.get_model_weights)
   test_fn = federated_trainer_utils.build_eval_fn(
       evaluation_computation=test_computation,
-      client_datasets_fn=test_client_datasets_fn)
+      client_datasets_fn=test_client_datasets_fn,
+      get_model=training_process.get_model_weights)
   test_fn = functools.partial(test_fn, round_num=0)
 
   training_loop.run(

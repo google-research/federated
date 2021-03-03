@@ -87,41 +87,6 @@ def _write_metrics(metrics_mngr, tb_mngr, metrics, round_num):
   tb_mngr.save_metrics(round_num, metrics)
 
 
-def _compute_numpy_l2_difference(model, previous_model):
-  squared_norms = tf.nest.map_structure(lambda x, y: tf.linalg.norm(x - y)**2,
-                                        model, previous_model)
-  l2_total_tensor = tf.reduce_sum(tf.nest.flatten(squared_norms))**0.5
-  return l2_total_tensor.numpy()
-
-
-def _check_iterative_process_compatibility(iterative_process):
-  """Checks the compatibility of an iterative process with the training loop."""
-  error_message = (
-      'The iterative_process argument must be of '
-      'type`tff.templates.IterativeProcess`, and must have an '
-      'attribute `get_model_weights`, which must be a `tff.Computation`. This '
-      'computation must accept as input the state of `iterative_process`, and '
-      'its output must be a nested structure of tensors matching the input '
-      'shape of `validation_fn`.')
-  compatibility_error = IterativeProcessCompatibilityError(error_message)
-
-  if not isinstance(iterative_process, tff.templates.IterativeProcess):
-    raise compatibility_error
-  if not hasattr(iterative_process, 'get_model_weights'):
-    raise compatibility_error
-  elif not callable(iterative_process.get_model_weights):
-    raise compatibility_error
-  get_model_weights_fn = iterative_process.get_model_weights
-
-  if not isinstance(get_model_weights_fn, tff.Computation):
-    raise compatibility_error
-  input_type = get_model_weights_fn.type_signature.parameter
-  server_state_type = iterative_process.state_type.member
-  server_state_type.is_assignable_from(input_type)
-  # TODO(b/174268978): Once we enforce federated evaluations, we can check
-  # compatibility with `validation_fn` without actually running the function.
-
-
 def run(iterative_process: tff.templates.IterativeProcess,
         client_datasets_fn: Callable[[int], List[tf.data.Dataset]],
         validation_fn: Callable[[Any, int], Dict[str, float]],
@@ -142,24 +107,20 @@ def run(iterative_process: tff.templates.IterativeProcess,
         represents the server state, `{B*}` represents the client datasets,
         and `T` represents a python `Mapping` object.
 
-  The iterative process must also have a callable attribute `get_model_weights`
-  that takes as input the state of the iterative process, and returns a
-  `tff.learning.ModelWeights` object.
-
   Args:
     iterative_process: A `tff.templates.IterativeProcess` instance to run.
     client_datasets_fn: Function accepting an integer argument (the round
       number) and returning a list of client datasets to use as federated data
       for that round.
-    validation_fn: A callable accepting a `tff.learning.ModelWeights` and the
-      current round number, and returning a dict of evaluation metrics. Used to
-      compute validation metrics throughout the training process.
+    validation_fn: A callable accepting the current state of `iterative_process`
+      and the current round number, and returning a dict of evaluation metrics.
+      Used to compute validation metrics throughout the training process.
     total_rounds: The number of federated training rounds to perform.
     experiment_name: The name of the experiment being run. This will be appended
       to the `root_output_dir` for purposes of writing outputs.
-    test_fn: An optional callable accepting a `tff.learning.ModelWeights` and
-      returning a dict of test set metrics. Used to compute test metrics at the
-      end of the training process.
+    test_fn: An optional callable accepting the current state of
+      `iterative_process` and returning a dict of test set metrics. Used to
+      compute test metrics at the end of the training process.
     root_output_dir: The name of the root output directory for writing
       experiment outputs.
     rounds_per_eval: How often to compute validation metrics.
@@ -172,7 +133,9 @@ def run(iterative_process: tff.templates.IterativeProcess,
   Returns:
     The final `state` of the iterative process after training.
   """
-  _check_iterative_process_compatibility(iterative_process)
+  if not isinstance(iterative_process, tff.templates.IterativeProcess):
+    raise TypeError(
+        'iterative_process must be a `tff.templates.IterativeProcess`.')
   if not callable(client_datasets_fn):
     raise TypeError('client_datasets_fn should be callable.')
   if not callable(validation_fn):
@@ -198,8 +161,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
     round_num += 1  # Increment to avoid overwriting current checkpoint
   metrics_mngr.clear_metrics(round_num)
 
-  current_model = iterative_process.get_model_weights(state)
-
   loop_start_time = time.time()
   loop_start_round = round_num
   while round_num < total_rounds:
@@ -210,7 +171,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
     }
 
     training_start_time = time.time()
-    prev_model = current_model
 
     # TODO(b/145604851): This try/except is used to circumvent ambiguous TF
     # errors during training, and should be removed once the root cause is
@@ -225,10 +185,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
                       type(e), round_num, e)
       continue  # restart the loop without incrementing the round number
 
-    current_model = iterative_process.get_model_weights(state)
     train_metrics['training_secs'] = time.time() - training_start_time
-    train_metrics['model_delta_l2_norm'] = _compute_numpy_l2_difference(
-        current_model, prev_model)
     train_metrics.update(round_metrics)
 
     loop_time = time.time() - loop_start_time
@@ -248,7 +205,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
     if round_num % rounds_per_eval == 0:
       # Compute validation metrics
       evaluate_start_time = time.time()
-      validation_metrics = validation_fn(current_model, round_num)
+      validation_metrics = validation_fn(state, round_num)
       validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
       metrics['eval'] = validation_metrics
 
@@ -260,14 +217,14 @@ def run(iterative_process: tff.templates.IterativeProcess,
 
   # Validation metrics
   evaluate_start_time = time.time()
-  validation_metrics = validation_fn(current_model, round_num)
+  validation_metrics = validation_fn(state, round_num)
   validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
   metrics['eval'] = validation_metrics
 
   # Test set metrics
   if test_fn:
     test_start_time = time.time()
-    test_metrics = test_fn(current_model)
+    test_metrics = test_fn(state)
     test_metrics['evaluate_secs'] = time.time() - test_start_time
     metrics['test'] = test_metrics
   _write_metrics(metrics_mngr, tb_mngr, metrics, total_rounds)
