@@ -73,9 +73,6 @@ with utils_impl.record_new_flags() as training_loop_flags:
       'How often to evaluate the global model on the validation dataset.')
   flags.DEFINE_integer('rounds_per_checkpoint', 50,
                        'How often to checkpoint the global model.')
-  flags.DEFINE_integer(
-      'rounds_per_profile', 0,
-      '(Experimental) How often to run the experimental TF profiler, if >0.')
 
 FLAGS = flags.FLAGS
 
@@ -186,8 +183,7 @@ def main(argv):
       experiment_name=FLAGS.experiment_name,
       root_output_dir=FLAGS.root_output_dir,
       rounds_per_eval=FLAGS.rounds_per_eval,
-      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint,
-      rounds_per_profile=FLAGS.rounds_per_profile)
+      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint)
 
 
 if __name__ == '__main__':

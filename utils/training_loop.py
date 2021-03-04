@@ -13,7 +13,6 @@
 # limitations under the License.
 """Internal dispatcher for training loops."""
 
-import contextlib
 import os.path
 import pprint
 import time
@@ -24,10 +23,6 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 
-class IterativeProcessCompatibilityError(TypeError):
-  pass
-
-
 def create_if_not_exists(path):
   try:
     tf.io.gfile.makedirs(path)
@@ -35,9 +30,7 @@ def create_if_not_exists(path):
     logging.info('Skipping creation of directory [%s], already exists', path)
 
 
-def _setup_outputs(root_output_dir,
-                   experiment_name,
-                   rounds_per_profile=0):
+def _setup_outputs(root_output_dir, experiment_name):
   """Set up directories for experiment loops, write hyperparameters to disk."""
 
   if not experiment_name:
@@ -62,15 +55,7 @@ def _setup_outputs(root_output_dir,
   logging.info('    metrics csv to: %s', metrics_mngr.metrics_filename)
   logging.info('    summaries to: %s', summary_logdir)
 
-  @contextlib.contextmanager
-  def profiler(round_num):
-    if (rounds_per_profile > 0 and round_num % rounds_per_profile == 0):
-      with tf.profiler.experimental.Profile(summary_logdir):
-        yield
-    else:
-      yield
-
-  return checkpoint_mngr, metrics_mngr, tb_mngr, profiler
+  return checkpoint_mngr, metrics_mngr, tb_mngr
 
 
 def _write_metrics(metrics_mngr, tb_mngr, metrics, round_num):
@@ -95,8 +80,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
         test_fn: Optional[Callable[[Any], Dict[str, float]]] = None,
         root_output_dir: Optional[str] = '/tmp/fed_opt',
         rounds_per_eval: Optional[int] = 1,
-        rounds_per_checkpoint: Optional[int] = 50,
-        rounds_per_profile: Optional[int] = 0):
+        rounds_per_checkpoint: Optional[int] = 50):
   """Runs federated training for a given `tff.templates.IterativeProcess`.
 
   We assume that the iterative process has the following functional type
@@ -127,8 +111,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
     rounds_per_checkpoint: How often to checkpoint the iterative process state.
       If you expect the job to restart frequently, this should be small. If no
       interruptions are expected, this can be made larger.
-    rounds_per_profile: Experimental setting. If set to a value greater than 0,
-      this dictates how often a TensorFlow profiler is run.
 
   Returns:
     The final `state` of the iterative process after training.
@@ -146,8 +128,8 @@ def run(iterative_process: tff.templates.IterativeProcess,
   logging.info('Starting iterative_process training loop...')
   initial_state = iterative_process.initialize()
 
-  checkpoint_mngr, metrics_mngr, tb_mngr, profiler = _setup_outputs(
-      root_output_dir, experiment_name, rounds_per_profile)
+  checkpoint_mngr, metrics_mngr, tb_mngr = _setup_outputs(
+      root_output_dir, experiment_name)
 
   logging.info('Asking checkpoint manager to load checkpoint.')
   state, round_num = checkpoint_mngr.load_latest_checkpoint(initial_state)
@@ -176,9 +158,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
     # errors during training, and should be removed once the root cause is
     # determined (and possibly fixed).
     try:
-      with profiler(round_num):
-        state, round_metrics = iterative_process.next(state,
-                                                      federated_train_data)
+      state, round_metrics = iterative_process.next(state, federated_train_data)
     except (tf.errors.FailedPreconditionError, tf.errors.NotFoundError,
             tf.errors.InternalError) as e:
       logging.warning('Caught %s exception while running round %d:\n\t%s',
