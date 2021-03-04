@@ -59,7 +59,6 @@ from reconstruction import reconstruction_model
 from reconstruction import reconstruction_utils
 from utils import tensor_utils
 
-
 # Type aliases for readability.
 ClientWeightFn = Callable[..., float]
 LossFn = Callable[[], tf.keras.losses.Loss]
@@ -276,8 +275,8 @@ def build_client_update_fn(
       by `client_optimizer_fn`. If False, only global variables are trained
       after the reconstruction stage with local variables frozen, similar to
       alternating minimization.
-    client_weight_fn: Optional function that takes the local model's output,
-      and returns a tensor that provides the weight in the federated average of
+    client_weight_fn: Optional function that takes the local model's output, and
+      returns a tensor that provides the weight in the federated average of
       model deltas. If not provided, the default is the total number of examples
       processed on device during post-reconstruction phase.
 
@@ -403,7 +402,7 @@ def build_client_update_fn(
     Args:
       tf_dataset: a `tf.data.Dataset` that provides training examples.
       initial_model_weights: a `tff.learning.ModelWeights` containing the
-          starting global trainable and non_trainable weights.
+        starting global trainable and non_trainable weights.
       round_num: the federated training round number, 1-indexed.
 
     Returns:
@@ -471,14 +470,12 @@ def build_run_one_round_fn(
         client_update_fn,
         (federated_dataset, client_model, client_round_number))
 
-    if len(aggregation_process.next.type_signature.parameter) == 3:
-      # Weighted aggregation.
+    if aggregation_process.is_weighted:
       aggregation_output = aggregation_process.next(
           server_state.aggregator_state,
           client_outputs.weights_delta,
           weight=client_outputs.client_weight)
     else:
-      # Unweighted aggregation.
       aggregation_output = aggregation_process.next(
           server_state.aggregator_state, client_outputs.weights_delta)
 
@@ -604,8 +601,8 @@ def build_federated_reconstruction_process(
       by client_optimizer_fn. If False, only global variables are trained during
       the second stage with local variables frozen, similar to alternating
       minimization.
-    client_weight_fn: Optional function that takes the local model's output,
-      and returns a tensor that provides the weight in the federated average of
+    client_weight_fn: Optional function that takes the local model's output, and
+      returns a tensor that provides the weight in the federated average of
       model deltas. If not provided, the default is the total number of examples
       processed on device during post-reconstruction phase.
     aggregation_factory: An optional instance of

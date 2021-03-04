@@ -279,7 +279,7 @@ def build_gan_training_process(gan: GanFnsAndTypes):
     # Note that weight goes unused here if the aggregation is involving
     # Differential Privacy; the underlying AggregationProcess doesn't take the
     # parameter, as it just uniformly weights the clients.
-    if len(gan.aggregation_process.next.type_signature.parameter) == 3:
+    if gan.aggregation_process.is_weighted:
       aggregation_output = gan.aggregation_process.next(
           server_state.aggregation_state,
           client_outputs.discriminator_weights_delta,
