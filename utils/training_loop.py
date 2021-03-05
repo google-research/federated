@@ -64,7 +64,6 @@ def _write_metrics(metrics_mngr, tb_mngr, metrics, round_num):
     raise TypeError('metrics should be type `dict`.')
   if not isinstance(round_num, int):
     raise TypeError('round_num should be type `int`.')
-
   logging.info('Metrics at round {:d}:\n{!s}'.format(round_num,
                                                      pprint.pformat(metrics)))
 
@@ -153,18 +152,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
     }
 
     training_start_time = time.time()
-
-    # TODO(b/145604851): This try/except is used to circumvent ambiguous TF
-    # errors during training, and should be removed once the root cause is
-    # determined (and possibly fixed).
-    try:
-      state, round_metrics = iterative_process.next(state, federated_train_data)
-    except (tf.errors.FailedPreconditionError, tf.errors.NotFoundError,
-            tf.errors.InternalError) as e:
-      logging.warning('Caught %s exception while running round %d:\n\t%s',
-                      type(e), round_num, e)
-      continue  # restart the loop without incrementing the round number
-
+    state, round_metrics = iterative_process.next(state, federated_train_data)
     train_metrics['training_secs'] = time.time() - training_start_time
     train_metrics.update(round_metrics)
 
