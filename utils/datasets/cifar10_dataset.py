@@ -105,7 +105,7 @@ def load_cifar10_federated(
   test_count = np.zeros(NUM_CLASSES).astype(int)
 
   train_examples_per_client = int(TRAIN_EXAMPLES / num_clients)
-  test_test_per_client = int(TEST_EXAMPLES / num_clients)
+  test_examples_per_client = int(TEST_EXAMPLES / num_clients)
   for k in range(num_clients):
 
     for i in range(train_examples_per_client):
@@ -120,7 +120,7 @@ def load_cifar10_federated(
             train_multinomial_vals /
             train_multinomial_vals.sum(axis=1)[:, None])
 
-    for i in range(test_test_per_client):
+    for i in range(test_examples_per_client):
       sampled_label = np.argwhere(
           np.random.multinomial(1, test_multinomial_vals[k, :]) == 1)[0][0]
       test_client_samples[k].append(test_indices[sampled_label,
