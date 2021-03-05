@@ -109,6 +109,26 @@ class LoadCifarTest(tf.test.TestCase):
         _compute_length_of_dataset(
             cifar_test.create_tf_dataset_for_client('0')), 1000)
 
+  def test_dataset_length_100_clients(self):
+    cifar_train, cifar_test = cifar10_dataset.load_cifar10_federated(
+        num_clients=100)
+    self.assertEqual(
+        _compute_length_of_dataset(
+            cifar_train.create_tf_dataset_for_client('0')), 500)
+    self.assertEqual(
+        _compute_length_of_dataset(
+            cifar_test.create_tf_dataset_for_client('0')), 100)
+
+  def test_dataset_length_8_clients(self):
+    cifar_train, cifar_test = cifar10_dataset.load_cifar10_federated(
+        num_clients=8)
+    self.assertEqual(
+        _compute_length_of_dataset(
+            cifar_train.create_tf_dataset_for_client('0')), 6250)
+    self.assertEqual(
+        _compute_length_of_dataset(
+            cifar_test.create_tf_dataset_for_client('0')), 1250)
+
 
 class FederatedDatasetTest(tf.test.TestCase):
 

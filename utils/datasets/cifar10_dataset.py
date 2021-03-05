@@ -23,14 +23,18 @@ import tensorflow_federated as tff
 
 CIFAR_SHAPE = (32, 32, 3)
 TOTAL_FEATURE_SIZE = 32 * 32 * 3
-NUM_EXAMPLES_PER_CLIENT = 5000
-TEST_SAMPLES_PER_CLIENT = 1000
 NUM_CLASSES = 10
-NUM_CLIENTS = 10
+TRAIN_EXAMPLES = 50000
+TEST_EXAMPLES = 10000
+# Number of training examples per class: 50,000 / 10.
+TRAIN_EXAMPLES_PER_LABEL = 5000
+# Number of test examples per class: 10,000 / 10.
+TEST_EXAMPLES_PER_LABEL = 1000
 
 
 def load_cifar10_federated(
-    dirichlet_parameter: float = 1
+    dirichlet_parameter: float = 1,
+    num_clients: int = 10,
 ) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
   """Construct a federated dataset from the centralized CIFAR-10.
 
@@ -45,6 +49,8 @@ def load_cifar10_federated(
       then each client only have data from a single category label. If
       approaches infinity, then the client distribution will approach IID
       partitioning.
+    num_clients: The number of clients the examples are going to be partitioned
+      on.
 
   Returns:
     A tuple of `tff.simulation.ClientData` representing unpreprocessed
@@ -71,7 +77,7 @@ def load_cifar10_federated(
   test_multinomial_vals = []
   # Each client has a multinomial distribution over classes drawn from a
   # Dirichlet.
-  for i in range(NUM_CLIENTS):
+  for i in range(num_clients):
     proportion = np.random.dirichlet(dirichlet_parameter *
                                      np.ones(NUM_CLASSES,))
     train_multinomial_vals.append(proportion)
@@ -93,37 +99,39 @@ def load_cifar10_federated(
   train_example_indices = np.array(train_example_indices)
   test_indices = np.array(test_indices)
 
-  train_client_samples = [[] for _ in range(NUM_CLIENTS)]
-  test_client_samples = [[] for _ in range(NUM_CLIENTS)]
+  train_client_samples = [[] for _ in range(num_clients)]
+  test_client_samples = [[] for _ in range(num_clients)]
   train_count = np.zeros(NUM_CLASSES).astype(int)
   test_count = np.zeros(NUM_CLASSES).astype(int)
 
-  for k in range(NUM_CLASSES):
+  train_examples_per_client = int(TRAIN_EXAMPLES / num_clients)
+  test_test_per_client = int(TEST_EXAMPLES / num_clients)
+  for k in range(num_clients):
 
-    for i in range(NUM_EXAMPLES_PER_CLIENT):
+    for i in range(train_examples_per_client):
       sampled_label = np.argwhere(
           np.random.multinomial(1, train_multinomial_vals[k, :]) == 1)[0][0]
       train_client_samples[k].append(
           train_example_indices[sampled_label, train_count[sampled_label]])
       train_count[sampled_label] += 1
-      if train_count[sampled_label] == NUM_EXAMPLES_PER_CLIENT:
+      if train_count[sampled_label] == TRAIN_EXAMPLES_PER_LABEL:
         train_multinomial_vals[:, sampled_label] = 0
         train_multinomial_vals = (
             train_multinomial_vals /
             train_multinomial_vals.sum(axis=1)[:, None])
 
-    for i in range(TEST_SAMPLES_PER_CLIENT):
+    for i in range(test_test_per_client):
       sampled_label = np.argwhere(
           np.random.multinomial(1, test_multinomial_vals[k, :]) == 1)[0][0]
       test_client_samples[k].append(test_indices[sampled_label,
                                                  test_count[sampled_label]])
       test_count[sampled_label] += 1
-      if test_count[sampled_label] == TEST_SAMPLES_PER_CLIENT:
+      if test_count[sampled_label] == TEST_EXAMPLES_PER_LABEL:
         test_multinomial_vals[:, sampled_label] = 0
         test_multinomial_vals = (
             test_multinomial_vals / test_multinomial_vals.sum(axis=1)[:, None])
 
-  for i in range(NUM_CLIENTS):
+  for i in range(num_clients):
     client_name = str(i)
     x_train = train_images[np.array(train_client_samples[i])]
     y_train = train_labels[np.array(
@@ -139,10 +147,10 @@ def load_cifar10_federated(
     test_clients[client_name] = test_data
 
   train_dataset = tff.simulation.ClientData.from_clients_and_fn(
-      [str(i) for i in range(NUM_CLIENTS)],
+      [str(i) for i in range(num_clients)],
       lambda client: tf.data.Dataset.from_tensor_slices(train_clients[client]))
   test_dataset = tff.simulation.ClientData.from_clients_and_fn(
-      [str(i) for i in range(NUM_CLIENTS)],
+      [str(i) for i in range(num_clients)],
       lambda client: tf.data.Dataset.from_tensor_slices(test_clients[client]))
 
   return train_dataset, test_dataset
@@ -245,15 +253,14 @@ def create_preprocess_fn(
   return preprocess_fn
 
 
-def get_federated_datasets(
-    train_client_batch_size: int = 20,
-    test_client_batch_size: int = 100,
-    train_client_epochs_per_round: int = 1,
-    test_client_epochs_per_round: int = 1,
-    train_shuffle_buffer_size: int = NUM_EXAMPLES_PER_CLIENT,
-    test_shuffle_buffer_size: int = 1,
-    crop_shape: Tuple[int, int, int] = CIFAR_SHAPE,
-    serializable: bool = False):
+def get_federated_datasets(train_client_batch_size: int = 20,
+                           test_client_batch_size: int = 100,
+                           train_client_epochs_per_round: int = 1,
+                           test_client_epochs_per_round: int = 1,
+                           train_shuffle_buffer_size: int = 1000,
+                           test_shuffle_buffer_size: int = 1,
+                           crop_shape: Tuple[int, int, int] = CIFAR_SHAPE,
+                           serializable: bool = False):
   """Loads and preprocesses federated CIFAR10 training and testing sets.
 
   Args:
