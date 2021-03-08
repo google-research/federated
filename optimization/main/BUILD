@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 package(default_visibility = ["//google/optimization/main:__subpackages__"])
 
@@ -8,6 +8,13 @@ py_binary(
     name = "centralized_trainer",
     srcs = ["centralized_trainer.py"],
     python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":centralized_trainer_lib"],
+)
+
+py_library(
+    name = "centralized_trainer_lib",
+    srcs = ["centralized_trainer.py"],
     srcs_version = "PY3",
     deps = [
         "//optimization/cifar100:centralized_cifar100",
@@ -46,6 +53,13 @@ py_binary(
     name = "federated_trainer",
     srcs = ["federated_trainer.py"],
     python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":federated_trainer_lib"],
+)
+
+py_library(
+    name = "federated_trainer_lib",
+    srcs = ["federated_trainer.py"],
     srcs_version = "PY3",
     deps = [
         "//optimization/cifar100:federated_cifar100",
