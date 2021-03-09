@@ -14,7 +14,8 @@
 """Data loader for Stack Overflow next-word-prediction tasks."""
 
 import collections
-from typing import Callable, List, Tuple
+import hashlib
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import attr
 import numpy as np
@@ -201,7 +202,9 @@ def get_federated_datasets(
     max_elements_per_train_client: int = 1000,
     max_elements_per_test_client: int = -1,
     train_shuffle_buffer_size: int = 10000,
-    test_shuffle_buffer_size: int = 1
+    test_shuffle_buffer_size: int = 1,
+    train_transform: Optional[Callable[[str, int], Callable[[Any],
+                                                            Any]]] = None,
 ) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
   """Loads federated Stack Overflow next-word prediction datasets.
 
@@ -235,6 +238,9 @@ def get_federated_datasets(
     test_shuffle_buffer_size: An integer representing the shuffle buffer size
       (as in `tf.data.Dataset.shuffle`) for each test client's dataset. If set
       to some integer less than or equal to 1, no shuffling occurs.
+    train_transform: An optional transformation to perform on the training data.
+      For example, to get a transformation that inserts random secrets into the
+      data, use `secret_inserting_transform_fn`.
 
   Returns:
     A tuple (stackoverflow_train, stackoverflow_test) of
@@ -251,6 +257,10 @@ def get_federated_datasets(
 
   (stackoverflow_train, _,
    stackoverflow_test) = tff.simulation.datasets.stackoverflow.load_data()
+
+  if train_transform:
+    stackoverflow_train = tff.simulation.TransformingClientData(
+        stackoverflow_train, train_transform)
 
   vocab = create_vocab(vocab_size)
 
@@ -359,3 +369,95 @@ def get_centralized_datasets(
   stackoverflow_test = test_preprocess_fn(stackoverflow_test)
 
   return stackoverflow_train, stackoverflow_validation, stackoverflow_test
+
+
+def make_random_secrets(vocab_size: int,
+                        num_secrets: int,
+                        secret_len: int,
+                        seed: int = 0):
+  vocab = create_vocab(vocab_size)
+  np.random.seed(seed)
+  return [
+      ' '.join(np.random.choice(vocab, secret_len)) for _ in range(num_secrets)
+  ]
+
+
+def secret_inserting_transform_fn(
+    secrets: Dict[str, Tuple[float, float]],
+    seed: int = 0) -> Callable[[str, int], Callable[[Any], Any]]:
+  """Builds secret inserting transform_fn for `TransformingClientData`.
+
+  Replaces the `tokens` field of some of selected clients' examples with
+  secrets. If a client is selected, one of the strings from `secrets` will be
+  chosen for that client uniformly at random. Then each that client's examples
+  will be selected for replacement independently at random.
+
+  Selection of clients is based on a hash of the client_id.
+
+  It is assumed that this will be used in a `TransformingClientData` with
+  `num_transformed_clients == len(client_ids)` so the `index` argument of
+  the transform_fn must be zero.
+
+  The method is described fully and used by Thakkar et. al (2020)
+  https://arxiv.org/abs/2006.07490.
+
+  Args:
+    secrets: A dict mapping secrets of type `str` to a 2-tuple of floats. The
+      first float is the probability that a client will have that secret
+      inserted (p_u in Thakkar et. al (2020) and the second float is the
+      probability that any given example of a selected client will be replaced
+      with that client's secret (p_e in Thakkar et. al (2020)).
+    seed: Random seed for client and example selection.
+
+  Returns:
+    A function that can be passed to the initializer of TransformingClientData
+    to insert secrets.
+  """
+
+  if (not secrets or not isinstance(secrets, dict) or
+      not all([isinstance(secret, str) for secret in secrets])):
+    raise ValueError('`secrets` must be a non-zero length dict with str keys.')
+
+  if any(not 0 <= value[1] <= 1 for value in secrets.values()):
+    raise ValueError('p_e values must be valid probabilities in [0, 1].')
+
+  secret_list, p_u = zip(*[(k, v[0]) for k, v in secrets.items()])
+  p_none = 1 - sum(p_u)
+  if p_none < 0:
+    raise ValueError('p_u values cannot sum to more than 1.')
+
+  # Append probability for no secret.
+  secret_list = secret_list + (None,)
+  p_u = p_u + (p_none,)
+
+  def make_transform_fn(client_id: str, index: int):
+    if index:
+      raise ValueError(
+          'secret_inserting_transform_fn is intended to be used in a '
+          '`TransformingClientData` with `num_transformed_clients == '
+          'len(client_ids)`. `index` should therefore always be zero.')
+
+    client_hash = hashlib.md5(client_id.encode()).digest()
+    # Hash is in bytes, so convert to int for numpy seed.
+    client_seed = (int.from_bytes(client_hash, 'big') + seed) % (2**32)
+    np.random.seed(client_seed)
+
+    secret = np.random.choice(secret_list, p=p_u)
+    if not secret:
+      return None
+    p_e = secrets[secret][1]
+
+    def transform_fn(example):
+      example_seed = tf.strings.to_hash_bucket_fast(example['creation_date'],
+                                                    2**32)
+      uniform = tf.random.stateless_uniform(
+          (),
+          [tf.cast(client_seed, tf.uint32),
+           tf.cast(example_seed, tf.uint32)])
+      if uniform < p_e:
+        example['tokens'] = secret
+      return example
+
+    return transform_fn
+
+  return make_transform_fn
