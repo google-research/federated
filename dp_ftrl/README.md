@@ -59,7 +59,7 @@ The following command can be used to reproduce the DP-FTRLM results in Section
 5.3 of "Practical and Private (Deep) Learning without Sampling or Shuffling".
 
 ```bash
-bazel run run_stackoverflow.py --exp_short_name=stackoverflow_ftrlm_smalln --device GPU --gpu=2 --server_optimizer=dpftrlm --total_epochs=10 --client_lr=0.5 --server_lr=3 --clip_norm=1 --noise_multiplier=0.067
+bazel run run_stackoverflow.py --experiment_name=stackoverflow_ftrlm_smalln --server_optimizer=dpftrlm --total_epochs=1 --total_rounds=1600 --client_lr=0.5 --server_lr=3 --clip_norm=1 --noise_multiplier=0.067
 ```
 
 NOTE: this code version did not implement tree restart for DP-FTRLM. It is not
