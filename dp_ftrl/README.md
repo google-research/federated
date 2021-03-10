@@ -38,8 +38,20 @@ This code is implemented with
 [Using TFF for Federated Learning Research](https://www.tensorflow.org/federated/tff_for_research)
 for more instructions on using TensorFlow Federated for research.
 
-The followingpackages may need to be installed `absl-py~=0.10 attrs~=19.3.0
-numpy~=1.19.2 pandas~=0.24.2 tensorflow-federated-nightly tf-nightly`
+The following packages may need to be installed
+
+<!-- mdformat off (multiple lines of small code piece) -->
+
+```bash
+absl-py~=0.10
+attrs~=19.3.0
+numpy~=1.19.2
+pandas~=0.24.2
+tensorflow-federated-nightly
+tf-nightly
+```
+
+<!-- mdformat on -->
 
 ## Example usage
 
