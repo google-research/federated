@@ -24,7 +24,6 @@ Communication-Efficient Learning of Deep Networks from Decentralized Data
     https://arxiv.org/abs/1602.05629
 """
 
-import collections
 from typing import Callable, Optional, Union
 
 import attr
@@ -49,7 +48,7 @@ def _initialize_optimizer_vars(model: tff.learning.Model,
   model_weights = _get_weights(model)
   grads_and_vars = tf.nest.map_structure(lambda x, v: (x, v), delta,
                                          model_weights.trainable)
-  optimizer.apply_gradients(grads_and_vars, name='server_update')
+  optimizer.apply_gradients(grads_and_vars)
   assert optimizer.variables()
 
 
@@ -85,12 +84,24 @@ def _get_optimizer_preconditioner(optimizer: tf.keras.optimizers.Optimizer,
   config = optimizer.get_config()
   config_name = config['name']
   if config_name == 'Adagrad':
-    return tf.nest.map_structure(
+    eps = optimizer.epsilon
+    v = tf.nest.map_structure(
         lambda var: optimizer.get_slot(var, 'accumulator'),
         model_weights.trainable)
+    return tf.nest.map_structure(
+        lambda a: tf.math.divide_no_nan(  # pylint: disable=g-long-lambda
+            1.0,
+            tf.math.sqrt(a) + eps),
+        v)
   elif config_name in {'Adam', 'Yogi'}:
-    return tf.nest.map_structure(lambda var: optimizer.get_slot(var, 'v'),
-                                 model_weights.trainable)
+    eps = optimizer.epsilon
+    v = tf.nest.map_structure(lambda var: optimizer.get_slot(var, 'v'),
+                              model_weights.trainable)
+    return tf.nest.map_structure(
+        lambda a: tf.math.divide_no_nan(  # pylint: disable=g-long-lambda
+            1.0,
+            tf.math.sqrt(a) + eps),
+        v)
   elif config_name == 'SGD':
     return tf.nest.map_structure(tf.ones_like, model_weights.trainable)
   else:
@@ -116,7 +127,11 @@ class ServerState(object):
 
 
 @tf.function
-def server_update(model, server_optimizer, server_state, weights_delta):
+def server_update(model,
+                  server_optimizer,
+                  server_state,
+                  weights_delta,
+                  global_cor=None):
   """Updates `server_state` based on `weights_delta`, increase the round number.
 
   Args:
@@ -124,6 +139,7 @@ def server_update(model, server_optimizer, server_state, weights_delta):
     server_optimizer: A `tf.keras.optimizers.Optimizer`.
     server_state: A `ServerState`, the state to be updated.
     weights_delta: An update to the trainable variables of the model.
+    global_cor: Optional. A correction to the update of `weights_delta`.
 
   Returns:
     An updated `ServerState`.
@@ -137,6 +153,10 @@ def server_update(model, server_optimizer, server_state, weights_delta):
       tensor_utils.zero_all_if_any_non_finite(weights_delta))
   if has_non_finite_weight > 0:
     return server_state
+
+  if global_cor is not None:
+    weights_delta = tf.nest.map_structure(tf.math.divide_no_nan, weights_delta,
+                                          global_cor)
 
   # Apply the update to the model. We must multiply weights_delta by -1.0 to
   # view it as a gradient that should be applied to the server_optimizer.
@@ -166,13 +186,13 @@ class ClientOutput(object):
   -   `model_output`: A structure matching
       `tff.learning.Model.report_local_outputs`, reflecting the results of
       training on the input dataset.
-  -   `optimizer_output`: Additional metrics or other outputs defined by the
-      optimizer.
+  -   `local_cor_states`: Local correction to be aggregated for global
+      correction.
   """
   weights_delta = attr.ib()
   client_weight = attr.ib()
   model_output = attr.ib()
-  optimizer_output = attr.ib()
+  local_cor_states = attr.ib()
 
 
 def create_client_update_fn():
@@ -208,11 +228,13 @@ def create_client_update_fn():
 
     model_weights = _get_weights(model)
     tff.utils.assign(model_weights, initial_weights)
-
     num_examples = tf.constant(0, dtype=tf.int32)
-    # Need to replace names of following two variables.
-    m_states = tf.nest.map_structure(tf.zeros_like, model_weights.trainable)
-    n_states = tf.nest.map_structure(tf.zeros_like, model_weights.trainable)
+
+    # Initialize local states for local and global corrections
+    avg_local_states = tf.nest.map_structure(tf.zeros_like,
+                                             model_weights.trainable)
+    cum_local_states = tf.nest.map_structure(tf.zeros_like,
+                                             model_weights.trainable)
     for batch in iter(dataset):
       with tf.GradientTape() as tape:
         output = model.forward_pass(batch)
@@ -220,20 +242,25 @@ def create_client_update_fn():
       grads_and_vars = zip(grads, model_weights.trainable)
       client_optimizer.apply_gradients(grads_and_vars)
       num_examples += tf.shape(output.predictions)[0]
+
+      # Get momentum factor and preconditioner to update local states
       client_opt_beta = _get_optimizer_momentum_beta(client_optimizer)
       client_opt_preconditioner = _get_optimizer_preconditioner(
           client_optimizer, model_weights)
-
-      m_states = tf.nest.map_structure(
+      avg_local_states = tf.nest.map_structure(
           lambda m, p, b=client_opt_beta: b * m + (1 - b) * p,
-          m_states,
+          avg_local_states,
           client_opt_preconditioner)
-      n_states = tf.nest.map_structure(lambda m, n: m + n, m_states, n_states)
+      cum_local_states = tf.nest.map_structure(lambda m, n: m + n,
+                                               avg_local_states,
+                                               cum_local_states)
 
     aggregated_outputs = model.report_local_outputs()
     weights_delta = tf.nest.map_structure(
         lambda a, b, c: tf.math.divide_no_nan(a - b, c),
-        model_weights.trainable, initial_weights.trainable, n_states)
+        model_weights.trainable, initial_weights.trainable, cum_local_states)
+    local_cor_states = tf.nest.map_structure(
+        lambda a: tf.math.divide_no_nan(1.0, a), cum_local_states)
 
     weights_delta, has_non_finite_weight = (
         tensor_utils.zero_all_if_any_non_finite(weights_delta))
@@ -245,10 +272,8 @@ def create_client_update_fn():
     else:
       client_weight = client_weight_fn(aggregated_outputs)
 
-    return ClientOutput(
-        weights_delta, client_weight, aggregated_outputs,
-        collections.OrderedDict([('num_examples', num_examples),
-                                 ('n_states', n_states)]))
+    return ClientOutput(weights_delta, client_weight, aggregated_outputs,
+                        local_cor_states)
 
   return client_update
 
@@ -291,7 +316,7 @@ def build_fed_avg_process(
     server_optimizer_fn: OptimizerBuilder = tf.keras.optimizers.SGD,
     server_lr: float = 1.0,
     client_weight_fn: Optional[ClientWeightFn] = None,
-) -> tff.templates.IterativeProcess:
+    correction: str = 'joint') -> tff.templates.IterativeProcess:
   """Builds the TFF computations for optimization using federated averaging.
 
   Args:
@@ -307,6 +332,9 @@ def build_fed_avg_process(
       `model.report_local_outputs` and returns a tensor that provides the weight
       in the federated average of model deltas. If not provided, the default is
       the total number of examples processed on device.
+    correction: A string that specifies the type of correction method when
+       applying local adaptive optimizers. It must be either `local` or `joint`.
+       The default is`joint`.
 
   Returns:
     A `tff.templates.IterativeProcess`.
@@ -315,7 +343,6 @@ def build_fed_avg_process(
   dummy_model = model_fn()
 
   client_optimizer = client_optimizer_fn(client_lr)
-  server_optimizer = server_optimizer_fn(server_lr)
 
   if not _check_client_optimizer(client_optimizer):
     raise TypeError(
@@ -338,10 +365,22 @@ def build_fed_avg_process(
   @tff.tf_computation(server_state_type, model_weights_type.trainable)
   def server_update_fn(server_state, model_delta):
     model = model_fn()
+    server_optimizer = server_optimizer_fn(server_lr)
     # We initialize the server optimizer variables to avoid creating them
     # within the scope of the tf.function server_update.
     _initialize_optimizer_vars(model, server_optimizer)
     return server_update(model, server_optimizer, server_state, model_delta)
+
+  @tff.tf_computation(server_state_type, model_weights_type.trainable,
+                      model_weights_type.trainable)
+  def server_update_joint_cor_fn(server_state, model_delta, global_cor):
+    model = model_fn()
+    server_optimizer = server_optimizer_fn(server_lr)
+    # We initialize the server optimizer variables to avoid creating them
+    # within the scope of the tf.function server_update.
+    _initialize_optimizer_vars(model, server_optimizer)
+    return server_update(model, server_optimizer, server_state, model_delta,
+                         global_cor)
 
   @tff.federated_computation(
       tff.type_at_server(server_state_type),
@@ -365,9 +404,17 @@ def build_fed_avg_process(
     client_weight = client_outputs.client_weight
     model_delta = tff.federated_mean(
         client_outputs.weights_delta, weight=client_weight)
-
-    server_state = tff.federated_map(server_update_fn,
-                                     (server_state, model_delta))
+    global_cor_states = tff.federated_mean(
+        client_outputs.local_cor_states, weight=client_weight)
+    if correction == 'joint':
+      server_state = tff.federated_map(
+          server_update_joint_cor_fn,
+          (server_state, model_delta, global_cor_states))
+    elif correction == 'local':
+      server_state = tff.federated_map(server_update_fn,
+                                       (server_state, model_delta))
+    else:
+      raise TypeError('Correction method must be local or joint.')
 
     aggregated_outputs = dummy_model.federated_output_computation(
         client_outputs.model_output)

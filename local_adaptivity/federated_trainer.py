@@ -61,6 +61,11 @@ with utils_impl.record_hparam_flags() as shared_flags:
                        'How many clients to sample per round.')
   flags.DEFINE_integer('client_datasets_random_seed', 1,
                        'Random seed for client sampling.')
+  flags.DEFINE_enum(
+      'correction_type', 'joint', ['local', 'joint'],
+      'which orrection technique to fix the '
+      'minimizer incosistency problem when applying '
+      'local adaptive optimizers.')
 
   # Training loop configuration
   flags.DEFINE_string(
@@ -193,7 +198,8 @@ def main(argv):
         client_lr=FLAGS.client_learning_rate,
         server_optimizer_fn=server_optimizer_fn,
         server_lr=FLAGS.server_learning_rate,
-        client_weight_fn=client_weight_fn)
+        client_weight_fn=client_weight_fn,
+        correction=FLAGS.correction_type)
 
   task_spec = training_specs.TaskSpec(
       iterative_process_builder=iterative_process_builder,

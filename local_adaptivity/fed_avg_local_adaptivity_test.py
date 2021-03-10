@@ -97,8 +97,6 @@ class ModelDeltaProcessTest(tf.test.TestCase, parameterized.TestCase):
                             fed_avg_local_adaptivity._get_weights(model),
                             client_optimizer)
     self.assertAllEqual(self.evaluate(outputs.client_weight), 1)
-    self.assertAllEqual(
-        self.evaluate(outputs.optimizer_output['num_examples']), 1)
 
   def test_client_update_with_non_finite_delta(self):
     federated_data = [_batch_fn(has_nan=True)]
