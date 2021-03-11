@@ -67,8 +67,8 @@ def _write_metrics(metrics_mngr, tb_mngr, metrics, round_num):
   logging.info('Metrics at round {:d}:\n{!s}'.format(round_num,
                                                      pprint.pformat(metrics)))
 
-  metrics_mngr.save_metrics(round_num, metrics)
-  tb_mngr.save_metrics(round_num, metrics)
+  metrics_mngr.save_metrics(metrics, round_num)
+  tb_mngr.save_metrics(metrics, round_num)
 
 
 def run(iterative_process: tff.templates.IterativeProcess,
