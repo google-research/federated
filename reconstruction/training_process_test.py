@@ -405,16 +405,16 @@ class TrainingProcessTest(tf.test.TestCase):
     client_data = create_emnist_client_data()
     federated_data = [client_data(), client_data()]
 
+    expected_keys = ['loss']
     server_states = []
-    outputs = []
-    for _ in range(2):
+    loss_list = []
+    for _ in range(10):
       server_state, output = it_process.next(server_state, federated_data)
       server_states.append(server_state)
-      outputs.append(output)
+      self.assertCountEqual(output.keys(), expected_keys)
+      loss_list.append(output['loss'])
 
-    expected_keys = ['loss']
-    self.assertCountEqual(outputs[0].keys(), expected_keys)
-    self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
+    self.assertLess(np.mean(loss_list[7:]), np.mean(loss_list[:2]))
     self.assertNotAllClose(server_states[0].model.trainable,
                            server_states[1].model.trainable)
 
