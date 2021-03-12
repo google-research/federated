@@ -15,6 +15,7 @@
 
 import collections
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
 
@@ -94,13 +95,13 @@ class FlarsFedAvgTest(tf.test.TestCase):
       keras_model.test_on_batch(**batch)
 
     loss_list = []
-    for _ in range(3):
+    for _ in range(10):
       keras_evaluate(server_state)
       server_state, output = it_process.next(server_state, federated_data)
       loss_list.append(output['loss'])
     keras_evaluate(server_state)
 
-    self.assertLess(tf.reduce_mean(loss_list[1:]), loss_list[0])
+    self.assertLess(np.mean(loss_list[7:]), np.mean(loss_list[:2]))
 
   def test_self_contained_example_keras_model(self):
     client_data = create_client_data()
