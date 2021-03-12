@@ -290,10 +290,12 @@ class TrainingProcessTest(tf.test.TestCase):
 
     server_states = []
     outputs = []
-    for _ in range(2):
+    loss_list = []
+    for _ in range(5):
       server_state, output = it_process.next(server_state, federated_data)
       server_states.append(server_state)
       outputs.append(output)
+      loss_list.append(output['loss'])
 
     expected_keys = [
         'sparse_categorical_accuracy', 'loss', 'num_examples_total',
@@ -302,7 +304,7 @@ class TrainingProcessTest(tf.test.TestCase):
     self.assertCountEqual(outputs[0].keys(), expected_keys)
     self.assertNotAllClose(server_states[0].model.trainable,
                            server_states[1].model.trainable)
-    self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
+    self.assertLess(np.mean(loss_list[2:]), np.mean(loss_list[:2]))
     self.assertEqual(outputs[0]['num_examples_total'], 6)
     self.assertEqual(outputs[1]['num_batches_total'], 4)
     self.assertEqual(outputs[0]['num_examples_total'], 6)
@@ -335,10 +337,12 @@ class TrainingProcessTest(tf.test.TestCase):
 
     server_states = []
     outputs = []
-    for _ in range(2):
+    loss_list = []
+    for _ in range(5):
       server_state, output = it_process.next(server_state, federated_data)
       server_states.append(server_state)
       outputs.append(output)
+      loss_list.append(output['loss'])
 
     expected_keys = [
         'sparse_categorical_accuracy', 'loss', 'num_examples_total',
@@ -347,7 +351,7 @@ class TrainingProcessTest(tf.test.TestCase):
     self.assertCountEqual(outputs[0].keys(), expected_keys)
     self.assertNotAllClose(server_states[0].model.trainable,
                            server_states[1].model.trainable)
-    self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
+    self.assertLess(np.mean(loss_list[2:]), np.mean(loss_list[:2]))
     self.assertEqual(outputs[0]['num_examples_total'], 6)
     self.assertEqual(outputs[1]['num_batches_total'], 4)
     self.assertEqual(outputs[0]['num_examples_total'], 6)
@@ -376,14 +380,16 @@ class TrainingProcessTest(tf.test.TestCase):
 
     server_states = []
     outputs = []
-    for _ in range(2):
+    loss_list = []
+    for _ in range(5):
       server_state, output = it_process.next(server_state, federated_data)
       server_states.append(server_state)
       outputs.append(output)
+      loss_list.append(output['loss'])
 
     expected_keys = ['loss']
     self.assertCountEqual(outputs[0].keys(), expected_keys)
-    self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
+    self.assertLess(np.mean(loss_list[2:]), np.mean(loss_list[:2]))
     self.assertNotAllClose(server_states[0].model.trainable,
                            server_states[1].model.trainable)
 
@@ -405,16 +411,18 @@ class TrainingProcessTest(tf.test.TestCase):
     client_data = create_emnist_client_data()
     federated_data = [client_data(), client_data()]
 
-    expected_keys = ['loss']
     server_states = []
+    outputs = []
     loss_list = []
-    for _ in range(10):
+    for _ in range(5):
       server_state, output = it_process.next(server_state, federated_data)
       server_states.append(server_state)
-      self.assertCountEqual(output.keys(), expected_keys)
+      outputs.append(output)
       loss_list.append(output['loss'])
 
-    self.assertLess(np.mean(loss_list[7:]), np.mean(loss_list[:2]))
+    expected_keys = ['loss']
+    self.assertCountEqual(outputs[0].keys(), expected_keys)
+    self.assertLess(np.mean(loss_list[2:]), np.mean(loss_list[:2]))
     self.assertNotAllClose(server_states[0].model.trainable,
                            server_states[1].model.trainable)
 
@@ -446,10 +454,12 @@ class TrainingProcessTest(tf.test.TestCase):
 
     server_states = []
     outputs = []
-    for _ in range(2):
+    loss_list = []
+    for _ in range(5):
       server_state, output = it_process.next(server_state, federated_data)
       server_states.append(server_state)
       outputs.append(output)
+      loss_list.append(output['loss'])
 
     expected_keys = [
         'sparse_categorical_accuracy', 'loss', 'num_examples_total',
@@ -458,7 +468,7 @@ class TrainingProcessTest(tf.test.TestCase):
     self.assertCountEqual(outputs[0].keys(), expected_keys)
     self.assertNotAllClose(server_states[0].model.trainable,
                            server_states[1].model.trainable)
-    self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
+    self.assertLess(np.mean(loss_list[2:]), np.mean(loss_list[:2]))
     self.assertEqual(outputs[0]['num_examples_total'], 6)
     self.assertEqual(outputs[1]['num_batches_total'], 4)
     self.assertEqual(outputs[0]['num_examples_total'], 6)
@@ -492,10 +502,12 @@ class TrainingProcessTest(tf.test.TestCase):
 
     server_states = []
     outputs = []
-    for _ in range(2):
+    loss_list = []
+    for _ in range(5):
       server_state, output = it_process.next(server_state, federated_data)
       server_states.append(server_state)
       outputs.append(output)
+      loss_list.append(output['loss'])
 
     expected_keys = [
         'sparse_categorical_accuracy', 'loss', 'num_examples_total',
@@ -504,7 +516,7 @@ class TrainingProcessTest(tf.test.TestCase):
     self.assertCountEqual(outputs[0].keys(), expected_keys)
     self.assertNotAllClose(server_states[0].model.trainable,
                            server_states[1].model.trainable)
-    self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
+    self.assertLess(np.mean(loss_list[2:]), np.mean(loss_list[:2]))
     self.assertEqual(outputs[0]['num_examples_total'], 12)
     self.assertEqual(outputs[1]['num_batches_total'], 8)
     self.assertEqual(outputs[0]['num_examples_total'], 12)
@@ -539,17 +551,19 @@ class TrainingProcessTest(tf.test.TestCase):
 
     server_states = []
     outputs = []
-    for _ in range(2):
+    loss_list = []
+    for _ in range(5):
       server_state, output = it_process.next(server_state, federated_data)
       server_states.append(server_state)
       outputs.append(output)
+      loss_list.append(output['loss'])
 
     expected_keys = [
         'sparse_categorical_accuracy', 'loss', 'num_examples_total',
         'num_batches_total'
     ]
     self.assertCountEqual(outputs[0].keys(), expected_keys)
-    self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
+    self.assertLess(np.mean(loss_list[2:]), np.mean(loss_list[:2]))
     self.assertNotAllClose(server_states[0].model.trainable,
                            server_states[1].model.trainable)
     self.assertEqual(outputs[0]['num_examples_total'], 12)

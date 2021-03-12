@@ -40,6 +40,7 @@ py_test(
     size = "large",
     srcs = ["training_process_test.py"],
     python_version = "PY3",
+    shard_count = 10,
     srcs_version = "PY3",
     deps = [
         ":keras_utils",
