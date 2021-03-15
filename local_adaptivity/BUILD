@@ -16,6 +16,13 @@ py_binary(
     srcs = ["federated_trainer.py"],
     python_version = "PY3",
     srcs_version = "PY3",
+    deps = [":federated_trainer_lib"],
+)
+
+py_library(
+    name = "federated_trainer_lib",
+    srcs = ["federated_trainer.py"],
+    srcs_version = "PY3",
     deps = [
         ":fed_avg_local_adaptivity",
         "//optimization/cifar100:federated_cifar100",
