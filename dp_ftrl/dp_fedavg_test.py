@@ -280,7 +280,7 @@ class DPFedAvgTest(tf.test.TestCase, parameterized.TestCase):
         self.assertEqual(
             i + 1,
             tree_aggregation.get_step_idx(
-                server_state.optimizer_state['dp_tree_state'].level_state))
+                server_state.optimizer_state['dp_tree_state']))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
   def test_self_contained_example_custom_model(self):
@@ -526,7 +526,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(
           i + 1,
           tree_aggregation.get_step_idx(
-              server_state.optimizer_state['dp_tree_state'].level_state))
+              server_state.optimizer_state['dp_tree_state']))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
 

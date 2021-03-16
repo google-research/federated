@@ -39,6 +39,7 @@ py_test(
     size = "large",
     srcs = ["tree_aggregation_test.py"],
     python_version = "PY3",
+    shard_count = 10,
     srcs_version = "PY3",
     deps = [":tree_aggregation"],
 )
