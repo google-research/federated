@@ -39,6 +39,13 @@ def _unpack_data_label(batch):
     raise ValueError('Unrecognized batch data.')
 
 
+def _get_model_weights(model):
+  if hasattr(model, 'weights'):
+    return model.weights
+  else:
+    return tff.learning.ModelWeights.from_model(model)
+
+
 @attr.s(eq=False, frozen=True, slots=True)
 class ModelWeights(object):
   """A container for the trainable and non-trainable variables of a `Model`.
@@ -57,6 +64,7 @@ class ModelOutputs(object):
   loss = attr.ib()
 
 
+# TODO(b/172867399): remove `KerasModelWrapper` and use `tff.learning.Model`.
 class KerasModelWrapper(object):
   """A standalone keras wrapper to be used in TFF."""
 
@@ -137,8 +145,7 @@ def build_server_broadcast_message(server_state):
     A `BroadcastMessage`.
   """
   return BroadcastMessage(
-      model_weights=server_state.model_weights,
-      dp_clip_norm=server_state.dp_clip_norm)
+      model_weights=server_state.model, dp_clip_norm=server_state.dp_clip_norm)
 
 
 @attr.s(eq=False, frozen=True, slots=True)
@@ -172,7 +179,7 @@ def client_update(model, dataset, server_message, client_optimizer):
   Returns:
     A 'ClientOutput`.
   """
-  model_weights = model.weights
+  model_weights = _get_model_weights(model)
   initial_weights = server_message.model_weights
   tff.utils.assign(model_weights, initial_weights)
 
@@ -187,8 +194,11 @@ def client_update(model, dataset, server_message, client_optimizer):
     grads = tape.gradient(outputs.loss, model_weights.trainable)
     grads_and_vars = zip(grads, model_weights.trainable)
     client_optimizer.apply_gradients(grads_and_vars)
-    batch_x, _ = _unpack_data_label(batch)
-    batch_size = tf.shape(batch_x)[0]
+    if hasattr(outputs, 'num_examples'):
+      batch_size = tf.cast(outputs.num_examples, dtype=tf.int32)
+    else:
+      batch_x, _ = _unpack_data_label(batch)
+      batch_size = tf.shape(batch_x)[0]
     num_examples += batch_size
     loss_sum += outputs.loss * tf.cast(batch_size, tf.float32)
 
@@ -212,11 +222,13 @@ class ServerState(object):
   """Structure for state on the server.
 
   Fields:
-  -   `model_weights`: A dictionary of model's trainable variables.
+  -   `model`: A dictionary of model's trainable variables.
   -   `optimizer_state`: Server optimizer states.
   -   'round_num': Current round index
   """
-  model_weights = attr.ib()
+  # Some attributes are named to be consistent with the private `ServerState` in
+  # `tff.learning` to possibly use `tff.learning.build_federated_evaluation`.
+  model = attr.ib()
   optimizer_state = attr.ib()
   round_num = attr.ib()
   dp_clip_norm = attr.ib()
@@ -242,8 +254,8 @@ def server_update(model, server_optimizer, server_state, weights_delta):
     return server_state
 
   # Initialize the model with the current state.
-  model_weights = model.weights
-  tff.utils.assign(model_weights, server_state.model_weights)
+  model_weights = _get_model_weights(model)
+  tff.utils.assign(model_weights, server_state.model)
 
   # Apply the update to the model, and return the updated state.
   grad = tf.nest.map_structure(lambda x: -1.0 * x, weights_delta)
@@ -256,7 +268,7 @@ def server_update(model, server_optimizer, server_state, weights_delta):
   # Create a new state based on the updated model.
   return tff.utils.update_state(
       server_state,
-      model_weights=model_weights,
+      model=model_weights,
       optimizer_state=optimizer_state,
       round_num=server_state.round_num + 1)
 
@@ -285,21 +297,23 @@ def build_federated_averaging_process(
   @tff.tf_computation
   def server_init_tf():
     model = model_fn()
-    optimizer = server_optimizer_fn(model.weights.trainable)
+    model_weights = _get_model_weights(model)
+    optimizer = server_optimizer_fn(model_weights.trainable)
     return ServerState(
-        model_weights=model.weights,
+        model=model_weights,
         optimizer_state=optimizer.init_state(),
         round_num=0,
         dp_clip_norm=dp_clip_norm)
 
   server_state_type = server_init_tf.type_signature.result
 
-  model_weights_type = server_state_type.model_weights
+  model_weights_type = server_state_type.model
 
   @tff.tf_computation(server_state_type, model_weights_type.trainable)
   def server_update_fn(server_state, model_delta):
     model = model_fn()
-    optimizer = server_optimizer_fn(model.weights.trainable)
+    model_weights = _get_model_weights(model)
+    optimizer = server_optimizer_fn(model_weights.trainable)
     return server_update(model, optimizer, server_state, model_delta)
 
   @tff.tf_computation(server_state_type)

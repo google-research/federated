@@ -319,7 +319,7 @@ class DPFedAvgTest(tf.test.TestCase, parameterized.TestCase):
             y=np.ones([1], dtype=np.int32))
     ]
     keras_model = _create_test_cnn_model()
-    server_state.model_weights.assign_weights_to(keras_model)
+    server_state.model.assign_weights_to(keras_model)
 
     sample_data = [
         collections.OrderedDict(
@@ -337,7 +337,7 @@ def _server_init(model: tff.learning.Model,
                  optimizer: optimizer_utils.ServerOptimizerBase):
   """Returns initial `ServerState`."""
   return dp_fedavg.ServerState(
-      model_weights=model.weights,
+      model=model.weights,
       round_num=0,
       optimizer_state=optimizer.init_state(),
       dp_clip_norm=1000)
@@ -356,7 +356,7 @@ class ServerTest(tf.test.TestCase):
       state = dp_fedavg.server_update(model, example_optimizer, state,
                                       weights_delta)
 
-    model_vars = self.evaluate(state.model_weights)
+    model_vars = self.evaluate(state.model)
     train_vars = model_vars.trainable
     self.assertLen(train_vars, 2)
     self.assertEqual(state.round_num, 2)
