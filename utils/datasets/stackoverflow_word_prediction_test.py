@@ -328,7 +328,7 @@ class SecretInsertionTest(tf.test.TestCase):
 
     def client_data():
       return collections.OrderedDict(
-          # We hash on date to decide whether to insert.
+          # We hash on date to seed client randomness.
           creation_date=[random_string() for _ in range(num_examples)],
           score=words,
           tags=words,
@@ -339,24 +339,37 @@ class SecretInsertionTest(tf.test.TestCase):
     data = tff.test.FromTensorSlicesClientData(
         {random_string(): client_data() for _ in range(num_clients)})
 
-    secrets = dict(b=(0.5, 0.6), c=(0.3, 0.7))
+    secrets = dict(b=(500, 0.5), c=(30, 1.0), d=(1, 1.0))
+
     transform_fn = stackoverflow_word_prediction.secret_inserting_transform_fn(
-        secrets, TEST_SEED + 1)
+        data.client_ids, secrets, TEST_SEED + 1)
     transformed = tff.simulation.TransformingClientData(data, transform_fn)
 
     secret_count = {secret: 0 for secret in secrets}
+    client_with_secret_count = {secret: 0 for secret in secrets}
+
     for client_id in transformed.client_ids:
       client_data = transformed.create_tf_dataset_for_client(client_id)
+      has_secret = None
       for example in client_data.enumerate():
         tokens = example[1]['tokens'].numpy().decode('utf-8')
         if tokens in secrets:
           secret_count[tokens] += 1
+          has_secret = tokens
+      if has_secret:
+        client_with_secret_count[has_secret] += 1
 
-    total_examples = num_examples * num_clients
-    for secret, (p_u, p_e) in secrets.items():
-      expected_frac = p_u * p_e
-      actual_frac = secret_count[secret] / total_examples
-      self.assertAllClose(expected_frac, actual_frac, atol=0.03)
+    # All selected clients should have at least one insertion, hence should
+    # be counted. The probability that there exists a client selected for secret
+    # b that doesn't have a single insertion is 1-(1-0.5^20)^500 ~ 5e-4.
+    self.assertAllEqual(500, client_with_secret_count['b'])
+    self.assertAllEqual(30, client_with_secret_count['c'])
+    self.assertAllEqual(1, client_with_secret_count['d'])
+
+    # Count of secret b is Bin(10000, 0.5) with mean 5000, stddev 50.
+    self.assertAllClose(5000, secret_count['b'], atol=150)
+    self.assertAllEqual(30 * num_examples, secret_count['c'])
+    self.assertAllEqual(num_examples, secret_count['d'])
 
   @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
   def test_make_random_secrets(self, mock_load_word_counts):

@@ -383,30 +383,30 @@ def make_random_secrets(vocab_size: int,
 
 
 def secret_inserting_transform_fn(
-    secrets: Dict[str, Tuple[float, float]],
+    client_ids: List[str],
+    secrets: Dict[str, Tuple[int, float]],
     seed: int = 0) -> Callable[[str, int], Callable[[Any], Any]]:
   """Builds secret inserting transform_fn for `TransformingClientData`.
 
-  Replaces the `tokens` field of some of selected clients' examples with
-  secrets. If a client is selected, one of the strings from `secrets` will be
-  chosen for that client uniformly at random. Then each that client's examples
-  will be selected for replacement independently at random.
-
-  Selection of clients is based on a hash of the client_id.
+  Assigns secret phrases to some clients. If a client is assigned a secret, each
+  of that client's examples will be selected independently at random for
+  replacement, in which case the `tokens` field of the example will be replaced
+  by the secret.
 
   It is assumed that this will be used in a `TransformingClientData` with
   `num_transformed_clients == len(client_ids)` so the `index` argument of
   the transform_fn must be zero.
 
-  The method is described fully and used by Thakkar et. al (2020)
-  https://arxiv.org/abs/2006.07490.
+  The method is similar to that used by Thakkar et. al (2020)
+  https://arxiv.org/abs/2006.07490 except a deterministic number of clients
+  are selected for each secret.
 
   Args:
-    secrets: A dict mapping secrets of type `str` to a 2-tuple of floats. The
-      first float is the probability that a client will have that secret
-      inserted (p_u in Thakkar et. al (2020) and the second float is the
-      probability that any given example of a selected client will be replaced
-      with that client's secret (p_e in Thakkar et. al (2020)).
+    client_ids: A list of all client IDs.
+    secrets: A dict mapping secrets of type `str` to an (int, float) 2-tuple.
+      The int is the number of clients that will have that secret inserted, and
+      the float is the probability that any given example of a selected client
+      will be replaced with that client's secret (p_e in Thakkar et. al (2020)).
     seed: Random seed for client and example selection.
 
   Returns:
@@ -418,17 +418,24 @@ def secret_inserting_transform_fn(
       not all([isinstance(secret, str) for secret in secrets])):
     raise ValueError('`secrets` must be a non-zero length dict with str keys.')
 
-  if any(not 0 <= value[1] <= 1 for value in secrets.values()):
-    raise ValueError('p_e values must be valid probabilities in [0, 1].')
+  if any(value[0] <= 0 for value in secrets.values()):
+    raise ValueError('Client count for each secret must be positive.')
 
-  secret_list, p_u = zip(*[(k, v[0]) for k, v in secrets.items()])
-  p_none = 1 - sum(p_u)
-  if p_none < 0:
-    raise ValueError('p_u values cannot sum to more than 1.')
+  if any(not 0 < value[1] <= 1 for value in secrets.values()):
+    raise ValueError('p_e values must be valid probabilities in (0, 1].')
 
-  # Append probability for no secret.
-  secret_list = secret_list + (None,)
-  p_u = p_u + (p_none,)
+  if sum(cc for (cc, _) in secrets.values()) >= len(client_ids):
+    raise ValueError(
+        'Client counts cannot sum to more than total number of clients.')
+
+  np.random.seed(seed)
+  id_perm = np.random.permutation(client_ids)
+  id_to_secret = {}
+  i = 0
+  for secret, (client_count, p) in secrets.items():
+    for _ in range(client_count):
+      id_to_secret[id_perm[i]] = (secret, p)
+      i += 1
 
   def make_transform_fn(client_id: str, index: int):
     if index:
@@ -437,15 +444,15 @@ def secret_inserting_transform_fn(
           '`TransformingClientData` with `num_transformed_clients == '
           'len(client_ids)`. `index` should therefore always be zero.')
 
+    secret_and_prob = id_to_secret.get(client_id)
+    if not secret_and_prob:
+      return None
+
     client_hash = hashlib.md5(client_id.encode()).digest()
     # Hash is in bytes, so convert to int for numpy seed.
     client_seed = (int.from_bytes(client_hash, 'big') + seed) % (2**32)
-    np.random.seed(client_seed)
 
-    secret = np.random.choice(secret_list, p=p_u)
-    if not secret:
-      return None
-    p_e = secrets[secret][1]
+    secret, p_e = secret_and_prob
 
     def transform_fn(example):
       example_seed = tf.strings.to_hash_bucket_fast(example['creation_date'],
