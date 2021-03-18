@@ -67,11 +67,22 @@ class SGDServerOptimizer(ServerOptimizerBase):
 
 
 class DPFTRLMServerOptimizer(ServerOptimizerBase):
-  """Momentum FTRL Optimizer with Tree aggregation for DP noise."""
+  """Momentum FTRL Optimizer with Tree aggregation for DP noise.
 
-  def __init__(self, learning_rate: float, momentum: float, noise_std: float,
-               model_weight_shape: Collection[tf.Tensor]):
+  There are two options of the tree aggregation algorithm:
+  the baseline method `tree_aggregation.TFTreeAggregator`, and the efficient
+  method `tree_aggregation.TFEfficientTreeAggregator` , which is controlled by
+  flag `efficient_tree` in the constructor.
+  """
+
+  def __init__(self,
+               learning_rate: float,
+               momentum: float,
+               noise_std: float,
+               model_weight_shape: Collection[tf.Tensor],
+               efficient_tree: bool = True):
     """Initialize the momemtum DPFTRL Optimizer."""
+
     self.lr = learning_rate
     self.momentum = momentum
     self.model_weight_shape = model_weight_shape
@@ -83,8 +94,12 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
           lambda x: random_generator.normal(x, stddev=noise_std),
           model_weight_shape)
 
-    self.noise_generator = tree_aggregation.TFTreeAggregator(
-        new_value_fn=_noise_fn)
+    if efficient_tree:
+      self.noise_generator = tree_aggregation.TFEfficientTreeAggregator(
+          new_value_fn=_noise_fn)
+    else:
+      self.noise_generator = tree_aggregation.TFTreeAggregator(
+          new_value_fn=_noise_fn)
 
   @tf.function
   def model_update(self, state: Dict[str, Any], weight: Collection[tf.Variable],
