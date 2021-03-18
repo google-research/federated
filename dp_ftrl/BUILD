@@ -78,6 +78,13 @@ py_binary(
     srcs = ["run_stackoverflow.py"],
     python_version = "PY3",
     srcs_version = "PY3",
+    deps = [":run_stackoverflow_lib"],
+)
+
+py_library(
+    name = "run_stackoverflow_lib",
+    srcs = ["run_stackoverflow.py"],
+    srcs_version = "PY3",
     deps = [
         ":dp_fedavg",
         ":optimizer_utils",

@@ -211,20 +211,8 @@ def _sample_client_ids(
   return random.sample(client_data.client_ids, num_clients), epoch
 
 
-def main(argv):
-  if len(argv) > 1:
-    raise app.UsageError('Expected no command-line arguments, '
-                         'got: {}'.format(argv))
-
-  # Multi-GPU configuration
-  client_devices = tf.config.list_logical_devices('GPU')
-  server_device = tf.config.list_logical_devices('CPU')[0]
-  tff.backends.native.set_local_execution_context(
-      max_fanout=2 * FLAGS.clients_per_round,
-      server_tf_device=server_device,
-      client_tf_devices=client_devices,
-      clients_per_thread=FLAGS.clients_per_thread)
-
+def train_and_eval():
+  """Train and evaluate StackOver NWP task."""
   logging.info('Show FLAGS for debugging:')
   for f in HPARAM_FLAGS:
     logging.info('%s=%s', f, FLAGS[f].value)
@@ -309,6 +297,23 @@ def main(argv):
       rounds_per_eval=FLAGS.rounds_per_eval,
       rounds_per_checkpoint=FLAGS.rounds_per_checkpoint,
       rounds_per_train_eval=2000)
+
+
+def main(argv):
+  if len(argv) > 1:
+    raise app.UsageError('Expected no command-line arguments, '
+                         'got: {}'.format(argv))
+
+  # Multi-GPU configuration
+  client_devices = tf.config.list_logical_devices('GPU')
+  server_device = tf.config.list_logical_devices('CPU')[0]
+  tff.backends.native.set_local_execution_context(
+      max_fanout=2 * FLAGS.clients_per_round,
+      server_tf_device=server_device,
+      client_tf_devices=client_devices,
+      clients_per_thread=FLAGS.clients_per_thread)
+
+  train_and_eval()
 
 
 if __name__ == '__main__':
