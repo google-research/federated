@@ -50,7 +50,7 @@ def get_step_idx(state: TreeState) -> tf.Tensor:
   return step_idx
 
 
-class TFTreeAggregator:
+class TFTreeAggregator():
   """Tree aggregator to compute accumulated noise in private algorithms.
 
   This class implements the tree aggregation algorithm for noise values to
@@ -131,6 +131,103 @@ class TFTreeAggregator:
     new_level_buffer_idx = new_level_buffer_idx.write(write_buffer_idx,
                                                       level_idx)
     new_value = self.get_new_value()
+    new_level_buffer = tf.nest.map_structure(
+        lambda x, y: x.write(write_buffer_idx, y), new_level_buffer, new_value)
+    write_buffer_idx += 1
+    # Buffer index will now different from level index for the old `TreeState`
+    # i.e., `level_buffer_idx[level_idx] != level_idx`. Rename parameter to
+    # buffer index for clarity.
+    buffer_idx = level_idx
+    while tf.less(buffer_idx, len(level_buffer_idx)):
+      new_level_buffer_idx = new_level_buffer_idx.write(
+          write_buffer_idx, level_buffer_idx[buffer_idx])
+      new_level_buffer = tf.nest.map_structure(
+          lambda nb, b: nb.write(write_buffer_idx, b[buffer_idx]),
+          new_level_buffer, level_buffer)
+      buffer_idx += 1
+      write_buffer_idx += 1
+    new_level_buffer_idx = new_level_buffer_idx.stack()
+    new_level_buffer = tf.nest.map_structure(lambda x: x.stack(),
+                                             new_level_buffer)
+    new_state = TreeState(
+        level_buffer=new_level_buffer, level_buffer_idx=new_level_buffer_idx)
+    return cumsum, new_state
+
+
+class TFEfficientTreeAggregator(TFTreeAggregator):
+  """Efficient tree aggregator to compute accumulated noise.
+
+  This class implements the efficient tree aggregation algorithm based on
+  Honaker 2015 "Efficient Use of Differentially Private Binary Trees".
+  The noise standard deviation for the note at depth d is roughly
+  `sigma * sqrt(2^{d-1}/(2^d-1))`. which becomes `sigma / sqrt(2)` when
+  the tree is very tall.
+
+  Attributes:
+    get_new_value: Function that returns a noise value for each tree node.
+  """
+
+  @tf.function
+  def _get_cumsum(self, state: TreeState) -> tf.Tensor:
+    # Note that the buffer saved recursive results of the weighted average of
+    # the node value (v) and its two children (l, r), i.e., node = v + (l+r)/2.
+    # To get unbiased estimation with reduced variance for each node, we have to
+    # reweight it by 1/(2-2^{-d}) where d is the depth of the node.
+    level_weights = tf.math.divide(
+        1., 2. - tf.math.pow(.5, tf.cast(state.level_buffer_idx, tf.float32)))
+
+    def _weighted_sum(buffer):
+      expand_shape = [len(level_weights)] + [1] * (len(tf.shape(buffer)) - 1)
+      weighted_buffer = tf.math.multiply(
+          buffer, tf.reshape(level_weights, expand_shape))
+      return tf.reduce_sum(weighted_buffer, axis=0)
+
+    return tf.nest.map_structure(_weighted_sum, state.level_buffer)
+
+  @tf.function
+  def get_cumsum_and_update(self,
+                            state: TreeState) -> Tuple[tf.Tensor, TreeState]:
+    """Returns tree aggregated value and updated `TreeState` for one step.
+
+    `TreeState` is updated to prepare for accepting the *next* leaf node. Note
+    that `get_step_idx` can be called to get the current index of the leaf node
+    before calling this function. This function accept state for the current
+    leaf node and prepare for the next leaf node because TFF prefers to know
+    the types of state at initialization. Note that the value of new node in
+    `TreeState.level_buffer` will depend on its two children, and is updated
+    from bottom up for the right child.
+
+    Args:
+      state: `TreeState` for the current leaf node, index can be queried by
+        `tree_aggregation.get_step_idx(state.level_buffer_idx)`.
+    """
+    cumsum = self._get_cumsum(state)
+
+    level_buffer_idx, level_buffer = state.level_buffer_idx, state.level_buffer
+    new_level_buffer = tf.nest.map_structure(
+        lambda x: tf.TensorArray(  # pylint: disable=g-long-lambda
+            dtype=tf.float32,
+            size=0,
+            dynamic_size=True),
+        level_buffer)
+    new_level_buffer_idx = tf.TensorArray(
+        dtype=tf.int32, size=0, dynamic_size=True)
+    # `TreeState` stores the left child node necessary for computing the cumsum
+    # noise. To update the buffer, let us find the lowest level that will switch
+    # from a right child (not in the buffer) to a left child.
+    level_idx = 0  # new leaf node starts from level 0
+    new_value = self.get_new_value()
+    while tf.less(level_idx, len(level_buffer_idx)) and tf.equal(
+        level_idx, level_buffer_idx[level_idx]):
+      # Recursively update if the current node is a right child.
+      new_value = tf.nest.map_structure(
+          lambda l, r, n: 0.5 * (l[level_idx] + r) + n, level_buffer, new_value,
+          self.get_new_value())
+      level_idx += 1
+    # A new (left) node will be created at `level_idx`.
+    write_buffer_idx = 0
+    new_level_buffer_idx = new_level_buffer_idx.write(write_buffer_idx,
+                                                      level_idx)
     new_level_buffer = tf.nest.map_structure(
         lambda x, y: x.write(write_buffer_idx, y), new_level_buffer, new_value)
     write_buffer_idx += 1
