@@ -216,7 +216,7 @@ def client_update(model, dataset, server_message, client_optimizer,
       outputs = model.forward_pass(batch)
 
     grads = tape.gradient(outputs.loss, model_weights.trainable)
-    client_optimizer.apply_gradients(zip(grads, model.weights.trainable))
+    client_optimizer.apply_gradients(zip(grads, model_weights.trainable))
     if hasattr(outputs, 'num_examples'):
       batch_size = tf.cast(outputs.num_examples, dtype=tf.int32)
     else:
