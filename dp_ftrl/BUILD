@@ -49,6 +49,7 @@ py_test(
     size = "large",
     srcs = ["dp_fedavg_test.py"],
     python_version = "PY3",
+    shard_count = 10,
     srcs_version = "PY3",
     deps = [
         ":dp_fedavg",

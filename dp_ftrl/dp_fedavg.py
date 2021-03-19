@@ -28,6 +28,29 @@ from dp_ftrl import optimizer_utils
 from utils import tensor_utils
 
 
+def _dataset_reduce_fn(reduce_fn, dataset, initial_state_fn):
+  return dataset.reduce(initial_state=initial_state_fn(), reduce_func=reduce_fn)
+
+
+def _for_iter_dataset_fn(reduce_fn, dataset, initial_state_fn):
+  """Performs dataset reduce for simulation performance."""
+  # TODO(b/155208489): this is a workaround for GPU simulation because
+  # `tf.device` does not cross the boundary of dataset ops. TF use a different
+  # set of ops when we explicitly use `iter` for dataset.
+  update_state = initial_state_fn()
+  for batch in iter(dataset):
+    update_state = reduce_fn(update_state, batch)
+  return update_state
+
+
+def _build_dataset_reduce_fn(simulation_flag=True):
+  """Returns a reduce loop function on input dataset."""
+  if simulation_flag:
+    return _for_iter_dataset_fn
+  else:
+    return _dataset_reduce_fn
+
+
 def _unpack_data_label(batch):
   if isinstance(batch, collections.abc.Mapping):
     return batch['x'], batch['y']
@@ -167,7 +190,8 @@ class ClientOutput(object):
 
 
 @tf.function
-def client_update(model, dataset, server_message, client_optimizer):
+def client_update(model, dataset, server_message, client_optimizer,
+                  use_simulation_loop):
   """Performans client local training of `model` on `dataset`.
 
   Args:
@@ -175,6 +199,8 @@ def client_update(model, dataset, server_message, client_optimizer):
     dataset: A 'tf.data.Dataset'.
     server_message: A `BroadcastMessage` from server.
     client_optimizer: A `tf.keras.optimizers.Optimizer`.
+    use_simulation_loop: Controls the reduce loop function for client dataset.
+      Set this flag to True for performant GPU simulations.
 
   Returns:
     A 'ClientOutput`.
@@ -183,17 +209,14 @@ def client_update(model, dataset, server_message, client_optimizer):
   initial_weights = server_message.model_weights
   tff.utils.assign(model_weights, initial_weights)
 
-  num_examples = tf.constant(0, dtype=tf.int32)
-  loss_sum = tf.constant(0, dtype=tf.float32)
-  # Explicit use `iter` for dataset is a trick that makes TFF more robust in
-  # GPU simulation and slightly more performant in the unconventional usage
-  # of large number of small datasets.
-  for batch in iter(dataset):
+  def reduce_fn(state, batch):
+    """Train model on local client batch."""
+    num_examples, loss_sum = state
     with tf.GradientTape() as tape:
       outputs = model.forward_pass(batch)
+
     grads = tape.gradient(outputs.loss, model_weights.trainable)
-    grads_and_vars = zip(grads, model_weights.trainable)
-    client_optimizer.apply_gradients(grads_and_vars)
+    client_optimizer.apply_gradients(zip(grads, model.weights.trainable))
     if hasattr(outputs, 'num_examples'):
       batch_size = tf.cast(outputs.num_examples, dtype=tf.int32)
     else:
@@ -201,7 +224,13 @@ def client_update(model, dataset, server_message, client_optimizer):
       batch_size = tf.shape(batch_x)[0]
     num_examples += batch_size
     loss_sum += outputs.loss * tf.cast(batch_size, tf.float32)
+    return num_examples, loss_sum
 
+  num_examples = tf.constant(0, dtype=tf.int32)
+  loss_sum = tf.constant(0, dtype=tf.float32)
+  dataset_reduce_fn = _build_dataset_reduce_fn(use_simulation_loop)
+  num_examples, loss_sum = dataset_reduce_fn(
+      reduce_fn, dataset, initial_state_fn=lambda: (num_examples, loss_sum))
   weights_delta = tf.nest.map_structure(lambda a, b: a - b,
                                         model_weights.trainable,
                                         initial_weights.trainable)
@@ -278,7 +307,8 @@ def build_federated_averaging_process(
     dp_clip_norm=1.0,
     server_optimizer_fn=lambda w: optimizer_utils.SGDServerOptimizer(  # pylint: disable=g-long-lambda
         learning_rate=1.0),
-    client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1)):
+    client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
+    use_simulation_loop=True):
   """Builds the TFF computations for optimization using federated averaging.
 
   Args:
@@ -287,6 +317,8 @@ def build_federated_averaging_process(
     server_optimizer_fn: .
     client_optimizer_fn: A no-arg function that returns a
       `tf.keras.optimizers.Optimizer` for client update.
+    use_simulation_loop: Controls the reduce loop function for client dataset.
+      Set this flag to True for performant GPU simulations.
 
   Returns:
     A `tff.templates.IterativeProcess`.
@@ -327,7 +359,8 @@ def build_federated_averaging_process(
   def client_update_fn(tf_dataset, server_message):
     model = model_fn()
     client_optimizer = client_optimizer_fn()
-    return client_update(model, tf_dataset, server_message, client_optimizer)
+    return client_update(model, tf_dataset, server_message, client_optimizer,
+                         use_simulation_loop)
 
   federated_server_state_type = tff.type_at_server(server_state_type)
   federated_dataset_type = tff.type_at_clients(tf_dataset_type)

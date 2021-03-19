@@ -387,12 +387,16 @@ def _initialize_optimizer_vars(model, optimizer):
 class ClientTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('clip1000', 1000),
-      ('clip1', 1),
-      ('clip0d1', 0.1),
-      ('clip0d001', 0.001),
+      ('clip1000_sim', 1000, True),
+      ('clip1_sim', 1, True),
+      ('clip0d1_sim', 0.1, True),
+      ('clip0d001_sim', 0.001, True),
+      ('clip1000', 1000, False),
+      ('clip1', 1, False),
+      ('clip0d1', 0.1, False),
+      ('clip0d001', 0.001, False),
   )
-  def test_self_contained_example(self, clip_norm):
+  def test_self_contained_example(self, clip_norm, simulation_flag):
 
     client_data = _create_client_data()
 
@@ -405,7 +409,7 @@ class ClientTest(tf.test.TestCase, parameterized.TestCase):
       server_message = dp_fedavg.BroadcastMessage(
           model_weights=model.weights, dp_clip_norm=clip_norm)
       outputs = dp_fedavg.client_update(model, client_data(), server_message,
-                                        optimizer)
+                                        optimizer, simulation_flag)
       losses.append(outputs.model_output.numpy())
       weights_delta_norm = tf.linalg.global_norm(
           tf.nest.flatten(outputs.weights_delta))
@@ -426,8 +430,12 @@ class ClientTest(tf.test.TestCase, parameterized.TestCase):
       _initialize_optimizer_vars(model, optimizer)
       server_message = dp_fedavg.BroadcastMessage(
           model_weights=model.weights, dp_clip_norm=clip_norm)
-      outputs = dp_fedavg.client_update(model, client_data(), server_message,
-                                        optimizer)
+      outputs = dp_fedavg.client_update(
+          model,
+          client_data(),
+          server_message,
+          optimizer,
+          use_simulation_loop=True)
       losses.append(outputs.model_output.numpy())
 
     self.assertAllEqual(int(outputs.client_weight.numpy()), 2)
@@ -497,10 +505,11 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
   @parameterized.named_parameters(
-      ('r5eff', 5, True),
-      ('r5', 5, False),
+      ('r5eff', 5, True, True),
+      ('r5eff_reduce', 5, True, False),
+      ('r5', 5, False, True),
   )
-  def test_dpftal_training(self, total_rounds, efficient_tree):
+  def test_dpftal_training(self, total_rounds, efficient_tree, simulation_flag):
 
     def server_optimzier_fn(model_weights):
       model_weight_shape = tf.nest.map_structure(tf.shape, model_weights)
@@ -512,7 +521,9 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
           efficient_tree=efficient_tree)
 
     it_process = dp_fedavg.build_federated_averaging_process(
-        _rnn_model_fn, server_optimizer_fn=server_optimzier_fn)
+        _rnn_model_fn,
+        server_optimizer_fn=server_optimzier_fn,
+        use_simulation_loop=simulation_flag)
     server_state = it_process.initialize()
 
     def deterministic_batch():
@@ -533,6 +544,47 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
           tree_aggregation.get_step_idx(
               server_state.optimizer_state['dp_tree_state']))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
+
+
+class DatasetReduceTest(parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      ('non-simulation', False, dp_fedavg._dataset_reduce_fn),
+      ('simulation', True, dp_fedavg._for_iter_dataset_fn))
+  def test_build_dataset_reduce_fn(self, simulation, reduce_fn):
+    dataset_reduce_fn = dp_fedavg._build_dataset_reduce_fn(simulation)
+    self.assertIs(dataset_reduce_fn, reduce_fn)
+    ds = tf.data.Dataset.range(10, output_type=tf.int32)
+    total_sum = dataset_reduce_fn(
+        reduce_fn=lambda x, y: x + y, dataset=ds, initial_state_fn=lambda: 0)
+    self.assertEqual(total_sum, np.int32(45))
+
+  @parameterized.named_parameters(
+      ('non-simulation', False, dp_fedavg._dataset_reduce_fn),
+      ('simulation', True, dp_fedavg._for_iter_dataset_fn))
+  def test_build_dataset_reduce_fn_float(self, simulation, reduce_fn):
+    dataset_reduce_fn = dp_fedavg._build_dataset_reduce_fn(simulation)
+    self.assertIs(dataset_reduce_fn, reduce_fn)
+    ds = tf.data.Dataset.range(
+        10, output_type=tf.float32).map(lambda x: 0.1 * x)
+    total_sum = dataset_reduce_fn(
+        reduce_fn=lambda x, y: x + y, dataset=ds, initial_state_fn=lambda: 0.)
+    self.assertEqual(total_sum, np.float32(4.5))
+
+  @parameterized.named_parameters(
+      ('non-simulation', False, dp_fedavg._dataset_reduce_fn),
+      ('simulation', True, dp_fedavg._for_iter_dataset_fn))
+  def test_build_dataset_reduce_fn_tuple(self, simulation, reduce_fn):
+    dataset_reduce_fn = dp_fedavg._build_dataset_reduce_fn(simulation)
+    self.assertIs(dataset_reduce_fn, reduce_fn)
+    ds = tf.data.Dataset.range(
+        10, output_type=tf.float32).map(lambda x: 0.1 * x)
+    total_cnt, total_sum = dataset_reduce_fn(
+        reduce_fn=lambda x, y: (x[0] + 1, x[1] + y),
+        dataset=ds,
+        initial_state_fn=lambda: (tf.constant(0), tf.constant(0.1)))
+    self.assertEqual(total_cnt, np.float32(10))
+    self.assertEqual(total_sum, np.float32(4.6))
 
 
 if __name__ == '__main__':
