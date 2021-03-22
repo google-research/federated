@@ -327,7 +327,7 @@ def build_iterative_process(
     optimizer_aggregation: AggregationType = 'mean',
     client_model_weight_fn: Optional[ClientWeightFn] = None,
     client_opt_weight_fn: Optional[ClientWeightFn] = None,
-) -> tff.templates.IterativeProcess:
+) -> tff.templates.IterativeProcess:  # pytype: disable=annotation-type-mismatch
   """Builds an iterative process for FedAvg with client optimizer aggregation.
 
   This version of FedAvg allows user-selected `tf.keras.Optimizers` on both
