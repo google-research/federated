@@ -32,7 +32,7 @@ class TriehhTffTest(hh_test.HeavyHittersTest):
 
     client_ids = list(range(size))
 
-    return tff.simulation.ClientData.from_clients_and_fn(
+    return tff.simulation.datasets.ClientData.from_clients_and_fn(
         client_ids=client_ids,
         create_tf_dataset_for_client_fn=create_dataset_fn)
 

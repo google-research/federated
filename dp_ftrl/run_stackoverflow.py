@@ -202,7 +202,7 @@ def _client_optimizer_fn(name, learning_rate):
 
 def _sample_client_ids(
     num_clients: int,
-    client_data: tff.simulation.ClientData,
+    client_data: tff.simulation.datasets.ClientData,
     round_num: int,
     epoch: int,
 ) -> Tuple[List, int]:  # pylint: disable=g-bare-generic

@@ -148,7 +148,8 @@ def get_federated_datasets(
     train_shuffle_buffer_size: int = 50,
     test_shuffle_buffer_size: int = 1,
     sequence_length: int = SEQUENCE_LENGTH
-) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
+) -> Tuple[tff.simulation.datasets.ClientData,
+           tff.simulation.datasets.ClientData]:
   """Loads and preprocesses federated Shakespeare datasets.
 
   Args:
@@ -171,8 +172,9 @@ def get_federated_datasets(
       client datasets.
 
   Returns:
-    A tuple (shakespeare_train, shakespeare_test) of `tff.simulation.ClientData`
-    instances representing the federated training and test datasets.
+    A tuple (shakespeare_train, shakespeare_test) of
+    `tff.simulation.datasets.ClientData` instances representing the federated
+    training and test datasets.
   """
   if train_client_epochs_per_round < 1:
     raise ValueError(

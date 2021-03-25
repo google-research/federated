@@ -318,7 +318,7 @@ def build_sample_fn(
 
 
 def build_client_datasets_fn(
-    dataset: tff.simulation.ClientData,
+    dataset: tff.simulation.datasets.ClientData,
     clients_per_round: int,
     random_seed: Optional[int] = None
 ) -> Callable[[int], List[tf.data.Dataset]]:
@@ -328,7 +328,7 @@ def build_client_datasets_fn(
   round, but with replacement across rounds) and returns their datasets.
 
   Args:
-    dataset: A `tff.simulation.ClientData` object.
+    dataset: A `tff.simulation.datasets.ClientData` object.
     clients_per_round: The number of client participants in each round.
     random_seed: If random_seed is set as an integer, then we use it as a random
       seed for which clients are sampled at each round. In this case, we set a

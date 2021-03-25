@@ -28,7 +28,7 @@ CSVS_BASE_PATH = 'gans/csvs/'
 
 @functools.lru_cache(maxsize=1)
 def get_unfiltered_client_data_for_training(batch_size):
-  r"""Returns `tff.simulation.ClientData` of unfiltered Federated EMNIST data.
+  r"""Returns `tff.simulation.datasets.ClientData` of unfiltered Federated EMNIST data.
 
   The data returned will neither be filtered by user nor by example, so training
   can take place with all users and all examples for each user.
@@ -37,7 +37,8 @@ def get_unfiltered_client_data_for_training(batch_size):
     batch_size: Batch size of output dataset. If None, don't batch.
 
   Returns:
-    A tff.simulation.ClientData` of real images of numbers/letters. The data has
+    A tff.simulation.datasets.ClientData` of real images of numbers/letters. The
+    data has
     not been filtered.
   """
   return get_filtered_client_data_for_training(None, None, batch_size)
@@ -48,7 +49,7 @@ def get_filtered_by_user_client_data_for_training(invert_imagery_probability,
                                                   accuracy_threshold,
                                                   batch_size,
                                                   cache_dir=None):
-  r"""Returns `tff.simulation.ClientData` of filtered Federated EMNIST data.
+  r"""Returns `tff.simulation.datasets.ClientData` of filtered Federated EMNIST data.
 
   Input data gets filtered on a per-user basis; users get selected via the
   `accuracy_threshold` criterion, and then training can take place with all
@@ -73,7 +74,8 @@ def get_filtered_by_user_client_data_for_training(invert_imagery_probability,
       caches in Keras' default cache directory.
 
   Returns:
-    A tff.simulation.ClientData` of real images of numbers/letters. The data has
+    A tff.simulation.datasets.ClientData` of real images of numbers/letters. The
+    data has
     been filtered by user classification accuracy as per the input arguments.
   """
   path_to_data = os.path.join(CSVS_BASE_PATH,
@@ -108,7 +110,7 @@ def get_filtered_by_example_client_data_for_training(invert_imagery_probability,
                                                      example_class_selection,
                                                      batch_size,
                                                      cache_dir=None):
-  r"""Returns `tff.simulation.ClientData` of filtered Federated EMNIST data.
+  r"""Returns `tff.simulation.datasets.ClientData` of filtered Federated EMNIST data.
 
   Input data gets filtered on a per-example basis. Any user meeting the
   `min_num_examples` criterion is included. The examples are limited to those
@@ -135,7 +137,8 @@ def get_filtered_by_example_client_data_for_training(invert_imagery_probability,
       caches in Keras' default cache directory.
 
   Returns:
-    A `tff.simulation.ClientData` of real images of numbers/letters. The data
+    A `tff.simulation.datasets.ClientData` of real images of numbers/letters.
+    The data
     has been filtered as per the input arguments (either not filtered, filtered
     by user classification accuracy, or filtered by example classification
     correctness).
@@ -215,7 +218,8 @@ def get_filtered_client_data_for_training(path_to_read_inversions_csv,
         shuffle=True,
         repeat=False)
 
-  return tff.simulation.ClientData.from_clients_and_fn(client_ids, _get_dataset)
+  return tff.simulation.datasets.ClientData.from_clients_and_fn(
+      client_ids, _get_dataset)
 
 
 def _filter_by_example(raw_ds, client_ids_example_indices_map, client_id):

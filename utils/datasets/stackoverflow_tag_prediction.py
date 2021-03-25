@@ -154,7 +154,8 @@ def get_federated_datasets(
     max_elements_per_test_client: int = -1,
     train_shuffle_buffer_size: int = 10000,
     test_shuffle_buffer_size: int = 1
-) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
+) -> Tuple[tff.simulation.datasets.ClientData,
+           tff.simulation.datasets.ClientData]:
   """Loads federated Stack Overflow tag prediction datasts.
 
   This function returns preprocessed versions of the training and test splits
@@ -192,8 +193,8 @@ def get_federated_datasets(
 
   Returns:
     A tuple (stackoverflow_train, stackoverflow_test) of
-    `tff.simulation.ClientData` instances representing the federated training
-    and test datasets.
+    `tff.simulation.datasets.ClientData` instances representing the federated
+    training and test datasets.
   """
   if word_vocab_size <= 0:
     raise ValueError('word_vocab_size must be a positive integer; you have '

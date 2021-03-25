@@ -35,7 +35,8 @@ TEST_EXAMPLES_PER_LABEL = 1000
 def load_cifar10_federated(
     dirichlet_parameter: float = 1,
     num_clients: int = 10,
-) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
+) -> Tuple[tff.simulation.datasets.ClientData,
+           tff.simulation.datasets.ClientData]:
   """Construct a federated dataset from the centralized CIFAR-10.
 
   Sampling based on Dirichlet distribution over categories, following the paper
@@ -53,7 +54,7 @@ def load_cifar10_federated(
       on.
 
   Returns:
-    A tuple of `tff.simulation.ClientData` representing unpreprocessed
+    A tuple of `tff.simulation.datasets.ClientData` representing unpreprocessed
     train data and test data.
   """
   train_images, train_labels = tfds.as_numpy(
@@ -146,10 +147,10 @@ def load_cifar10_federated(
     test_data = collections.OrderedDict((('image', x_test), ('label', y_test)))
     test_clients[client_name] = test_data
 
-  train_dataset = tff.simulation.ClientData.from_clients_and_fn(
+  train_dataset = tff.simulation.datasets.ClientData.from_clients_and_fn(
       [str(i) for i in range(num_clients)],
       lambda client: tf.data.Dataset.from_tensor_slices(train_clients[client]))
-  test_dataset = tff.simulation.ClientData.from_clients_and_fn(
+  test_dataset = tff.simulation.datasets.ClientData.from_clients_and_fn(
       [str(i) for i in range(num_clients)],
       lambda client: tf.data.Dataset.from_tensor_slices(test_clients[client]))
 
@@ -289,8 +290,8 @@ def get_federated_datasets(train_client_batch_size: int = 20,
       transformations will be disallowed.
 
   Returns:
-    A tuple (cifar_train, cifar_test) of `tff.simulation.ClientData` instances
-      representing the federated training and test datasets.
+    A tuple (cifar_train, cifar_test) of `tff.simulation.datasets.ClientData`
+    instances representing the federated training and test datasets.
   """
   if not isinstance(crop_shape, collections.abc.Iterable):
     raise TypeError('Argument crop_shape must be an iterable.')

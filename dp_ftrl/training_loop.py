@@ -277,7 +277,7 @@ class ClientIDShuffler(object):
   """Shuffling clients in federated learning for DP-FTRL."""
 
   def __init__(self, clients_per_round: int,
-               client_data: tff.simulation.ClientData):
+               client_data: tff.simulation.datasets.ClientData):
     self._client_ids = list(client_data.client_ids)
     self._clients_per_round = clients_per_round
     self._epoch = 0

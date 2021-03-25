@@ -692,7 +692,7 @@ class TriehhTfTest(hh_test.HeavyHittersTest):
 
     client_ids = list(range(100))
 
-    client_data = tff.simulation.ClientData.from_clients_and_fn(
+    client_data = tff.simulation.datasets.ClientData.from_clients_and_fn(
         client_ids=client_ids,
         create_tf_dataset_for_client_fn=create_dataset_fn)
 
@@ -766,7 +766,7 @@ class TriehhTfTest(hh_test.HeavyHittersTest):
 
     client_ids = list(range(100))
 
-    client_data = tff.simulation.ClientData.from_clients_and_fn(
+    client_data = tff.simulation.datasets.ClientData.from_clients_and_fn(
         client_ids=client_ids,
         create_tf_dataset_for_client_fn=create_dataset_fn)
 

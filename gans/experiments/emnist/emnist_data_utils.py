@@ -24,7 +24,7 @@ SHUFFLE_BUFFER = 10000
 
 @functools.lru_cache(maxsize=1)
 def create_real_images_tff_client_data(split='train', num_pseudo_clients=1):
-  """Returns `tff.simulation.ClientData` of real images of numbers/letters."""
+  """Returns `tff.simulation.datasets.ClientData` of real images of numbers/letters."""
 
   if split == 'synthetic':
     return tff.simulation.datasets.emnist.get_infinite(

@@ -205,7 +205,8 @@ def get_federated_datasets(
     test_shuffle_buffer_size: int = 1,
     train_transform: Optional[Callable[[str, int], Callable[[Any],
                                                             Any]]] = None,
-) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
+) -> Tuple[tff.simulation.datasets.ClientData,
+           tff.simulation.datasets.ClientData]:
   """Loads federated Stack Overflow next-word prediction datasets.
 
   This function ignores the heldout Stack Overflow dataset for consistency with
@@ -244,8 +245,8 @@ def get_federated_datasets(
 
   Returns:
     A tuple (stackoverflow_train, stackoverflow_test) of
-    `tff.simulation.ClientData` instances representing the federated training
-    and test datasets.
+    `tff.simulation.datasets.ClientData` instances representing the federated
+    training and test datasets.
   """
   if vocab_size <= 0:
     raise ValueError('vocab_size must be a positive integer; you have '
@@ -259,7 +260,7 @@ def get_federated_datasets(
    stackoverflow_test) = tff.simulation.datasets.stackoverflow.load_data()
 
   if train_transform:
-    stackoverflow_train = tff.simulation.TransformingClientData(
+    stackoverflow_train = tff.simulation.datasets.TransformingClientData(
         stackoverflow_train, train_transform)
 
   vocab = create_vocab(vocab_size)

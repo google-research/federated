@@ -46,7 +46,7 @@ def build_scheduled_client_datasets_fn(train_dataset,
   """Builds the function for generating client datasets at each round.
 
   Args:
-    train_dataset: A `tff.simulation.ClientData` object.
+    train_dataset: A `tff.simulation.datasets.ClientData` object.
     clients_per_round: The number of client participants in each round.
     client_batch_size: An integer, the batch size on the clients.
     client_epochs_per_round: An integer, the number of local client epochs.
@@ -69,8 +69,8 @@ def build_scheduled_client_datasets_fn(train_dataset,
     ValueError: If epochs_decrease_amount is not a nonnegative integer.
 
   Returns:
-    A function which returns a list of `tff.simulation.ClientData` objects at a
-    given round round_num.
+    A function which returns a list of `tff.simulation.datasets.ClientData`
+    objects at a given round round_num.
   """
 
   if not isinstance(batch_growth_factor, int) or batch_growth_factor < 0:

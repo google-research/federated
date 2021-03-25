@@ -97,7 +97,8 @@ def get_federated_datasets(
     test_shuffle_buffer_size: int = 1,
     only_digits: bool = False,
     emnist_task: str = 'digit_recognition'
-) -> Tuple[tff.simulation.ClientData, tff.simulation.ClientData]:
+) -> Tuple[tff.simulation.datasets.ClientData,
+           tff.simulation.datasets.ClientData]:
   """Loads and preprocesses federated EMNIST training and testing sets.
 
   Args:
@@ -126,8 +127,8 @@ def get_federated_datasets(
       elements are mapped to tuples of the form (pixels, pixels).
 
   Returns:
-    A tuple (emnist_train, emnist_test) of `tff.simulation.ClientData` instances
-      representing the federated training and test datasets.
+    A tuple (emnist_train, emnist_test) of `tff.simulation.datasets.ClientData`
+    instances representing the federated training and test datasets.
   """
 
   if train_client_epochs_per_round < 1:

@@ -46,7 +46,7 @@ def shakespeare_deterministic_sampler(data):
   """Returns a deterministic sample.
 
   Args:
-    data: a tff.simulation.ClientData object.
+    data: a tff.simulation.datasets.ClientData object.
 
   Returns:
     list of tf.data.Datasets.

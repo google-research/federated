@@ -95,9 +95,9 @@ class FederatedDatasetTest(tf.test.TestCase):
     # objects we desired are used.
     #
     # The correctness of the preprocessing function is tested in other tests.
-    mock_train = mock.create_autospec(tff.simulation.ClientData)
-    mock_validation = mock.create_autospec(tff.simulation.ClientData)
-    mock_test = mock.create_autospec(tff.simulation.ClientData)
+    mock_train = mock.create_autospec(tff.simulation.datasets.ClientData)
+    mock_validation = mock.create_autospec(tff.simulation.datasets.ClientData)
+    mock_test = mock.create_autospec(tff.simulation.datasets.ClientData)
     mock_load_data.return_value = (mock_train, mock_validation, mock_test)
     # Return a factor word dictionary.
     mock_load_word_counts.return_value = collections.OrderedDict(a=1)
@@ -146,13 +146,13 @@ class CentralizedDatasetTest(tf.test.TestCase):
     # The correctness of the preprocessing function is tested in other tests.
     sample_ds = tf.data.Dataset.from_tensor_slices(TEST_DATA)
 
-    mock_train = mock.create_autospec(tff.simulation.ClientData)
+    mock_train = mock.create_autospec(tff.simulation.datasets.ClientData)
     mock_train.create_tf_dataset_from_all_clients = mock.Mock(
         return_value=sample_ds)
 
-    mock_validation = mock.create_autospec(tff.simulation.ClientData)
+    mock_validation = mock.create_autospec(tff.simulation.datasets.ClientData)
 
-    mock_test = mock.create_autospec(tff.simulation.ClientData)
+    mock_test = mock.create_autospec(tff.simulation.datasets.ClientData)
     mock_test.create_tf_dataset_from_all_clients = mock.Mock(
         return_value=sample_ds)
 
