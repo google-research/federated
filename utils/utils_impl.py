@@ -152,9 +152,15 @@ def atomic_read_from_csv(csv_file):
   Returns:
     A `pandas.Dataframe`.
   """
+  if csv_file.endswith('.bz2'):
+    file_open_mode = 'rb'
+    compression = 'bz2'
+  else:
+    file_open_mode = 'r'
+    compression = None
   return pd.read_csv(
-      tf.io.gfile.GFile(csv_file, mode='rb'),
-      compression='bz2' if csv_file.endswith('.bz2') else None,
+      tf.io.gfile.GFile(csv_file, mode=file_open_mode),
+      compression=compression,
       engine='c',
       index_col=0)
 
