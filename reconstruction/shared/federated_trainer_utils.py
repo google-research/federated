@@ -38,7 +38,7 @@ def build_list_sample_fn(a: Union[Sequence[Any], int],
 
   Note that round number is ignored here. For more sophosticated (seeded)
   sampling that remains consistently seeded across rounds, see
-  `training_utils.build_sample_fn`.
+  `tff.simulation.build_uniform_sampling_fn`.
 
   Args:
     a: A 1-D array-like sequence or int that satisfies np.random.choice.
@@ -68,12 +68,13 @@ def build_eval_fn(
     evaluation_computation: A `tff.Computation` performing evaluation.
     client_datasets_fn: A function taking in an integer round number and
       returning the expected input of `evaluation_computation`. See
-      `training_utils.build_client_datasets_fn` for an example. For evaluation,
-      the round number passed is always 0, so this function should typically
-      return a different result each time it is called with the same argument,
-      e.g. if it is sampling a subset of users from the evaluation set.
-    get_model: A callable accepting the current server state, and returning
-      a `tff.learning.ModelWeights` to be used for evaluation.
+      `tff.simulation.build_uniform_client_sampling_fn` for an example. For
+      evaluation, the round number passed is always 0, so this function should
+      typically return a different result each time it is called with the same
+      argument, e.g. if it is sampling a subset of users from the evaluation
+      set.
+    get_model: A callable accepting the current server state, and returning a
+      `tff.learning.ModelWeights` to be used for evaluation.
 
   Returns:
     An evaluation function accepting as input a `tff.learning.ModelWeights` and

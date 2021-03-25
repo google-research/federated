@@ -175,7 +175,7 @@ def run_experiment():
       emnist_train.client_ids[0])
   input_spec = example_dataset.element_spec
 
-  client_datasets_fn = training_utils.build_client_datasets_fn(
+  client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
       emnist_train, FLAGS.clients_per_round)
 
   evaluate_fn = training_utils.build_centralized_evaluate_fn(

@@ -116,7 +116,7 @@ def run_federated(
 
   training_process = iterative_process_builder(tff_model_fn, client_weight_fn)
 
-  client_datasets_fn = training_utils.build_client_datasets_fn(
+  client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
       dataset=cifar_train,
       clients_per_round=clients_per_round,
       random_seed=client_datasets_random_seed)

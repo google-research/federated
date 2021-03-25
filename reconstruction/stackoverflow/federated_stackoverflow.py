@@ -24,7 +24,6 @@ from reconstruction.shared import federated_trainer_utils
 from reconstruction.stackoverflow import models
 from reconstruction.stackoverflow import stackoverflow_dataset
 from utils import training_loop
-from utils import training_utils
 from utils.datasets import stackoverflow_word_prediction
 
 
@@ -236,11 +235,11 @@ def run_federated(
     test_clientdata = test_clientdata.preprocess(dataset_preprocess_comp)
 
     # Create client sampling functions for each of train/val/test.
-    train_client_datasets_fn = training_utils.build_client_datasets_fn(
+    train_client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
         train_clientdata, clients_per_round=clients_per_round)
-    val_client_datasets_fn = training_utils.build_client_datasets_fn(
+    val_client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
         validation_clientdata, clients_per_round=clients_per_round)
-    test_client_datasets_fn = training_utils.build_client_datasets_fn(
+    test_client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
         test_clientdata, clients_per_round=clients_per_round)
 
   # Create final evaluation functions to pass to `training_loop`.

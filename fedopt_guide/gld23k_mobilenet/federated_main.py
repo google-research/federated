@@ -150,7 +150,7 @@ def run_federated(
   else:
     trainer.get_model_weights = training_process.get_model_weights
 
-  client_ids_fn = training_utils.build_sample_fn(
+  client_ids_fn = tff.simulation.build_uniform_sampling_fn(
       train_data.client_ids,
       size=clients_per_round,
       replace=False,

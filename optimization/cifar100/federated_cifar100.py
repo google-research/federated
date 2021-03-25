@@ -86,7 +86,7 @@ def configure_training(
 
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
       build_train_dataset_from_client_id, iterative_process)
-  client_ids_fn = training_utils.build_sample_fn(
+  client_ids_fn = tff.simulation.build_uniform_sampling_fn(
       cifar_train.client_ids,
       size=task_spec.clients_per_round,
       replace=False,

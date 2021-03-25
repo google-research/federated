@@ -195,7 +195,7 @@ def run_federated(
 
     training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
         train_dataset_computation, iterative_process)
-    client_ids_fn = training_utils.build_sample_fn(
+    client_ids_fn = tff.simulation.build_uniform_sampling_fn(
         train_clientdata.client_ids,
         size=clients_per_round,
         replace=False,
@@ -206,7 +206,7 @@ def run_federated(
   else:
     training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
         train_dataset_preprocess_comp, iterative_process)
-    client_sampling_fn = training_utils.build_client_datasets_fn(
+    client_sampling_fn = tff.simulation.build_uniform_client_sampling_fn(
         dataset=train_clientdata,
         clients_per_round=clients_per_round,
         random_seed=client_datasets_random_seed)

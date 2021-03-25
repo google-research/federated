@@ -32,7 +32,6 @@ py_library(
         "//optimization/shared:keras_metrics",
         "//reconstruction/shared:federated_trainer_utils",
         "//utils:training_loop",
-        "//utils:training_utils",
         "//utils/datasets:stackoverflow_word_prediction",
     ],
 )
