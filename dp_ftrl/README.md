@@ -2,11 +2,12 @@
 
 ## Overview
 
-Implements and experiments with DP-FTRLM (momentum variant of differential
+Implements and experiments with DP-FTRLM (momentum variant of differentially
 private follow-the-regularized-leader) in federated learning. See "Practical and
 Private (Deep) Learning without Sampling or Shuffling"
 ([arXiv link](https://arxiv.org/abs/2103.00039)) for algorithmic details. The
-code in this folder is used for the StackOverflow experiments in the paper.
+code in this folder is for the StackOverflow federated learning (FL) experiments
+in the paper.
 
 This folder is organized as following,
 
