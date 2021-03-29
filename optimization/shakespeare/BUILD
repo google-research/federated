@@ -23,7 +23,6 @@ py_library(
     deps = [
         "//optimization/shared:keras_metrics",
         "//optimization/shared:training_specs",
-        "//utils:training_utils",
         "//utils/datasets:shakespeare_dataset",
         "//utils/models:shakespeare_models",
     ],

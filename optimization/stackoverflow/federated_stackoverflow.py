@@ -20,7 +20,6 @@ import tensorflow_federated as tff
 
 from optimization.shared import keras_metrics
 from optimization.shared import training_specs
-from utils import training_utils
 from utils.datasets import stackoverflow_word_prediction
 from utils.models import stackoverflow_models
 
@@ -143,28 +142,17 @@ def configure_training(
 
   training_process.get_model_weights = iterative_process.get_model_weights
 
-  centralized_validation_fn = training_utils.build_centralized_evaluate_fn(
-      model_builder=model_builder,
-      eval_dataset=validation_dataset,
-      loss_builder=loss_builder,
-      metrics_builder=metrics_builder)
+  evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
 
-  def validation_fn(server_state, round_num):
+  def validation_fn(state, round_num):
     del round_num
-    return centralized_validation_fn(
-        iterative_process.get_model_weights(server_state))
+    return evaluate_fn(
+        iterative_process.get_model_weights(state), [validation_dataset])
 
-  centralized_test_fn = training_utils.build_centralized_evaluate_fn(
-      model_builder=model_builder,
-      # Use both val and test for symmetry with other experiments, which
-      # evaluate on the entire test set.
-      eval_dataset=validation_dataset.concatenate(test_dataset),
-      loss_builder=loss_builder,
-      metrics_builder=metrics_builder)
-
-  def test_fn(server_state):
-    return centralized_test_fn(
-        iterative_process.get_model_weights(server_state))
+  def test_fn(state):
+    return evaluate_fn(
+        iterative_process.get_model_weights(state),
+        [validation_dataset.concatenate(test_dataset)])
 
   return training_specs.RunnerSpec(
       iterative_process=training_process,

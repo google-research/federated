@@ -23,7 +23,6 @@ py_library(
     deps = [
         "//optimization/shared:keras_metrics",
         "//optimization/shared:training_specs",
-        "//utils:training_utils",
         "//utils/datasets:stackoverflow_word_prediction",
         "//utils/models:stackoverflow_models",
     ],

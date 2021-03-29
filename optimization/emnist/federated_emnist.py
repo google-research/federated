@@ -19,7 +19,6 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from optimization.shared import training_specs
-from utils import training_utils
 from utils.datasets import emnist_dataset
 from utils.models import emnist_models
 
@@ -97,18 +96,16 @@ def configure_training(task_spec: training_specs.TaskSpec,
 
   training_process.get_model_weights = iterative_process.get_model_weights
 
-  centralized_eval_fn = training_utils.build_centralized_evaluate_fn(
-      eval_dataset=emnist_test,
-      model_builder=model_builder,
-      loss_builder=loss_builder,
-      metrics_builder=metrics_builder)
+  evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
 
   def test_fn(state):
-    return centralized_eval_fn(iterative_process.get_model_weights(state))
+    return evaluate_fn(
+        iterative_process.get_model_weights(state), [emnist_test])
 
   def validation_fn(state, round_num):
     del round_num
-    return test_fn(state)
+    return evaluate_fn(
+        iterative_process.get_model_weights(state), [emnist_test])
 
   return training_specs.RunnerSpec(
       iterative_process=training_process,

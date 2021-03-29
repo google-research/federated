@@ -21,7 +21,6 @@ py_library(
     srcs_version = "PY3",
     deps = [
         "//optimization/shared:training_specs",
-        "//utils:training_utils",
         "//utils/datasets:cifar100_dataset",
         "//utils/models:resnet_models",
     ],

@@ -21,7 +21,6 @@ py_library(
     srcs_version = "PY3",
     deps = [
         "//optimization/shared:training_specs",
-        "//utils:training_utils",
         "//utils/datasets:stackoverflow_tag_prediction",
         "//utils/models:stackoverflow_lr_models",
     ],
