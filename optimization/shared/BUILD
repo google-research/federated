@@ -5,21 +5,6 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])
 
 py_library(
-    name = "evaluation",
-    srcs = ["evaluation.py"],
-    srcs_version = "PY3",
-)
-
-py_test(
-    name = "evaluation_test",
-    size = "medium",
-    srcs = ["evaluation_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":evaluation"],
-)
-
-py_library(
     name = "fed_avg_client_opt",
     srcs = ["fed_avg_client_opt.py"],
     srcs_version = "PY3",
@@ -102,21 +87,6 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [":optimizer_utils"],
-)
-
-py_library(
-    name = "schedule_utils",
-    srcs = ["schedule_utils.py"],
-    srcs_version = "PY3",
-)
-
-py_test(
-    name = "schedule_utils_test",
-    size = "small",
-    srcs = ["schedule_utils_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":schedule_utils"],
 )
 
 py_library(
