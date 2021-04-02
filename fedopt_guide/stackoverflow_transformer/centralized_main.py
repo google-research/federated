@@ -30,9 +30,9 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
                     lr_decay: Optional[float] = None,
                     vocab_size: int = 10000,
                     num_oov_buckets: int = 1,
-                    d_embed: int = 96,
-                    d_model: int = 512,
-                    d_hidden: int = 2048,
+                    dim_embed: int = 96,
+                    dim_model: int = 512,
+                    dim_hidden: int = 2048,
                     num_heads: int = 8,
                     num_layers: int = 1,
                     max_position_encoding: int = 1000,
@@ -55,9 +55,9 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
       training epochs have occurred.
     vocab_size: Vocab size for normal tokens.
     num_oov_buckets: Number of out of vocabulary buckets.
-    d_embed: Dimension of the token embeddings.
-    d_model: Dimension of features of MultiHeadAttention layers.
-    d_hidden: Dimension of hidden layers of the FFN.
+    dim_embed: Dimension of the token embeddings.
+    dim_model: Dimension of features of MultiHeadAttention layers.
+    dim_hidden: Dimension of hidden layers of the FFN.
     num_heads: Number of attention heads.
     num_layers: Number of Transformer blocks.
     max_position_encoding: Maximum number of positions for position embeddings.
@@ -92,9 +92,9 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
   model = transformer_models.create_transformer_lm(
       vocab_size=vocab_size,
       num_oov_buckets=num_oov_buckets,
-      d_embed=d_embed,
-      d_model=d_model,
-      d_hidden=d_hidden,
+      dim_embed=dim_embed,
+      dim_model=dim_model,
+      dim_hidden=dim_hidden,
       num_heads=num_heads,
       num_layers=num_layers,
       max_position_encoding=max_position_encoding,
@@ -131,4 +131,3 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
       hparams_dict=hparams_dict,
       decay_epochs=decay_epochs,
       lr_decay=lr_decay)
-

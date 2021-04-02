@@ -57,11 +57,10 @@ with utils_impl.record_hparam_flags() as training_flags:
 with utils_impl.record_hparam_flags() as transformer_flags:
   flags.DEFINE_integer('vocab_size', 10000,
                        'Vocab size for normal tokens.')
-  flags.DEFINE_integer('d_embed', 96,
-                       'Dimension of the token embeddings.')
-  flags.DEFINE_integer('d_model', 512,
+  flags.DEFINE_integer('dim_embed', 96, 'Dimension of the token embeddings.')
+  flags.DEFINE_integer('dim_model', 512,
                        'Dimension of features of MultiHeadAttention layers.')
-  flags.DEFINE_integer('d_hidden', 2048,
+  flags.DEFINE_integer('dim_hidden', 2048,
                        'Dimension of hidden layers of the FFN.')
   flags.DEFINE_integer('num_heads', 8,
                        'Number of attention heads.')
@@ -133,9 +132,9 @@ def main(argv):
       max_elements_per_user=FLAGS.max_elements_per_user,
       total_rounds=FLAGS.total_rounds,
       vocab_size=FLAGS.vocab_size,
-      d_embed=FLAGS.d_embed,
-      d_model=FLAGS.d_model,
-      d_hidden=FLAGS.d_hidden,
+      dim_embed=FLAGS.dim_embed,
+      dim_model=FLAGS.dim_model,
+      dim_hidden=FLAGS.dim_hidden,
       num_heads=FLAGS.num_heads,
       num_layers=FLAGS.num_layers,
       dropout=FLAGS.dropout,

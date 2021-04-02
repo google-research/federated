@@ -253,9 +253,9 @@ class TransformerLM(tf.keras.layers.Layer):
 
 def create_transformer_lm(vocab_size: int = 10000,
                           num_oov_buckets: int = 1,
-                          d_embed: int = 96,
-                          d_model: int = 512,
-                          d_hidden: int = 2048,
+                          dim_embed: int = 96,
+                          dim_model: int = 512,
+                          dim_hidden: int = 2048,
                           num_heads: int = 8,
                           num_layers: int = 1,
                           max_position_encoding: int = 1000,
@@ -266,9 +266,9 @@ def create_transformer_lm(vocab_size: int = 10000,
   Args:
     vocab_size: Vocab size for normal tokens.
     num_oov_buckets: Number of out of vocabulary buckets.
-    d_embed: Dimension of the token embeddings.
-    d_model: Dimension of features of MultiHeadAttention layers.
-    d_hidden: Dimension of hidden layers of the FFN.
+    dim_embed: Dimension of the token embeddings.
+    dim_model: Dimension of features of MultiHeadAttention layers.
+    dim_hidden: Dimension of hidden layers of the FFN.
     num_heads: Number of attention heads.
     num_layers: Number of Transformer blocks.
     max_position_encoding: Maximum number of positions for position embeddings.
@@ -287,10 +287,10 @@ def create_transformer_lm(vocab_size: int = 10000,
   inputs = tf.keras.layers.Input(shape=(None,))
   transformer = TransformerLM(
       num_layers,
-      d_embed,
-      d_model,
+      dim_embed,
+      dim_model,
       num_heads,
-      d_hidden,
+      dim_hidden,
       extended_vocab_size,
       max_position_encoding,
       dropout_rate=dropout)
