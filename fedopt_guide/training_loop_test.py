@@ -20,7 +20,6 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from fedopt_guide import training_loop
-from utils import training_utils
 
 _Batch = collections.namedtuple('Batch', ['x', 'y'])
 
@@ -83,9 +82,7 @@ def _build_federated_averaging_process():
 
 
 def _evaluation_fn():
-  metrics_builder = lambda: [tf.keras.metrics.SparseCategoricalAccuracy()]
-  fed_eval_fn = training_utils.build_federated_evaluate_fn(
-      model_builder=_keras_model_builder, metrics_builder=metrics_builder)
+  fed_eval_fn = tff.learning.build_federated_evaluation(_tff_model_fn)
   fed_data = _federated_data()
 
   def eval_fn(model, round_num):
@@ -384,8 +381,6 @@ class ExperimentRunnerTest(tf.test.TestCase):
     metrics_manager = tff.simulation.CSVMetricsManager(csv_file)
     fieldnames, metrics = metrics_manager.get_metrics()
     self.assertLen(metrics, 2)
-    self.assertIn('eval/sparse_categorical_accuracy/example_weighted',
-                  fieldnames)
     self.assertIn('test/loss', fieldnames)
 
 

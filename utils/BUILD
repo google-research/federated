@@ -67,21 +67,6 @@ py_test(
 )
 
 py_library(
-    name = "training_utils",
-    srcs = ["training_utils.py"],
-    srcs_version = "PY3",
-)
-
-py_test(
-    name = "training_utils_test",
-    size = "large",
-    srcs = ["training_utils_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":training_utils"],
-)
-
-py_library(
     name = "utils_impl",
     srcs = ["utils_impl.py"],
     srcs_version = "PY3",

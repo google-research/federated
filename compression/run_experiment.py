@@ -34,7 +34,6 @@ import tensorflow_federated as tff
 
 from compression import sparsity
 from utils import training_loop
-from utils import training_utils
 from utils import utils_impl
 from utils.datasets import emnist_dataset
 from utils.models import emnist_models
@@ -178,16 +177,6 @@ def run_experiment():
   client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
       emnist_train, FLAGS.clients_per_round)
 
-  evaluate_fn = training_utils.build_centralized_evaluate_fn(
-      eval_dataset=emnist_test,
-      model_builder=model_builder,
-      loss_builder=loss_builder,
-      metrics_builder=metrics_builder)
-
-  def validation_fn(state, round_num):
-    del round_num
-    return evaluate_fn(state.model)
-
   client_optimizer_fn = functools.partial(
       utils_impl.create_optimizer_from_flags, 'client')
   server_optimizer_fn = functools.partial(
@@ -200,6 +189,12 @@ def run_experiment():
         input_spec=input_spec,
         loss=loss_builder(),
         metrics=metrics_builder())
+
+  evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
+
+  def validation_fn(state, round_num):
+    del round_num
+    return evaluate_fn(state.model, [emnist_test])
 
   if FLAGS.use_compression:
     # We create a `MeasuredProcess` for broadcast process and a

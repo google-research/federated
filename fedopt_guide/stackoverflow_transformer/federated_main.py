@@ -23,7 +23,6 @@ import tensorflow_federated as tff
 from fedopt_guide import training_loop
 from fedopt_guide.stackoverflow_transformer import transformer_models
 from optimization.shared import keras_metrics
-from utils import training_utils
 from utils.datasets import stackoverflow_word_prediction
 
 
@@ -213,21 +212,15 @@ def run_federated(iterative_process_builder: Callable[
 
   training_process.get_model_weights = iterative_process.get_model_weights
 
-  evaluate_fn = training_utils.build_centralized_evaluate_fn(
-      model_builder=model_builder,
-      eval_dataset=validation_dataset,
-      loss_builder=loss_builder,
-      metrics_builder=metrics_builder)
+  evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
 
-  validation_fn = lambda model_weights, round_num: evaluate_fn(model_weights)
+  def validation_fn(model_weights, round_num):
+    del round_num
+    return evaluate_fn(model_weights, [validation_dataset])
 
-  test_fn = training_utils.build_centralized_evaluate_fn(
-      model_builder=model_builder,
-      # Use both val and test for symmetry with other experiments, which
-      # evaluate on the entire test set.
-      eval_dataset=validation_dataset.concatenate(test_dataset),
-      loss_builder=loss_builder,
-      metrics_builder=metrics_builder)
+  def test_fn(model_weights):
+    return evaluate_fn(model_weights,
+                       [validation_dataset.concatenate(test_dataset)])
 
   logging.info('Training model:')
   logging.info(model_builder().summary())

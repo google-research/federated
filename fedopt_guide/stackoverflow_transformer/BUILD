@@ -71,7 +71,6 @@ py_library(
         ":transformer_models",
         "//fedopt_guide:training_loop",
         "//optimization/shared:keras_metrics",
-        "//utils:training_utils",
         "//utils/datasets:stackoverflow_word_prediction",
     ],
 )

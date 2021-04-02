@@ -17,8 +17,5 @@ py_test(
     srcs = ["training_loop_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    deps = [
-        "//fedopt_guide:training_loop",
-        "//utils:training_utils",
-    ],
+    deps = ["//fedopt_guide:training_loop"],
 )

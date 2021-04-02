@@ -21,7 +21,6 @@ import tensorflow_federated as tff
 from fedopt_guide import training_loop
 from fedopt_guide.gld23k_mobilenet import dataset
 from fedopt_guide.gld23k_mobilenet import mobilenet_v2
-from utils import training_utils
 
 
 def run_federated(
@@ -159,11 +158,14 @@ def run_federated(
   # be used as input to the iterative process.
   client_ids_fn_as_list = lambda x: list(client_ids_fn(x))
 
-  evaluate_fn = training_utils.build_centralized_evaluate_fn(
-      model_builder=model_builder,
-      eval_dataset=test_data,
-      loss_builder=loss_builder,
-      metrics_builder=metrics_builder)
+  evaluate_fn = tff.learning.build_federated_evaluation(model_fn)
+
+  def validation_fn(model_weights, round_num):
+    del round_num
+    return evaluate_fn(model_weights, [test_data])
+
+  def test_fn(model_weights):
+    return evaluate_fn(model_weights, [test_data])
 
   logging.info('Training model:')
   logging.info(model_builder().summary())
@@ -171,8 +173,8 @@ def run_federated(
   training_loop.run(
       iterative_process=trainer,
       train_client_datasets_fn=client_ids_fn_as_list,
-      evaluation_fn=lambda model, _: evaluate_fn(model),
-      test_fn=evaluate_fn,
+      evaluation_fn=validation_fn,
+      test_fn=test_fn,
       total_rounds=total_rounds,
       experiment_name=experiment_name,
       root_output_dir=root_output_dir,

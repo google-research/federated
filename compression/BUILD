@@ -12,7 +12,6 @@ py_binary(
     deps = [
         ":sparsity",
         "//utils:training_loop",
-        "//utils:training_utils",
         "//utils:utils_impl",
         "//utils/datasets:emnist_dataset",
         "//utils/models:emnist_models",

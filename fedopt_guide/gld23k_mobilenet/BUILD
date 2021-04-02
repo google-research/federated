@@ -74,7 +74,6 @@ py_library(
         ":dataset",
         ":mobilenet_v2",
         "//fedopt_guide:training_loop",
-        "//utils:training_utils",
     ],
 )
 

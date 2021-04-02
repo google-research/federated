@@ -38,7 +38,6 @@ py_library(
     srcs_version = "PY3",
     deps = [
         "//fedopt_guide:training_loop",
-        "//utils:training_utils",
         "//utils/datasets:cifar10_dataset",
         "//utils/models:resnet_models",
     ],
