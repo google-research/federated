@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections
-import hashlib
-import string
 from unittest import mock
 
 import numpy as np
@@ -308,91 +306,6 @@ class CentralizedDatasetTest(tf.test.TestCase):
 
     # Assert the word counts were loaded once to apply to each dataset.
     mock_load_word_counts.assert_called_once()
-
-
-class SecretInsertionTest(tf.test.TestCase):
-
-  def test_secret_inserting_transform_fn(self):
-    # The built-in synthetic data is too small to ensure all random events
-    # occur. So we make a larger synthetic dataset with all random components.
-
-    num_clients = 1000
-    num_examples = 20
-
-    np.random.seed(TEST_SEED)
-
-    def random_string():
-      return ''.join(np.random.choice(list(string.ascii_uppercase), 5))
-
-    words = ['a' for _ in range(num_examples)]
-
-    def client_data():
-      return collections.OrderedDict(
-          # We hash on date to seed client randomness.
-          creation_date=[random_string() for _ in range(num_examples)],
-          score=words,
-          tags=words,
-          title=words,
-          tokens=words,
-          type=words)
-
-    data = tff.test.FromTensorSlicesClientData(
-        {random_string(): client_data() for _ in range(num_clients)})
-
-    secrets = dict(b=(500, 0.5), c=(30, 1.0), d=(1, 1.0))
-
-    transform_fn = stackoverflow_word_prediction.secret_inserting_transform_fn(
-        data.client_ids, secrets, TEST_SEED + 1)
-    transformed = tff.simulation.datasets.TransformingClientData(
-        data, transform_fn)
-
-    secret_count = {secret: 0 for secret in secrets}
-    client_with_secret_count = {secret: 0 for secret in secrets}
-
-    for client_id in transformed.client_ids:
-      client_data = transformed.create_tf_dataset_for_client(client_id)
-      has_secret = None
-      for example in client_data.enumerate():
-        tokens = example[1]['tokens'].numpy().decode('utf-8')
-        if tokens in secrets:
-          secret_count[tokens] += 1
-          has_secret = tokens
-      if has_secret:
-        client_with_secret_count[has_secret] += 1
-
-    # All selected clients should have at least one insertion, hence should
-    # be counted. The probability that there exists a client selected for secret
-    # b that doesn't have a single insertion is 1-(1-0.5^20)^500 ~ 5e-4.
-    self.assertAllEqual(500, client_with_secret_count['b'])
-    self.assertAllEqual(30, client_with_secret_count['c'])
-    self.assertAllEqual(1, client_with_secret_count['d'])
-
-    # Count of secret b is Bin(10000, 0.5) with mean 5000, stddev 50.
-    self.assertAllClose(5000, secret_count['b'], atol=150)
-    self.assertAllEqual(30 * num_examples, secret_count['c'])
-    self.assertAllEqual(num_examples, secret_count['d'])
-
-  @mock.patch(STACKOVERFLOW_MODULE + '.load_word_counts')
-  def test_make_random_secrets(self, mock_load_word_counts):
-    mock_load_word_counts.return_value = collections.OrderedDict(
-        zip(string.ascii_uppercase, range(26)))
-
-    secrets = stackoverflow_word_prediction.make_random_secrets(
-        10, 10, 5, TEST_SEED)
-    self.assertLen(secrets, 10)
-
-    allowed_tokens = set(string.ascii_uppercase[:10])
-    longhash = hashlib.md5()
-    for secret in secrets:
-      tokens = secret.split(' ')
-      self.assertLen(tokens, 5)
-      self.assertAllInSet(tokens, allowed_tokens)
-      longhash.update(secret.encode())
-
-    # Check that there is no accidental non-determinism.
-    self.assertEqual(
-        2353504054,
-        int.from_bytes(longhash.digest(), byteorder='big') % (2**32))
 
 
 if __name__ == '__main__':
