@@ -94,7 +94,7 @@ def build_fixed_clip_norm_mean_process(
         result=tff.federated_mean(clipped_deltas, weight=weights),
         measurements=tff.federated_zip(
             NormClippedAggregationMetrics(
-                max_global_norm=tff.utils.federated_max(client_norms),
+                max_global_norm=tff.aggregators.federated_max(client_norms),
                 num_clipped=tff.federated_sum(client_was_clipped),
             )))
 

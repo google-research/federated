@@ -73,12 +73,12 @@ def build_aggregator(aggregation_method):
 
     def aggregator(federated_values, weight=None):
       del weight
-      return tff.utils.federated_max(federated_values)
+      return tff.aggregators.federated_max(federated_values)
   elif aggregation_type is AggregationType.min:
 
     def aggregator(federated_values, weight=None):
       del weight
-      return tff.utils.federated_min(federated_values)
+      return tff.aggregators.federated_min(federated_values)
   else:
     raise ValueError(
         'Aggregation method {} has no associated TFF computation implemented.')
