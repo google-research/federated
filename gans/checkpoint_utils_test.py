@@ -18,7 +18,7 @@ import os.path
 import attr
 import tensorflow as tf
 
-from utils import checkpoint_utils
+from gans import checkpoint_utils
 
 
 @attr.s(frozen=True)

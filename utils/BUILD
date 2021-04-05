@@ -37,21 +37,6 @@ py_test(
 )
 
 py_library(
-    name = "checkpoint_utils",
-    srcs = ["checkpoint_utils.py"],
-    srcs_version = "PY3",
-)
-
-py_test(
-    name = "checkpoint_utils_test",
-    size = "large",
-    srcs = ["checkpoint_utils_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":checkpoint_utils"],
-)
-
-py_library(
     name = "training_loop",
     srcs = ["training_loop.py"],
     srcs_version = "PY3",
