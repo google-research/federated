@@ -73,7 +73,7 @@ with utils_impl.record_hparam_flags() as shared_flags:
                       'Root directory for writing experiment output.')
   flags.DEFINE_integer('total_rounds', 200, 'Number of total training rounds.')
   flags.DEFINE_integer(
-      'rounds_per_eval', 100,
+      'rounds_per_eval', 1,
       'How often to evaluate the global model on the validation dataset.')
   flags.DEFINE_integer('rounds_per_checkpoint', 50,
                        'How often to checkpoint the global model.')

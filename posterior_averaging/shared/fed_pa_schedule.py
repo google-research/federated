@@ -712,7 +712,7 @@ def build_server_init_fn(
 
 def build_fed_pa_process(
     model_fn: ModelBuilder,
-    client_update_epochs,
+    client_update_epochs: int,
     client_mixedin_schedule_fn: ClientMixedinScheduleFn,
     client_update_delta_fn: ClientUpdateDeltaFn,
     client_optimizer_fn: OptimizerBuilder,
@@ -726,8 +726,8 @@ def build_fed_pa_process(
 
   Args:
     model_fn: A no-arg function that returns a `tff.learning.Model`.
-    client_update_epochs: The number of update epochs to run on the client,
-      which is equivalent to the number of passes over the local dataset.
+    client_update_epochs: An inteter that represents the number of local
+      epochs to run on the clients.
     client_mixedin_schedule_fn: A function that returns a client mixed in check
       function for given round; the latter determines whether the client has
       mixed-in based on the outputs of the previous two epochs; if mixed-in,the
@@ -809,8 +809,8 @@ def build_fed_pa_process(
                                                       client_weight_type)
 
   @tff.federated_computation(
-      tff.FederatedType(server_state_type, tff.SERVER),
-      tff.FederatedType(tf_dataset_type, tff.CLIENTS))
+      tff.type_at_server(server_state_type),
+      tff.type_at_clients(tf_dataset_type))
   def run_one_round(server_state, federated_dataset):
     """Orchestration logic for one round of computation.
 
