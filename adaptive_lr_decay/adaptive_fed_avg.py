@@ -93,9 +93,11 @@ def server_update(model, server_optimizer, server_state, aggregated_gradients,
     An updated `ServerState`.
   """
   model_weights = _get_weights(model)
-  tff.utils.assign(model_weights, server_state.model)
+  tf.nest.map_structure(lambda v, t: v.assign(t), model_weights,
+                        server_state.model)
   # Server optimizer variables must be initialized prior to invoking this
-  tff.utils.assign(server_optimizer.variables(), server_state.optimizer_state)
+  tf.nest.map_structure(lambda v, t: v.assign(t), server_optimizer.variables(),
+                        server_state.optimizer_state)
 
   # Apply the update to the model. Note that we do not multiply by -1.0, since
   # we actually accumulate the client gradients.
@@ -150,7 +152,7 @@ class ClientOutput(object):
 def get_client_output(model, dataset, weights):
   """Evaluates the metrics of a client model."""
   model_weights = _get_weights(model)
-  tff.utils.assign(model_weights, weights)
+  tf.nest.map_structure(lambda v, t: v.assign(t), model_weights, weights)
   for batch in dataset:
     model.forward_pass(batch)
   return model.report_local_outputs()
@@ -179,7 +181,8 @@ def client_update(model,
   """
 
   model_weights = _get_weights(model)
-  tff.utils.assign(model_weights, initial_weights)
+  tf.nest.map_structure(lambda v, t: v.assign(t), model_weights,
+                        initial_weights)
 
   num_examples = tf.constant(0, dtype=tf.int32)
   grad_sums = tf.nest.map_structure(tf.zeros_like, model_weights.trainable)

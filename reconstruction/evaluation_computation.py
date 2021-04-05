@@ -172,7 +172,8 @@ def build_federated_reconstruction_evaluation(
           client_dataset, tf.constant(0, dtype=tf.int64))
 
       # Assign incoming global weights to `client_model` before reconstruction.
-      tff.utils.assign(client_global_weights, incoming_model_weights)
+      tf.nest.map_structure(lambda v, t: v.assign(t), client_global_weights,
+                            incoming_model_weights)
 
       recon_dataset.reduce(tf.constant(0), reconstruction_reduce_fn)
       eval_dataset.reduce(tf.constant(0), evaluation_reduce_fn)

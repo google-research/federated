@@ -128,10 +128,12 @@ class KerasModelWrapper(object):
         non_trainable=self.keras_model.non_trainable_variables)
 
   def from_weights(self, model_weights):
-    tff.utils.assign(self.keras_model.trainable_variables,
-                     list(model_weights.trainable))
-    tff.utils.assign(self.keras_model.non_trainable_variables,
-                     list(model_weights.non_trainable))
+    tf.nest.map_structure(lambda v, t: v.assign(t),
+                          self.keras_model.trainable_variables,
+                          list(model_weights.trainable))
+    tf.nest.map_structure(lambda v, t: v.assign(t),
+                          self.keras_model.non_trainable_variables,
+                          list(model_weights.non_trainable))
 
 
 def keras_evaluate(model, test_data, metrics):
@@ -207,7 +209,8 @@ def client_update(model, dataset, server_message, client_optimizer,
   """
   model_weights = _get_model_weights(model)
   initial_weights = server_message.model_weights
-  tff.utils.assign(model_weights, initial_weights)
+  tf.nest.map_structure(lambda v, t: v.assign(t), model_weights,
+                        initial_weights)
 
   def reduce_fn(state, batch):
     """Train model on local client batch."""
@@ -284,7 +287,8 @@ def server_update(model, server_optimizer, server_state, weights_delta):
 
   # Initialize the model with the current state.
   model_weights = _get_model_weights(model)
-  tff.utils.assign(model_weights, server_state.model)
+  tf.nest.map_structure(lambda v, t: v.assign(t), model_weights,
+                        server_state.model)
 
   # Apply the update to the model, and return the updated state.
   grad = tf.nest.map_structure(lambda x: -1.0 * x, weights_delta)

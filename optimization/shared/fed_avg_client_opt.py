@@ -143,14 +143,16 @@ def server_update(model, server_optimizer, server_state, weights_delta,
     An updated `ServerState`.
   """
   model_weights = _get_weights(model)
-  tff.utils.assign(model_weights, server_state.model)
+  tf.nest.map_structure(lambda v, t: v.assign(t), model_weights,
+                        server_state.model)
 
   # Server optimizer variables must be initialized prior to invoking this
   updated_client_optimizer_state = tf.nest.map_structure(
       lambda a, b: a + b, server_state.client_optimizer_state,
       client_optimizer_state_delta)
   server_optimizer_state = _get_optimizer_state(server_optimizer)
-  tff.utils.assign(server_optimizer_state, server_state.server_optimizer_state)
+  tf.nest.map_structure(lambda v, t: v.assign(t), server_optimizer_state,
+                        server_state.server_optimizer_state)
 
   # Apply the update to the model. We must multiply weights_delta by -1.0 to
   # view it as a gradient that should be applied to the server_optimizer.
@@ -231,11 +233,13 @@ def create_client_update_fn():
     """
 
     model_weights = _get_weights(model)
-    tff.utils.assign(model_weights, initial_weights)
+    tf.nest.map_structure(lambda v, t: v.assign(t), model_weights,
+                          initial_weights)
 
     # Client optimizer variables must be initialized prior to invoking this
     client_optimizer_state = _get_optimizer_state(client_optimizer)
-    tff.utils.assign(client_optimizer_state, initial_client_optimizer_state)
+    tf.nest.map_structure(lambda v, t: v.assign(t), client_optimizer_state,
+                          initial_client_optimizer_state)
 
     num_examples = tf.constant(0, dtype=tf.int32)
     for batch in dataset:

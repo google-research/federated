@@ -154,7 +154,8 @@ def build_federated_finetune_evaluation(
           client_dataset, tf.constant(0, dtype=tf.int64))
 
       # Assign incoming global weights to `client_model` before fine-tuning.
-      tff.utils.assign(client_global_weights, incoming_model_weights)
+      tf.nest.map_structure(lambda v, t: v.assign(t), client_global_weights,
+                            incoming_model_weights)
 
       finetune_dataset.reduce(tf.constant(0), finetune_reduce_fn)
       eval_dataset.reduce(tf.constant(0), evaluation_reduce_fn)
