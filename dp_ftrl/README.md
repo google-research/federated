@@ -27,7 +27,7 @@ This folder is organized as following,
 *   `optimizer_utils` defined several custimized optimizers including a simple
     reimplementation of SGD, differential private SGD with momentum (DP-SGDM)
     and differential private FTRL with momentum (DP-FTRLM).
-*   `tree_aggregation`defined the noise accumulation by a tree structure for
+*   `tree_aggregation` defined the noise accumulation by a tree structure for
     DP-FTRLM.
 
 TODO(b/172867399): add privacy computation method.
