@@ -242,7 +242,7 @@ def create_client_update_fn():
                           initial_client_optimizer_state)
 
     num_examples = tf.constant(0, dtype=tf.int32)
-    for batch in dataset:
+    for batch in iter(dataset):
       with tf.GradientTape() as tape:
         output = model.forward_pass(batch)
       grads = tape.gradient(output.loss, model_weights.trainable)
