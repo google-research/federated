@@ -96,7 +96,7 @@ def configure_training(
 
   training_process.get_model_weights = iterative_process.get_model_weights
 
-  evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
+  evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn, use_experimental_simulation_loop=True)
 
   def test_fn(state):
     return evaluate_fn(iterative_process.get_model_weights(state), [cifar_test])
