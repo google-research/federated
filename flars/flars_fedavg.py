@@ -108,7 +108,7 @@ def server_update(model, server_optimizer, server_optimizer_vars, server_state,
       tf.nest.flatten(model_weights.trainable), grads_norm)
   server_optimizer.apply_gradients(grads_and_vars, name='server_update')
 
-  return tff.utils.update_state(
+  return tff.structure.update_struct(
       server_state, model=model_weights, optimizer_state=server_optimizer_vars)
 
 

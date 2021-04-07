@@ -132,12 +132,12 @@ class TffGansTest(tf.test.TestCase, parameterized.TestCase):
         return aggregation_state
 
       dp_averaging_state = aggregation_state[0]
-      new_sum_state = tff.utils.update_state(
+      new_sum_state = tff.structure.update_struct(
           dp_averaging_state.numerator_state.sum_state,
           l2_norm_clip=UPDATE_DP_L2_NORM_CLIP)
-      new_numerator_state = tff.utils.update_state(
+      new_numerator_state = tff.structure.update_struct(
           dp_averaging_state.numerator_state, sum_state=new_sum_state)
-      new_dp_averaging_state = tff.utils.update_state(
+      new_dp_averaging_state = tff.structure.update_struct(
           dp_averaging_state, numerator_state=new_numerator_state)
       return (new_dp_averaging_state, ())
 

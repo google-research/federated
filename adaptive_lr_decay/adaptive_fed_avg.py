@@ -113,7 +113,7 @@ def server_update(model, server_optimizer, server_state, aggregated_gradients,
       server_monitor_value)
 
   # Create a new state based on the updated model.
-  return tff.utils.update_state(
+  return tff.structure.update_struct(
       server_state,
       model=model_weights,
       optimizer_state=server_optimizer.variables(),
@@ -296,7 +296,7 @@ def build_fed_avg_process(
                                              initial_model_weights)
     client_state = client_update(model_fn(), tf_dataset, initial_model_weights,
                                  client_optimizer, client_weight_fn)
-    return tff.utils.update_state(
+    return tff.structure.update_struct(
         client_state, initial_model_output=initial_model_output)
 
   @tff.tf_computation(server_state_type, model_weights_type.trainable,

@@ -124,7 +124,7 @@ def server_update(model, server_optimizer, server_optimizer_vars, server_state,
       tf.nest.flatten(model_weights.trainable))
   server_optimizer.apply_gradients(grads_and_vars, name='server_update')
 
-  return tff.utils.update_state(
+  return tff.structure.update_struct(
       server_state,
       model=model_weights,
       optimizer_state=server_optimizer_vars,
@@ -191,9 +191,8 @@ class ClientExplicitBoosting:
     @tf.function
     def compute_malicious_update():
       """compute malicious update sent back to the server."""
-
-      weights_delta_benign, aggregated_outputs, num_examples_sum \
-          = compute_benign_update()
+      result = compute_benign_update()
+      weights_delta_benign, aggregated_outputs, num_examples_sum = result
 
       tf.nest.map_structure(lambda a, b: a.assign(b), model_weights,
                             initial_weights)

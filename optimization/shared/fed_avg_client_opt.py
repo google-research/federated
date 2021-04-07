@@ -163,7 +163,7 @@ def server_update(model, server_optimizer, server_state, weights_delta,
   server_optimizer.apply_gradients(grads_and_vars)
 
   # Create a new state based on the updated model.
-  return tff.utils.update_state(
+  return tff.structure.update_struct(
       server_state,
       model=model_weights,
       client_optimizer_state=updated_client_optimizer_state,

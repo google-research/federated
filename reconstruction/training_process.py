@@ -162,7 +162,7 @@ def build_server_update_fn(
         tensor_utils.zero_all_if_any_non_finite(weights_delta))
     # We ignore the update if the weights_delta is non finite.
     if has_non_finite_weight > 0:
-      return tff.utils.update_state(
+      return tff.structure.update_struct(
           server_state,
           model=global_model_weights,
           optimizer_state=server_optimizer_vars,
@@ -176,7 +176,7 @@ def build_server_update_fn(
     server_optimizer.apply_gradients(grads_and_vars, name='server_update')
 
     # Create a new state based on the updated model.
-    return tff.utils.update_state(
+    return tff.structure.update_struct(
         server_state,
         model=global_model_weights,
         optimizer_state=server_optimizer_vars,

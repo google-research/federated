@@ -196,10 +196,8 @@ def accumulate_server_votes(server_state, sub_round_votes):
   """Accumulates votes and returns an updated server state."""
   accumulated_votes = server_state.accumulated_votes + sub_round_votes
   round_num = server_state.round_num + 1
-  return tff.utils.update_state(
-      server_state,
-      accumulated_votes=accumulated_votes,
-      round_num=round_num)
+  return tff.structure.update_struct(
+      server_state, accumulated_votes=accumulated_votes, round_num=round_num)
 
 
 @tf.function()
@@ -364,7 +362,7 @@ def accumulate_server_votes_and_decode(server_state, possible_prefix_extensions,
   round_num = server_state.round_num + 1
 
   # Return an updated server state.
-  return tff.utils.update_state(
+  return tff.structure.update_struct(
       server_state,
       discovered_heavy_hitters=discovered_heavy_hitters,
       heavy_hitters_counts=heavy_hitters_counts,

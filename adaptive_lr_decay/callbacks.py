@@ -113,7 +113,7 @@ class ReduceLROnPlateau(object):
           wait = 0
 
     # Return an updated callback
-    return tff.utils.update_state(
+    return tff.structure.update_struct(
         self,
         learning_rate=learning_rate,
         metrics_window=metrics_window,
