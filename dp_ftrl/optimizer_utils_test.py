@@ -85,6 +85,46 @@ class OptimizerTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(flatten_variables,
                         [-result * np.ones_like(v) for v in flatten_variables])
 
+  @parameterized.named_parameters(
+      ('m0s2', 0, 2, False),
+      ('m0.9s2', 0.9, 2, False),
+      ('m0s3', 0.9, 10, False),
+      ('m0s3nes', 0.9, 10, True),
+  )
+  def test_ftrl_match_keras(self, momentum, steps, nesterov):
+    # FTRL is identical to SGD for unconstrained problem when no noise is added;
+    # it is identical to Keras SGD without learning rate change.
+    lr = 0.1
+
+    def _run_ftrl():
+      model_variables = _create_model_variables()
+      model_weight_shape = tf.nest.map_structure(tf.shape, model_variables)
+      grad = tf.nest.map_structure(tf.ones_like, model_variables)
+      optimizer = optimizer_utils.DPFTRLMServerOptimizer(
+          learning_rate=lr,
+          momentum=momentum,
+          noise_std=0.0,
+          model_weight_shape=model_weight_shape,
+          use_nesterov=nesterov)
+
+      state = optimizer.init_state()
+      for i in range(steps):
+        state = optimizer.model_update(state, model_variables, grad, i)
+
+      self.assertLen(model_variables, 2)
+      return tf.nest.flatten(model_variables)
+
+    def _run_keras():
+      model_variables = tf.nest.flatten(_create_model_variables())
+      grad = tf.nest.map_structure(tf.ones_like, model_variables)
+      optimizer = tf.keras.optimizers.SGD(
+          learning_rate=lr, momentum=momentum, nesterov=nesterov)
+      for _ in range(steps):
+        optimizer.apply_gradients(zip(grad, model_variables))
+      return model_variables
+
+    self.assertAllClose(_run_ftrl(), _run_keras())
+
 
 def _build_noise_generator():
   return tf.random.Generator.from_non_deterministic_state()

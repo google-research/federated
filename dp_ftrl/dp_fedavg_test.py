@@ -505,11 +505,19 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
   @parameterized.named_parameters(
-      ('r5eff', 5, True, True),
-      ('r5eff_reduce', 5, True, False),
-      ('r5', 5, False, True),
+      ('r5eff', 5, True, True, False),
+      (
+          'r5eff_reduce',
+          5,
+          True,
+          False,
+          False,
+      ),
+      ('r5', 5, False, True, False),
+      ('r5eff_nesterov', 5, True, True, True),
   )
-  def test_dpftal_training(self, total_rounds, efficient_tree, simulation_flag):
+  def test_dpftal_training(self, total_rounds, efficient_tree, simulation_flag,
+                           nesterov):
 
     def server_optimzier_fn(model_weights):
       model_weight_shape = tf.nest.map_structure(tf.shape, model_weights)
@@ -518,7 +526,8 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
           momentum=0.9,
           noise_std=1e-5,
           model_weight_shape=model_weight_shape,
-          efficient_tree=efficient_tree)
+          efficient_tree=efficient_tree,
+          use_nesterov=nesterov)
 
     it_process = dp_fedavg.build_federated_averaging_process(
         _rnn_model_fn,

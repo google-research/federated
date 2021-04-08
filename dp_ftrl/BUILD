@@ -62,6 +62,7 @@ py_test(
     name = "optimizer_utils_test",
     srcs = ["optimizer_utils_test.py"],
     python_version = "PY3",
+    shard_count = 10,
     srcs_version = "PY3",
     deps = [":optimizer_utils"],
 )

@@ -22,6 +22,11 @@ import tensorflow as tf
 from dp_ftrl import tree_aggregation
 
 
+def _check_momentum(m: float):
+  if m < 0 or m >= 1:
+    raise ValueError('Momenum should be in [0, 1), but got {}'.format(m))
+
+
 class ServerOptimizerBase(metaclass=abc.ABCMeta):
   """Base class establishing interface for server optimizer."""
 
@@ -80,12 +85,18 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
                momentum: float,
                noise_std: float,
                model_weight_shape: Collection[tf.Tensor],
-               efficient_tree: bool = True):
+               efficient_tree: bool = True,
+               use_nesterov: bool = False):
     """Initialize the momemtum DPFTRL Optimizer."""
+
+    _check_momentum(momentum)
+    if use_nesterov and momentum == 0:
+      raise ValueError('Use a positive momentum for Nesterov')
 
     self.lr = learning_rate
     self.momentum = momentum
     self.model_weight_shape = model_weight_shape
+    self.use_nesterov = use_nesterov
 
     random_generator = tf.random.Generator.from_non_deterministic_state()
 
@@ -119,13 +130,21 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
     cumsum_noise, dp_tree_state = self.noise_generator.get_cumsum_and_update(
         dp_tree_state)
 
-    momentum_buffer = tf.nest.map_structure(
-        lambda m, g, n: self.momentum * m + g + n, momentum_buffer, sum_grad,
-        cumsum_noise)
+    noised_sum_grad = tf.nest.map_structure(tf.add, sum_grad, cumsum_noise)
+    momentum_buffer = tf.nest.map_structure(lambda v, g: self.momentum * v + g,
+                                            momentum_buffer, noised_sum_grad)
+    if self.use_nesterov:
+      # The Nesterov implementation mimics the implementation of
+      # `tf.keras.optimizers.SGD`. The forecasted weight is used to generate
+      # gradient in momentum buffer (velocity).
+      delta_w = tf.nest.map_structure(lambda v, g: self.momentum * v + g,
+                                      momentum_buffer, noised_sum_grad)
+    else:
+      delta_w = momentum_buffer
     # Different from a conventional SGD step, FTRL use the initial weight w0
     # and (momementum version of) the gradient sum to update the model weight.
-    tf.nest.map_structure(lambda w, w0, v: w.assign(w0 - self.lr * v), weight,
-                          init_weight, momentum_buffer)
+    tf.nest.map_structure(lambda w, w0, g: w.assign(w0 - self.lr * g), weight,
+                          init_weight, delta_w)
 
     state = collections.OrderedDict(
         init_weight=init_weight,
