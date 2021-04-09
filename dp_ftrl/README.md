@@ -9,6 +9,10 @@ Private (Deep) Learning without Sampling or Shuffling"
 code in this folder is for the StackOverflow federated learning (FL) experiments
 in the paper.
 
+NOTE: The implementation and experiments for centralized setting on image
+datasets can be found at
+[another repository](https://github.com/google-research/DP-FTRL).
+
 This folder is organized as following,
 
 *   Two python drivers `run_emnist` and `run_stackoverflow` for
