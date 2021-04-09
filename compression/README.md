@@ -27,4 +27,4 @@ Note that the tooling is not limited to the specific ideas outlined above.
 Rather, the use of `tensor_encoding` API enables the use of any compression
 algorithm to be provided via the
 `tff.learning.framework.build_encoded_broadcast_from_model` and
-`tff.learning.framework.build_encoded_mean_from_model` utilities.
+`tff.aggregators.EncodedSumFactory`.

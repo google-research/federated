@@ -96,14 +96,6 @@ def model_builder():
       only_digits=FLAGS.only_digits)
 
 
-def loss_builder():
-  return tf.keras.losses.SparseCategoricalCrossentropy()
-
-
-def metrics_builder():
-  return [tf.keras.metrics.SparseCategoricalAccuracy()]
-
-
 def _broadcast_encoder_fn(value):
   """Function for building encoded broadcast.
 
@@ -130,7 +122,7 @@ def _broadcast_encoder_fn(value):
     return te.encoders.as_simple_encoder(te.encoders.identity(), spec)
 
 
-def _mean_encoder_fn(value):
+def _mean_encoder_fn(spec):
   """Function for building encoded mean.
 
   This method decides, based on the tensor size, whether to use lossy
@@ -140,15 +132,13 @@ def _mean_encoder_fn(value):
   weights usually results in larger impact on model's accuracy.
 
   Args:
-    value: A tensor or variable to be encoded in client to server communication.
+    spec: A `tf.TensorSpec` for the value to be encoded in client to server
+      communication.
 
   Returns:
     A `te.core.GatherEncoder`.
   """
-  # TODO(b/131681951): We cannot use .from_tensor(...) because it does not
-  # currently support Variables.
-  spec = tf.TensorSpec(value.shape, value.dtype)
-  if value.shape.num_elements() > 10000:
+  if spec.shape.num_elements() > 10000:
     if FLAGS.use_sparsity_in_aggregation:
       return te.encoders.as_gather_encoder(
           sparsity.sparse_quantizing_encoder(
@@ -166,15 +156,15 @@ def run_experiment():
   emnist_train, _ = emnist_dataset.get_federated_datasets(
       train_client_batch_size=FLAGS.client_batch_size,
       train_client_epochs_per_round=FLAGS.client_epochs_per_round,
-      only_digits=False)
-
-  _, emnist_test = emnist_dataset.get_centralized_datasets()
+      only_digits=FLAGS.only_digits)
+  _, emnist_test = emnist_dataset.get_centralized_datasets(
+      only_digits=FLAGS.only_digits)
 
   example_dataset = emnist_train.create_tf_dataset_for_client(
       emnist_train.client_ids[0])
   input_spec = example_dataset.element_spec
 
-  client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
+  client_dataset_ids_fn = tff.simulation.build_uniform_client_sampling_fn(
       emnist_train, FLAGS.clients_per_round)
 
   client_optimizer_fn = functools.partial(
@@ -183,12 +173,11 @@ def run_experiment():
       utils_impl.create_optimizer_from_flags, 'server')
 
   def tff_model_fn():
-    keras_model = model_builder()
     return tff.learning.from_keras_model(
-        keras_model,
+        keras_model=model_builder(),
         input_spec=input_spec,
-        loss=loss_builder(),
-        metrics=metrics_builder())
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
 
   evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
 
@@ -197,27 +186,30 @@ def run_experiment():
     return evaluate_fn(state.model, [emnist_test])
 
   if FLAGS.use_compression:
-    # We create a `MeasuredProcess` for broadcast process and a
-    # `MeasuredProcess` for aggregate process by providing the
-    # `_broadcast_encoder_fn` and `_mean_encoder_fn` to corresponding utilities.
-    # The fns are called once for each of the model weights created by
-    # tff_model_fn, and return instances of appropriate encoders.
+    # We create a `tff.templates.MeasuredProcess` for broadcast process and a
+    # `tff.aggregators.WeightedAggregationFactory` for aggregation by providing
+    # the `_broadcast_encoder_fn` and `_mean_encoder_fn` to corresponding
+    # utilities. The fns are called once for each of the model weights created
+    # by tff_model_fn, and return instances of appropriate encoders.
     encoded_broadcast_process = (
         tff.learning.framework.build_encoded_broadcast_process_from_model(
             tff_model_fn, _broadcast_encoder_fn))
-    encoded_mean_process = (
-        tff.learning.framework.build_encoded_mean_process_from_model(
-            tff_model_fn, _mean_encoder_fn))
+    aggregator = tff.aggregators.MeanFactory(
+        tff.aggregators.EncodedSumFactory(_mean_encoder_fn))
   else:
     encoded_broadcast_process = None
-    encoded_mean_process = None
+    aggregator = None
 
   iterative_process = tff.learning.build_federated_averaging_process(
       model_fn=tff_model_fn,
       client_optimizer_fn=client_optimizer_fn,
       server_optimizer_fn=server_optimizer_fn,
-      aggregation_process=encoded_mean_process,
-      broadcast_process=encoded_broadcast_process)
+      broadcast_process=encoded_broadcast_process,
+      model_update_aggregation_factory=aggregator)
+
+  iterative_process = (
+      tff.simulation.compose_dataset_computation_with_iterative_process(
+          emnist_train.dataset_computation, iterative_process))
 
   # Log hyperparameters to CSV
   hparam_dict = utils_impl.lookup_flag_values(utils_impl.get_hparam_flags())
@@ -229,7 +221,7 @@ def run_experiment():
 
   training_loop.run(
       iterative_process=iterative_process,
-      client_datasets_fn=client_datasets_fn,
+      client_datasets_fn=client_dataset_ids_fn,
       validation_fn=validation_fn,
       total_rounds=FLAGS.total_rounds,
       experiment_name=FLAGS.experiment_name,
