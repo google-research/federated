@@ -38,6 +38,8 @@ import tensorflow as tf
 import tensorflow_federated as tff
 from utils import tensor_utils
 
+from optimization.shared.fed_avg_schedule import ServerState, server_update
+
 
 # Convenience type aliases.
 ModelBuilder = Callable[[], tff.learning.Model]
@@ -62,62 +64,6 @@ def _initialize_optimizer_vars(model: tff.learning.Model,
 
 def _get_weights(model: tff.learning.Model) -> tff.learning.ModelWeights:
   return tff.learning.ModelWeights.from_model(model)
-
-
-@attr.s(eq=False, order=False, frozen=True)
-class ServerState(object):
-  """Structure for state on the server.
-
-  Fields:
-  -   `model`: A dictionary of the model's trainable and non-trainable
-        weights.
-  -   `optimizer_state`: The server optimizer variables.
-  -   `round_num`: The current training round, as a float.
-  """
-  model = attr.ib()
-  optimizer_state = attr.ib()
-  round_num = attr.ib()
-  # This is a float to avoid type incompatibility when calculating learning rate
-  # schedules.
-
-
-@tf.function
-def server_update(model, server_optimizer, server_state, weights_delta):
-  """Updates `server_state` based on `weights_delta`, increase the round number.
-
-  Args:
-    model: A `tff.learning.Model`.
-    server_optimizer: A `tf.keras.optimizers.Optimizer`.
-    server_state: A `ServerState`, the state to be updated.
-    weights_delta: An update to the trainable variables of the model.
-
-  Returns:
-    An updated `ServerState`.
-  """
-  model_weights = _get_weights(model)
-  tff.utils.assign(model_weights, server_state.model)
-  # Server optimizer variables must be initialized prior to invoking this
-  tff.utils.assign(server_optimizer.variables(), server_state.optimizer_state)
-
-  weights_delta, has_non_finite_weight = (
-    tensor_utils.zero_all_if_any_non_finite(weights_delta))
-  if has_non_finite_weight > 0:
-    return server_state
-
-  # Apply the update to the model. We must multiply weights_delta by -1.0 to
-  # view it as a gradient that should be applied to the server_optimizer.
-  grads_and_vars = [
-    (-1.0 * x, v) for x, v in zip(weights_delta, model_weights.trainable)
-  ]
-
-  server_optimizer.apply_gradients(grads_and_vars)
-
-  # Create a new state based on the updated model.
-  return tff.utils.update_state(
-    server_state,
-    model=model_weights,
-    optimizer_state=server_optimizer.variables(),
-    round_num=server_state.round_num + 1.0)
 
 
 @attr.s(eq=False, order=False, frozen=True)
@@ -563,7 +509,8 @@ def client_update(model,
   initial_weights = tff.learning.ModelWeights(
     trainable=tuple(initial_weights.trainable),
     non_trainable=tuple(initial_weights.non_trainable))
-  tff.utils.assign(model_weights, initial_weights)
+  tf.nest.map_structure(lambda v, t: v.assign(t), model_weights,
+                        initial_weights)
 
   # Do a pass over the dataset to produce initial delta and count examples.
   outputs = client_single_data_pass_fn(

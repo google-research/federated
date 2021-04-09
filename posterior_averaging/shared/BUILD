@@ -8,5 +8,8 @@ py_library(
     name = "fed_pa_schedule",
     srcs = ["fed_pa_schedule.py"],
     srcs_version = "PY3",
-    deps = ["//utils:tensor_utils"],
+    deps = [
+        "//optimization/shared:fed_avg_schedule",
+        "//utils:tensor_utils",
+    ],
 )
