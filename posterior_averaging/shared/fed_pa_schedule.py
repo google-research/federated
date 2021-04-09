@@ -226,9 +226,9 @@ def create_update_delta_fn(name, *, rho=1.):
         updates = DeltaUpdateOutput(
             weights_delta=weights_delta,
             num_samples=tf.add(previous_updates.num_samples, 1),
-          weights_sample_mean=(
-              data_pass_outputs.model_weights_trainable_sample),
-          dp_state=previous_updates.dp_state)
+            weights_sample_mean=(
+                data_pass_outputs.model_weights_trainable_sample),
+            dp_state=previous_updates.dp_state)
       else:
         updates = update_delta_fn(
             data_pass_outputs=data_pass_outputs,
@@ -512,19 +512,15 @@ def client_update(model,
   tf.nest.map_structure(lambda v, t: v.assign(t), model_weights,
                         initial_weights)
 
-  # Do a pass over the dataset to produce initial delta and count examples.
-  outputs = client_single_data_pass_fn(
-      model=model, dataset=dataset, client_optimizer=client_optimizer)
-  num_examples = outputs.num_examples
-
   # Initialize updates.
   mixedin = tf.constant(False, dtype=tf.bool)
   updates = DeltaUpdateOutput.from_weights(
       initial_weights=initial_weights.trainable,
-      updated_weights=outputs.model_weights_trainable_sample)
+      updated_weights=initial_weights.trainable)
 
   # Keep iterating over the data and refining weight deltas.
-  for epoch in tf.range(1, num_epochs):
+  num_examples = 0.0
+  for epoch in tf.range(num_epochs):
     outputs = client_single_data_pass_fn(
         model=model, dataset=dataset, client_optimizer=client_optimizer)
     mixedin = client_mixedin_fn(epoch, mixedin, outputs)
@@ -533,6 +529,7 @@ def client_update(model,
         initial_weights=initial_weights,
         data_pass_outputs=outputs,
         previous_updates=updates)
+    num_examples = outputs.num_examples
 
   # Check for non-finite weights.
   weights_delta, has_non_finite_weight = (
