@@ -88,8 +88,8 @@ class DataPassOutput(object):
 class DeltaUpdateOutput(object):
   """Structure for outputs returned by delta update functions.
 
-  This structure contains the sufficient state of the dymanic program used by
-  PostAvg to update weight deltas given a new approximate posterior sample.
+  This structure contains the sufficient state of the dynamic program used by
+  FedPA to update weight deltas given a new approximate posterior sample.
   Each field described below is a dictionary of the same structure as model's
   trainable variables.
 
@@ -98,13 +98,13 @@ class DeltaUpdateOutput(object):
   - `weights_delta`: Updates to model's trainable variables.
   - `weights_sample_mean`: The mean of the all posterior samples so far.
       `n`-th sample from the mean of the previous `(n - 1)` samples.
-  - `dp_state`: The state of the dynamic programming (DP) represented by a
-      structure of `tf.TensorArray`s.
+  - `recursion_state`: The state of the dynamic programming recursion
+      represented by a structure of `tf.TensorArray`s.
   """
   num_samples = attr.ib()
   weights_delta = attr.ib()
   weights_sample_mean = attr.ib(None)
-  dp_state = attr.ib(default=None)
+  recursion_state = attr.ib(default=None)
 
   @classmethod
   def from_weights(cls, initial_weights, updated_weights, num_samples=0):
@@ -113,15 +113,15 @@ class DeltaUpdateOutput(object):
     weights_delta = tf.nest.map_structure(lambda a, b: a - b, updated_weights,
                                           initial_weights)
     # Initial state for dynamic programming updates.
-    vk_tas_init = tf.nest.map_structure(
-        lambda d: tf.TensorArray(d.dtype, size=0, dynamic_size=True),
-        weights_delta)
-    dot_vk_uk_ta_init = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
-    return cls(
-        num_samples=tf.cast(num_samples, dtype=tf.float32),
-        weights_delta=weights_delta,
-        weights_sample_mean=updated_weights,
-        dp_state=(vk_tas_init, dot_vk_uk_ta_init))
+    recursion_state_init = (
+        tf.nest.map_structure(
+            lambda d: tf.TensorArray(d.dtype, size=0, dynamic_size=True),
+            weights_delta),
+        tf.TensorArray(tf.float32, size=0, dynamic_size=True))
+    return cls(num_samples=tf.cast(num_samples, dtype=tf.float32),
+               weights_delta=weights_delta,
+               weights_sample_mean=updated_weights,
+               recursion_state=recursion_state_init)
 
 
 @attr.s(eq=False, order=False, frozen=True)
@@ -214,7 +214,7 @@ def create_update_delta_fn(name, *, rho=1.):
           weights_delta=weights_delta,
           num_samples=previous_updates.num_samples,
           weights_sample_mean=data_pass_outputs.model_weights_trainable_sample,
-          dp_state=previous_updates.dp_state)
+          recursion_state=previous_updates.recursion_state)
     else:
       if tf.equal(previous_updates.num_samples, 0.):
         # Special case of the first sample.
@@ -228,7 +228,7 @@ def create_update_delta_fn(name, *, rho=1.):
             num_samples=tf.add(previous_updates.num_samples, 1),
             weights_sample_mean=(
                 data_pass_outputs.model_weights_trainable_sample),
-            dp_state=previous_updates.dp_state)
+            recursion_state=previous_updates.recursion_state)
       else:
         updates = update_delta_fn(
             data_pass_outputs=data_pass_outputs,
@@ -269,12 +269,42 @@ def _update_delta_simple_mean(data_pass_outputs, previous_updates):
       num_samples=n,
       weights_delta=weights_delta,
       weights_sample_mean=weights_sample_mean,
-      dp_state=previous_updates.dp_state)
+      recursion_state=previous_updates.recursion_state)
+
+
+@tf.function
+def _struct_dot(struct1, struct2):
+  """Computes a dot product between two similar structures of tensors."""
+  dot_struct = tf.nest.map_structure(lambda x, y: tf.reduce_sum(x * y),
+                                     struct1, struct2)
+  return sum(tf.nest.flatten(dot_struct))
 
 
 @tf.function
 def _update_delta_posterior_mean(data_pass_outputs, previous_updates, *, rho):
   """Updates weights delta by incrementally re-computing posterior mean.
+
+  The variable naming convention in this function ties to closely follow the
+  variable naming used in the original paper (Appendix C):
+  https://arxiv.org/pdf/2010.05273.pdf#page=18
+
+  The notation is explained below. For more details, please refer to the paper.
+
+  Notation:
+    `n`: The number of posterior samples produced so far (including the sample
+      that `data_pass_outputs` argument contains). Denoted `\ell` in the paper.
+    `un`: A vector that represents the difference between the new posterior
+      sample and the mean of the previous samples.
+    `vn`: A vector proportional to `uk` multiplied by the inverse covariance
+      estimate based on the previous samples.
+    `vk_tas`: A `tf.TensorArray` of size `n_prev` that contains all previous
+      `vk` values for k = 1, ..., n - 1.
+    `dot_vk_uk_ta`: A `tf.TensorArray` of size `n_prev` that contains dot
+      products between all previous `uk` and `vk` vectors for k = 1, ..., n - 1.
+    `weights_delta_tilde`: The previous weights delta scaled by a constant,
+      `1 / (1 + (n_prev - 1) * rho)`. The scaling is necessary to simplify
+      the intermediate algebraic computations.
+    `weights_delta`: The updated client delta (computed at the end).
 
   Args:
     data_pass_outputs: A `DataPassOutputs` structure returned by a single data
@@ -287,13 +317,12 @@ def _update_delta_posterior_mean(data_pass_outputs, previous_updates, *, rho):
   Returns:
     A `DeltaUpdateOutputs` structure.
   """
-  n_1 = previous_updates.num_samples
   n = tf.add(previous_updates.num_samples, 1)
-  vk_tas, dot_vk_uk_ta = previous_updates.dp_state
+  vk_tas, dot_vk_uk_ta = previous_updates.recursion_state
 
   # Rescale previous weights delta to use it in the recursion.
   weights_delta_tilde = tf.nest.map_structure(
-      lambda wd: wd / (1 + (n_1 - 1) * rho), previous_updates.weights_delta)
+      lambda wd: wd / (1 + ((n - 1) - 1) * rho), previous_updates.weights_delta)
 
   # Update the running mean of the weights samples.
   weights_sample_mean = tf.nest.map_structure(
@@ -326,23 +355,18 @@ def _update_delta_posterior_mean(data_pass_outputs, previous_updates, *, rho):
     vn_flat = un_flat
 
   # Compute `dot(vn, un)`.
-  dot_vn_un = sum(
-      tf.nest.flatten(
-          tf.nest.map_structure(lambda v, u: tf.reduce_sum(v * u), vn_flat,
-                                un_flat)))
+  dot_vn_un = _struct_dot(vn_flat, un_flat)
 
-  # Update DP state represented by TensorArrays.
+  # Update the state of the recursion represented by `tf.TensorArrays`.
   i = tf.cast(n - 2, dtype=tf.int32)
   vk_tas = tf.nest.map_structure(lambda vk_ta, vn: vk_ta.write(i, vn), vk_tas,
                                  vn_flat)
   dot_vk_uk_ta = dot_vk_uk_ta.write(i, dot_vn_un)
+  recursion_state = (vk_tas, dot_vk_uk_ta)
 
   # Compute weights delta tilde: `weights_delta_tilde += coeff * vn / n`.
-  dot_wd_un = sum(
-      tf.nest.flatten(
-          tf.nest.map_structure(
-              lambda wdt, u: tf.reduce_sum(tf.reshape(wdt, [-1]) * u),
-              weights_delta_tilde, un_flat)))
+  wdt_flat = tf.nest.map_structure(lambda x: tf.reshape(x, [-1]))
+  dot_wd_un = _struct_dot(wdt_flat, un_flat)
   gamma = rho * (n - 1) / n
   vn_coeff = 1. - gamma * (n * dot_wd_un + dot_vn_un) / (1. + gamma * dot_vn_un)
   weights_delta_tilde = tf.nest.map_structure(
@@ -357,13 +381,13 @@ def _update_delta_posterior_mean(data_pass_outputs, previous_updates, *, rho):
       num_samples=n,
       weights_delta=weights_delta,
       weights_sample_mean=weights_sample_mean,
-      dp_state=(vk_tas, dot_vk_uk_ta))
+      recursion_state=recursion_state)
 
 
 def create_client_single_data_pass_fn():
   """Returns a tf.function for taking a single pass over the client data.
 
-  This "create" fn is ncessary to prevent
+  This "create" fn is necessary to prevent
   "ValueError: Creating variables on a non-first call to a function decorated
   with tf.function" errors due to the client optimizer creating variables. This
   is needed only because we test the client_single_data_pass function directly.

@@ -216,13 +216,6 @@ def main(argv):
     Returns:
       A `tff.templates.IterativeProcess`.
     """
-    if FLAGS.task == 'shakespeare' or FLAGS.task == 'stackoverflow_nwp':
-
-      def client_weight_fn(local_outputs):
-        return tf.cast(tf.squeeze(local_outputs['num_tokens']), tf.float32)
-    else:
-      client_weight_fn = None
-
     return fed_pa_schedule.build_fed_pa_process(
         model_fn=model_fn,
         client_update_epochs=FLAGS.client_epochs_per_round,
@@ -232,7 +225,6 @@ def main(argv):
         server_lr=server_lr_schedule,
         client_mixedin_schedule_fn=client_mixedin_schedule_fn,
         client_update_delta_fn=client_update_delta_fn,
-        client_weight_fn=client_weight_fn,
         mask_zeros_in_client_updates=FLAGS.mask_zeros_in_client_updates)
 
   task_spec = training_specs.TaskSpec(
