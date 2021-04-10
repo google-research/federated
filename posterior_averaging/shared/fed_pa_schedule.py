@@ -365,8 +365,9 @@ def _update_delta_posterior_mean(data_pass_outputs, previous_updates, *, rho):
   recursion_state = (vk_tas, dot_vk_uk_ta)
 
   # Compute weights delta tilde: `weights_delta_tilde += coeff * vn / n`.
-  wdt_flat = tf.nest.map_structure(lambda x: tf.reshape(x, [-1]))
-  dot_wd_un = _struct_dot(wdt_flat, un_flat)
+  weights_delta_tilde_flat = tf.nest.map_structure(
+      lambda x: tf.reshape(x, [-1]), weights_delta_tilde)
+  dot_wd_un = _struct_dot(weights_delta_tilde_flat, un_flat)
   gamma = rho * (n - 1) / n
   vn_coeff = 1. - gamma * (n * dot_wd_un + dot_vn_un) / (1. + gamma * dot_vn_un)
   weights_delta_tilde = tf.nest.map_structure(
