@@ -167,6 +167,7 @@ TASK_FLAGS = collections.OrderedDict(
 def _write_hparam_flags():
   """Creates an ordered dictionary of hyperparameter flags and writes to CSV."""
   hparam_dict = utils_impl.lookup_flag_values(shared_flags)
+  hparam_dict.update(utils_impl.lookup_flag_values(fed_pa_flags))
 
   # Update with optimizer flags corresponding to the chosen optimizers.
   opt_flag_dict = utils_impl.lookup_flag_values(optimizer_flags)
