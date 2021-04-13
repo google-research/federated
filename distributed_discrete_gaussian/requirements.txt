@@ -1,0 +1,10 @@
+absl-py
+attrs
+matplotlib
+numpy
+pandas
+scipy
+tensorflow
+tensorflow-federated
+tensorflow-privacy
+tensorflow-probability
