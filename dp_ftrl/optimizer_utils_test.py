@@ -136,7 +136,7 @@ class RandomNoiseTest(tf.test.TestCase, parameterized.TestCase):
                                noise_mean=1.0,
                                noise_std=1.0,
                                samples=2000,
-                               tolerance=0.05):
+                               tolerance=0.07):
     g = _build_noise_generator()
 
     @tf.function

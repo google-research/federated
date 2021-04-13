@@ -256,10 +256,8 @@ class DPFedAvgTest(tf.test.TestCase, parameterized.TestCase):
           noise_std=1e-5,
           model_weight_shape=model_weight_shape)
 
-    print('defining it process')
     it_process = dp_fedavg.build_federated_averaging_process(
         model_fn, server_optimizer_fn=server_optimzier_fn)
-    print('next type', it_process.next.type_signature.parameter[0])
     server_state = it_process.initialize()
 
     def deterministic_batch():
@@ -272,7 +270,6 @@ class DPFedAvgTest(tf.test.TestCase, parameterized.TestCase):
 
     loss_list = []
     for i in range(total_rounds):
-      print('round', i)
       server_state, loss = it_process.next(server_state, federated_data)
       loss_list.append(loss)
       self.assertEqual(i + 1, server_state.round_num)
@@ -463,14 +460,18 @@ def _create_test_rnn_model(vocab_size: int = 6,
   return model
 
 
-def _rnn_model_fn() -> tff.learning.Model:
+def _rnn_model_fn(use_tff_learning=False) -> tff.learning.Model:
   keras_model = _create_test_rnn_model()
   loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
   input_spec = collections.OrderedDict(
       x=tf.TensorSpec([None, 5], tf.int32),
       y=tf.TensorSpec([None, 5], tf.int32))
-  return tff.learning.from_keras_model(
-      keras_model=keras_model, input_spec=input_spec, loss=loss)
+  if use_tff_learning:
+    return tff.learning.from_keras_model(
+        keras_model=keras_model, input_spec=input_spec, loss=loss)
+  else:
+    return dp_fedavg.KerasModelWrapper(
+        keras_model=keras_model, input_spec=input_spec, loss=loss)
 
 
 class RNNTest(tf.test.TestCase, parameterized.TestCase):
@@ -550,6 +551,54 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(i + 1, server_state.round_num)
       self.assertEqual(
           i + 1,
+          tree_aggregation.get_step_idx(
+              server_state.optimizer_state['dp_tree_state']))
+    self.assertLess(np.mean(loss_list[1:]), loss_list[0])
+
+  def test_dpftal_restart(self, total_rounds=3):
+
+    def server_optimizer_fn(model_weights):
+      model_weight_shape = tf.nest.map_structure(tf.shape, model_weights)
+      return optimizer_utils.DPFTRLMServerOptimizer(
+          learning_rate=0.1,
+          momentum=0.9,
+          noise_std=1e-5,
+          model_weight_shape=model_weight_shape,
+          efficient_tree=True,
+          use_nesterov=True)
+
+    it_process = dp_fedavg.build_federated_averaging_process(
+        _rnn_model_fn,
+        server_optimizer_fn=server_optimizer_fn,
+        use_simulation_loop=True)
+    server_state = it_process.initialize()
+
+    model = _rnn_model_fn()
+    optimizer = server_optimizer_fn(model.weights.trainable)
+
+    def server_state_update(state):
+      return tff.structure.update_struct(
+          state,
+          model=state.model,
+          optimizer_state=optimizer.restart_dp_tree(state.model.trainable),
+          round_num=state.round_num)
+
+    def deterministic_batch():
+      return collections.OrderedDict(
+          x=np.array([[0, 1, 2, 3, 4]], dtype=np.int32),
+          y=np.array([[1, 2, 3, 4, 0]], dtype=np.int32))
+
+    batch = tff.tf_computation(deterministic_batch)()
+    federated_data = [[batch]]
+
+    loss_list = []
+    for i in range(total_rounds):
+      server_state, loss = it_process.next(server_state, federated_data)
+      server_state = server_state_update(server_state)
+      loss_list.append(loss)
+      self.assertEqual(i + 1, server_state.round_num)
+      self.assertEqual(
+          0,
           tree_aggregation.get_step_idx(
               server_state.optimizer_state['dp_tree_state']))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])

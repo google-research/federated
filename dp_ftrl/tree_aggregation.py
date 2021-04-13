@@ -25,7 +25,7 @@ import attr
 import tensorflow as tf
 
 
-@attr.s(eq=False, frozen=True)
+@attr.s(eq=False, frozen=True, slots=True)
 class TreeState(object):
   """Class defining state of the tree.
 

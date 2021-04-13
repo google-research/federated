@@ -72,20 +72,16 @@ bazel run run_stackoverflow.py --experiment_name=stackoverflow_ftrlm_smalln --se
 > (Deep) Learning without Sampling or Shuffling"
 > [on arxiv](https://arxiv.org/abs/2103.00039v1).
 >
-> 1.  Tree restart in Appendix D is not implemented. For StackOverflow results,
->     when report goal `--clients_per_round=100`, less than one epoch of data
->     will be parsed, and hence not necessary to restart; when report goal
->     `--clients_per_round=1000`, less than five epochs of data will be parsed.
->     Restart after every epoch is used in the paper for Figure 10, but not
->     included in the code in this repository. The utility of with and without
->     restart for report goal `--clients_per_round=1000` are almost identical.
->     The privacy accounting are different and details can be found in Appendix
->     D of the paper.
 > 1.  Efficient tree aggregation is the default in this repository. The
 >     advantage of efficient tree aggregation can found in the
 >     [following section](#efficient-tree-aggregation). To reproduce results in
 >     the paper, please manually set `efficient_tree=False` for
 >     `optimizer_utils.DPFTRLMServerOptimizer`.
+> 1.  This code version uses the up-to-date version of StackOverflow data
+>     processing and other `utils/` functions including functions migrated to
+>     `tff.simulation`, while the arxiv paper uses an older version. The changes
+>     should have minimum effects but might cause minor issues to reproduce the
+>     exact results in the paper.
 
 ## Efficient tree aggregation
 

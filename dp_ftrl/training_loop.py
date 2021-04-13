@@ -23,17 +23,9 @@ from absl import logging
 import tensorflow as tf
 import tensorflow_federated as tff
 
+from dp_ftrl import dp_fedavg
 from utils import utils_impl
 from tensorboard.plugins.hparams import api as hp
-
-
-def _get_model_weights(tff_state):
-  if hasattr(tff_state, 'model_weights'):
-    return tff_state.model_weights
-  elif hasattr(tff_state, 'model'):
-    return tff_state.model
-  else:
-    raise ValueError('Cannot parse model weight from TFF states')
 
 
 def _create_if_not_exists(path):
@@ -113,7 +105,9 @@ def run(
     hparam_dict: Optional[Dict[str, Any]] = None,
     rounds_per_eval: Optional[int] = 1,
     rounds_per_checkpoint: Optional[int] = 50,
-    rounds_per_train_eval: Optional[int] = 100):
+    rounds_per_train_eval: Optional[int] = 100,
+    server_state_epoch_update_fn: Optional[Callable[
+        [dp_fedavg.ServerState], dp_fedavg.ServerState]] = None):
   """Runs federated training for a given `tff.templates.IterativeProcess`.
 
   We assume that the iterative process has the following functional type
@@ -158,6 +152,9 @@ def run(
     rounds_per_train_eval: How often to compute metrics over the entire training
       dataset. Note that this is only done if a `train_eval_fn` argument is
       supplied.
+    server_state_epoch_update_fn: A function to update the `SeverState` outside
+      of TFF iterative process. It is called at the beginning of each epoch
+      traversing all the clients. Used to restart tree for FTRL algorithm.
 
   Returns:
     The final `state` of the iterative process after training.
@@ -200,21 +197,26 @@ def run(
 
   loop_start_time = time.time()
   while epoch < total_epochs and round_num < total_rounds:
-    # TODO(b/172867399): add restarts functionality for FTRLM when total_epochs
-    # is larger than one.
     data_prep_start_time = time.time()
+    prev_epoch = epoch
     federated_train_data, epoch = client_datasets_fn(round_num, epoch)
+    # Server state is updated outside of TFF iterative process, which is used
+    # to restart the tree in DP-FTRL.
+    if server_state_epoch_update_fn is not None and epoch == prev_epoch + 1:
+      logging.info('External server state update at epoch %d', epoch)
+      state = server_state_epoch_update_fn(state)
+
     train_metrics = {
         'prepare_datasets_secs': time.time() - data_prep_start_time
     }
 
     training_start_time = time.time()
-    prev_model = _get_model_weights(state)
+    prev_model = state.model
     state, loss = iterative_process.next(state, federated_train_data)
 
     train_metrics['training_secs'] = time.time() - training_start_time
     train_metrics['model_delta_l2_norm'] = _compute_numpy_l2_difference(
-        _get_model_weights(state), prev_model)
+        state.model, prev_model)
     train_metrics['loss'] = loss
 
     logging.info('Round {:2d}, {:.2f}s per round in average.'.format(
@@ -223,7 +225,10 @@ def run(
     if (round_num % rounds_per_checkpoint == 0 or
         round_num == total_rounds - 1):
       save_checkpoint_start_time = time.time()
-      checkpoint_mngr.save_checkpoint(state, round_num)
+      try:
+        checkpoint_mngr.save_checkpoint(state, round_num)
+      except Exception:  # pylint: disable=broad-except
+        logging.info('Checkpoint saving exception: %s', Exception)
       train_metrics['save_checkpoint_secs'] = (
           time.time() - save_checkpoint_start_time)
 
@@ -232,14 +237,14 @@ def run(
     if train_eval_fn and round_num % rounds_per_train_eval == 0:
       # Compute metrics over the entire training dataset
       train_eval_start = time.time()
-      train_eval_metrics = train_eval_fn(_get_model_weights(state))
+      train_eval_metrics = train_eval_fn(state.model)
       train_eval_metrics['evaluate_secs'] = time.time() - train_eval_start
       metrics['train_eval'] = train_eval_metrics
 
     if round_num % rounds_per_eval == 0:
       # Compute validation metrics
       evaluate_start_time = time.time()
-      validation_metrics = validation_fn(_get_model_weights(state))
+      validation_metrics = validation_fn(state.model)
       validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
       metrics['eval'] = validation_metrics
       _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num)
@@ -251,21 +256,21 @@ def run(
 
   # Validation metrics
   evaluate_start_time = time.time()
-  validation_metrics = validation_fn(_get_model_weights(state))
+  validation_metrics = validation_fn(state.model)
   validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
   metrics['eval'] = validation_metrics
 
   # Training set metrics
   if train_eval_fn:
     train_eval_start = time.time()
-    train_eval_metrics = train_eval_fn(_get_model_weights(state))
+    train_eval_metrics = train_eval_fn(state.model)
     train_eval_metrics['evaluate_secs'] = time.time() - train_eval_start
     metrics['train_eval'] = train_eval_metrics
 
   # Test set metrics
   if test_fn:
     test_start_time = time.time()
-    test_metrics = test_fn(_get_model_weights(state))
+    test_metrics = test_fn(state.model)
     test_metrics['evaluate_secs'] = time.time() - test_start_time
     metrics['test'] = test_metrics
   _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num)
@@ -276,10 +281,13 @@ def run(
 class ClientIDShuffler(object):
   """Shuffling clients in federated learning for DP-FTRL."""
 
-  def __init__(self, clients_per_round: int,
-               client_data: tff.simulation.datasets.ClientData):
+  def __init__(self,
+               clients_per_round: int,
+               client_data: tff.simulation.datasets.ClientData,
+               drop_remainder: bool = True):
     self._client_ids = list(client_data.client_ids)
     self._clients_per_round = clients_per_round
+    self._drop_remainder = drop_remainder
     self._epoch = 0
     self._start_index = 0
 
@@ -304,7 +312,10 @@ class ClientIDShuffler(object):
     end_index = min(self._start_index + self._clients_per_round,
                     len(self._client_ids))
     sampled_ids = self._client_ids[self._start_index:end_index]
-    if end_index >= len(self._client_ids):
+    skip_remainder_flag = (
+        self._drop_remainder and
+        (end_index + self._clients_per_round) > len(self._client_ids))
+    if skip_remainder_flag or end_index >= len(self._client_ids):
       logging.info(
           'shuffling clients at epoch %d, round %d, client start index %d',
           epoch, round_num, self._start_index)

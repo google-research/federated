@@ -165,6 +165,12 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
         dp_tree_state=self.noise_generator.init_state(),
         momentum_buffer=_zero_state())
 
+  def restart_dp_tree(self, weight):
+    """Returns a reinitialized state based on the current model weights."""
+    state = self.init_state()
+    state['init_weight'] = weight
+    return state
+
 
 class DPSGDMServerOptimizer(ServerOptimizerBase):
   """Momentum DPSGD Optimizer."""

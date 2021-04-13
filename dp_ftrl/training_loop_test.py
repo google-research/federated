@@ -265,6 +265,23 @@ class ClientIDShufflerTest(tf.test.TestCase):
       epoch = new_epoch
     self.assertCountEqual(epoch2clientid[0], epoch2clientid[1])
 
+  def test_remainder(self):
+    clients_data = tff.simulation.datasets.stackoverflow.get_synthetic()
+    client_shuffer1 = training_loop.ClientIDShuffler(
+        len(clients_data.client_ids) - 1, clients_data, drop_remainder=True)
+    client_shuffer2 = training_loop.ClientIDShuffler(
+        len(clients_data.client_ids) - 1, clients_data, drop_remainder=False)
+    epoch1, epoch2, round_num = 0, 0, 0
+    total_rounds = 2
+    while round_num < total_rounds:
+      clients1, epoch1 = client_shuffer1.sample_client_ids(round_num, epoch1)
+      clients2, epoch2 = client_shuffer2.sample_client_ids(round_num, epoch2)
+      round_num += 1
+    self.assertEqual(len(clients1), len(clients_data.client_ids) - 1)
+    self.assertEqual(len(clients2), 1)
+    self.assertEqual(epoch1, 2)
+    self.assertEqual(epoch2, 1)
+
 
 if __name__ == '__main__':
   tf.test.main()

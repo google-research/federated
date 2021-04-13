@@ -193,6 +193,29 @@ def _server_optimizer_fn(model_weights, name, learning_rate, noise_std):
     raise ValueError('Unknown server optimizer name {}'.format(name))
 
 
+def _build_server_state_epoch_update_fn(server_optimizer_name, model_fn,
+                                        server_optimizer_fn):
+  """Build server update function: tree restart for FTRL."""
+  if server_optimizer_name == 'dpftrl' or server_optimizer_name == 'dpftrlm':
+    # A server optimzier is built to get a new state to restart the optimizer.
+    # A model is built to initialize the optimizer because the optimizer state
+    # depends on the shape of the model weights. The model and optimizer are
+    # only constructed once.
+    model = model_fn()
+    optimizer = server_optimizer_fn(model.weights.trainable)
+
+    def server_state_update(state):
+      return tff.structure.update_struct(
+          state,
+          model=state.model,
+          optimizer_state=optimizer.restart_dp_tree(state.model.trainable),
+          round_num=state.round_num)
+
+    return server_state_update
+  else:
+    return None
+
+
 def _client_optimizer_fn(name, learning_rate):
   if name == 'sgd':
     return tf.keras.optimizers.SGD(learning_rate)
@@ -256,7 +279,6 @@ def train_and_eval():
   keras_metics = _get_stackoverflow_metrics(FLAGS.vocab_size,
                                             FLAGS.num_oov_buckets)
   model = tff_model_fn()
-
   def evaluate_fn(model_weights, dataset):
     model.from_weights(model_weights)
     metrics = dp_fedavg.keras_evaluate(model.keras_model, dataset, keras_metics)
@@ -283,6 +305,8 @@ def train_and_eval():
                  FLAGS.total_epochs, FLAGS.total_rounds)
     total_epochs = FLAGS.total_epochs
 
+  server_state_update_fn = _build_server_state_epoch_update_fn(
+      FLAGS.server_optimizer, tff_model_fn, server_optimizer_fn)
   training_loop.run(
       iterative_process,
       client_dataset_ids_fn,
@@ -296,7 +320,8 @@ def train_and_eval():
       hparam_dict=hparam_dict,
       rounds_per_eval=FLAGS.rounds_per_eval,
       rounds_per_checkpoint=FLAGS.rounds_per_checkpoint,
-      rounds_per_train_eval=2000)
+      rounds_per_train_eval=2000,
+      server_state_epoch_update_fn=server_state_update_fn)
 
 
 def main(argv):
