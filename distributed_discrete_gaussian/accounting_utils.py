@@ -18,8 +18,7 @@ import math
 import numpy as np
 from scipy import optimize
 from scipy import special
-from tensorflow_privacy.privacy.analysis.rdp_accountant import compute_rdp
-from tensorflow_privacy.privacy.analysis.rdp_accountant import get_privacy_spent
+import tensorflow_privacy as tfp
 
 RDP_ORDERS = tuple(map(float, range(2, 21)))
 RDP_ORDERS += (22., 24., 28., 32., 64., 128., 256.)
@@ -155,10 +154,10 @@ def guass_noise_stddev_direct(epsilon, delta, norm_bound, tol=1.e-12):
 
 
 def get_eps_gaussian(q, noise_multiplier, steps, target_delta, orders):
-  """Simple wrapper on rdp_accountant."""
-  rdp = compute_rdp(
+  """Compute eps for the Gaussian mechanism given the DP params."""
+  rdp = tfp.compute_rdp(
       q=q, noise_multiplier=noise_multiplier, steps=steps, orders=orders)
-  eps, _, _ = get_privacy_spent(orders, rdp, target_delta=target_delta)
+  eps, _, _ = tfp.get_privacy_spent(orders, rdp, target_delta=target_delta)
   return eps
 
 
@@ -281,7 +280,7 @@ def get_ddgauss_epsilon(q,
 
   rdp = compute_rdp_discrete_gaussian_simplified(q, l2_scale, tau, dimension,
                                                  steps, orders)
-  eps, _, _ = get_privacy_spent(orders, rdp, target_delta=delta)
+  eps, _, _ = tfp.get_privacy_spent(orders, rdp, target_delta=delta)
   return eps
 
 

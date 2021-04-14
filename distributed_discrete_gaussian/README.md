@@ -10,15 +10,9 @@ Gaussian Mechanism for Federated Learning with Secure Aggregation".
 
 -   Bazel (build tool for running the scripts)
 -   Python dependencies: see `requirements.txt`.
--   Additional notes
-    -   Please install `tensorflow-privacy` directly from
-        [source](https://github.com/tensorflow/privacy#installing-tensorflow-privacy).
-        Some DP accounting code in the version available from `pip` may be
-        outdated and may influence performance.
-    -   You may also need the
-        [nightly build](https://pypi.org/project/tensorflow-federated-nightly/)
-        of Tensorflow Federated (TFF): `pip install
-        tensorflow-federated-nightly`.
+-   Note: You may need the
+    [nightly build](https://pypi.org/project/tensorflow-federated-nightly/) of
+    Tensorflow Federated (TFF): `pip install tensorflow-federated-nightly`.
 
 ## Directory Structure
 
@@ -56,21 +50,25 @@ There are two main components:
 
 ### Distributed Mean Estimation
 
-1.  Set the experiment parameters (e.g. bits, `n`, and `d`) in the Python script
-    `dme_run.py` for both the CLI flags and the constants in the `main()`
-    function.
-2.  Execute the script with:
+First, set the experiment parameters (e.g. bits, `n`, and `d`) in the Python
+script `dme_run.py` for both the CLI flags and the constants in the `main()`
+function.
+
+#### Sequential Execution
+
+Run the script with:
 
 ```
 bazel run :dme_run
 ```
 
-It also provides some basic plotting with the `--show_plot` flag.
+It also provides some basic plotting with the `--show_plot` flag. Note that by
+default the above script runs everything sequentially.
 
-Note that by default the script runs everything sequentially. For settings with
-large `n` and `d`, one simple approach to parallelization is to run different
-random dataset initializations over different processes, for instance with a
-for-loop in bash:
+#### Parallel Execution
+
+For settings with larger `n` and `d`, different random dataset initializations
+can be parallelized over different processes with a for-loop in `bash`:
 
 ```
 for i in `seq 10`; do
@@ -94,7 +92,7 @@ python3 dme_merge_repeats.py /tmp/ddg_dme_outputs/my_test_run/
 bazel run :fl_run_emnist -- <flags>
 ```
 
-The optimization flags can be set as:
+The optimizer flags can be set as:
 
 ```
 --server_optimizer=sgd --server_learning_rate=<slr> --server_sgd_momentum=0.9 \
@@ -136,8 +134,7 @@ Distributed discrete Gaussian achieves comparable utility to central
 differential privacy (Gaussian mechanism) under the same privacy budget on
 distributed mean estimation (left) and federated learning on EMNIST (right):
 
-<img src="images/dme-n1000-k2-linear.png" height="200px">
-<img src="images/emnist-eps10-k4.png" height="200px">
+<img src="images/dme-n1000-k2-linear.png" height="200px"><img src="images/emnist-eps10-k4.png" height="200px">
 
 ## Troubleshooting
 
