@@ -17,6 +17,7 @@ import abc
 import collections
 from typing import Any, Collection, Dict
 
+import attr
 import tensorflow as tf
 
 from dp_ftrl import tree_aggregation
@@ -71,6 +72,25 @@ class SGDServerOptimizer(ServerOptimizerBase):
     return collections.OrderedDict()
 
 
+@attr.s(eq=False, frozen=True, slots=True)
+class FTRLState(object):
+  """Class defining state of the DP-FTRL optimizer.
+
+  Attributes:
+    init_weight: A Collection[tf.Tensor] defining the initial weight.
+    sum_grad: A Collection[tf.Tensor] tracing the summation of gradient.
+    dp_tree_state: A `tree_aggregation.TreeState` tracking the state of the tree
+      aggregatin noise for the additive in DP-FTRL algorithm.
+    momentum_buffer:  A Collection[tf.Tensor] tracing the velocity in the
+      momentum variant. Momentum is applied to the (noised) summation of
+      gradients.
+  """
+  init_weight = attr.ib()
+  sum_grad = attr.ib()
+  dp_tree_state = attr.ib()
+  momentum_buffer = attr.ib()
+
+
 class DPFTRLMServerOptimizer(ServerOptimizerBase):
   """Momentum FTRL Optimizer with Tree aggregation for DP noise.
 
@@ -113,15 +133,12 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
           new_value_fn=_noise_fn)
 
   @tf.function
-  def model_update(self, state: Dict[str, Any], weight: Collection[tf.Variable],
-                   grad: Collection[tf.Tensor],
-                   round_idx: int) -> Dict[str, Any]:
+  def model_update(self, state: FTRLState, weight: Collection[tf.Variable],
+                   grad: Collection[tf.Tensor], round_idx: int) -> FTRLState:
     """Returns optimizer state after one step update."""
-    # TODO(b/172867399): use `attr.s` instead of ditionary for better
-    # readability and avoiding pack and unpack
-    init_weight, sum_grad, dp_tree_state, momentum_buffer = state[
-        'init_weight'], state['sum_grad'], state['dp_tree_state'], state[
-            'momentum_buffer']
+    init_weight, sum_grad, dp_tree_state, momentum_buffer = (
+        state.init_weight, state.sum_grad, state.dp_tree_state,
+        state.momentum_buffer)
     round_idx = tf.cast(round_idx, tf.int32)
     if tf.equal(round_idx, tf.constant(0, dtype=tf.int32)):
       init_weight = weight
@@ -146,30 +163,31 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
     tf.nest.map_structure(lambda w, w0, g: w.assign(w0 - self.lr * g), weight,
                           init_weight, delta_w)
 
-    state = collections.OrderedDict(
+    state = FTRLState(
         init_weight=init_weight,
         sum_grad=sum_grad,
         dp_tree_state=dp_tree_state,
         momentum_buffer=momentum_buffer)
     return state
 
-  def init_state(self) -> Dict[str, Any]:
+  def _zero_state(self):
+    return tf.nest.map_structure(tf.zeros, self.model_weight_shape)
+
+  def init_state(self) -> FTRLState:
     """Returns initialized optimizer and tree aggregation states."""
-
-    def _zero_state():
-      return tf.nest.map_structure(tf.zeros, self.model_weight_shape)
-
-    return collections.OrderedDict(
-        init_weight=_zero_state(),
-        sum_grad=_zero_state(),
+    return FTRLState(
+        init_weight=self._zero_state(),
+        sum_grad=self._zero_state(),
         dp_tree_state=self.noise_generator.init_state(),
-        momentum_buffer=_zero_state())
+        momentum_buffer=self._zero_state())
 
-  def restart_dp_tree(self, weight):
+  def restart_dp_tree(self, weight) -> FTRLState:
     """Returns a reinitialized state based on the current model weights."""
-    state = self.init_state()
-    state['init_weight'] = weight
-    return state
+    return FTRLState(
+        init_weight=weight,
+        sum_grad=self._zero_state(),
+        dp_tree_state=self.noise_generator.init_state(),
+        momentum_buffer=self._zero_state())
 
 
 class DPSGDMServerOptimizer(ServerOptimizerBase):

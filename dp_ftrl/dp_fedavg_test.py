@@ -273,11 +273,11 @@ class DPFedAvgTest(tf.test.TestCase, parameterized.TestCase):
       server_state, loss = it_process.next(server_state, federated_data)
       loss_list.append(loss)
       self.assertEqual(i + 1, server_state.round_num)
-      if 'server_state_type' in server_state.optimizer_state:
+      if server_state.optimizer_state is optimizer_utils.FTRLState:
         self.assertEqual(
             i + 1,
             tree_aggregation.get_step_idx(
-                server_state.optimizer_state['dp_tree_state']))
+                server_state.optimizer_state.dp_tree_state))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
   def test_self_contained_example_custom_model(self):
@@ -552,7 +552,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(
           i + 1,
           tree_aggregation.get_step_idx(
-              server_state.optimizer_state['dp_tree_state']))
+              server_state.optimizer_state.dp_tree_state))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
   def test_dpftal_restart(self, total_rounds=3):
@@ -600,7 +600,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(
           0,
           tree_aggregation.get_step_idx(
-              server_state.optimizer_state['dp_tree_state']))
+              server_state.optimizer_state.dp_tree_state))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
 
