@@ -8,6 +8,7 @@ py_library(
     name = "emnist_data_utils",
     srcs = ["emnist_data_utils.py"],
     srcs_version = "PY3",
+    deps = ["//utils/datasets:infinite_emnist"],
 )
 
 py_test(
