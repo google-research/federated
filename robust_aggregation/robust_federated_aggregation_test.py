@@ -43,7 +43,7 @@ def get_model_fn():
 
   def model_fn():
     keras_model = tf.keras.models.Sequential([
-        tf.keras.layers.Input(shape=(DIM,)),
+        tf.keras.layers.InputLayer(input_shape=(DIM,)),
         tf.keras.layers.Dense(1, kernel_initializer='zeros', use_bias=False)
     ])
     return tff.learning.from_keras_model(

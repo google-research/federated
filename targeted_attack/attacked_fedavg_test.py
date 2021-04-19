@@ -245,7 +245,7 @@ class ServerTest(tf.test.TestCase):
   def _assert_server_update_with_all_ones(self, model_fn):
     optimizer_fn = lambda: tf.keras.optimizers.SGD(learning_rate=0.1)
     model = tf.keras.models.Sequential([
-        tf.keras.layers.Input(shape=(784,)),
+        tf.keras.layers.InputLayer(input_shape=(784,)),
         tf.keras.layers.Flatten(),
         tf.keras.layers.Dense(units=10, kernel_initializer='zeros'),
         tf.keras.layers.Softmax(),

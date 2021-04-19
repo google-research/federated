@@ -34,7 +34,7 @@ def _create_client_data(num_batches=2):
 
 def _uncompiled_model_builder():
   keras_model = tf.keras.Sequential([
-      tf.keras.layers.Input(shape=(1,)),
+      tf.keras.layers.InputLayer(input_shape=(1,)),
       tf.keras.layers.Dense(
           units=1, kernel_initializer='zeros', bias_initializer='zeros')
   ])
