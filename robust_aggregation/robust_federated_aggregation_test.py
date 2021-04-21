@@ -138,19 +138,13 @@ def build_federated_process_for_test(model_fn, num_passes=5, tolerance=1e-6):
     return DummyClientComputation(model_fn(), client_weight_fn=None)
 
   # Build robust aggregation function
-  with tf.Graph().as_default():
-    # workaround since keras automatically appends "_n" to the nth call of
-    # `model_fn`
-    model_type = tff.framework.type_from_tensors(model_fn().weights.trainable)
-
-    aggregate_fn = rfa.build_stateless_robust_aggregation(
-        model_type, num_communication_passes=num_passes, tolerance=tolerance)
-
-    return tff.learning.framework.build_model_delta_optimizer_process(
-        model_fn,
-        client_fed_avg,
-        server_optimizer_fn,
-        aggregation_process=aggregate_fn)
+  aggregator = rfa.RobustWeiszfeldFactory(
+      num_communication_passes=num_passes, tolerance=tolerance)
+  return tff.learning.framework.build_model_delta_optimizer_process(
+      model_fn,
+      client_fed_avg,
+      server_optimizer_fn,
+      model_update_aggregation_factory=aggregator)
 
 
 def get_mean(dataset):
