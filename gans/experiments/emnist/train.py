@@ -398,7 +398,7 @@ def main(argv):
     print('{} : {} '.format(k, v))
 
   tff.backends.native.set_local_execution_context(
-      num_clients=FLAGS.num_clients_per_round)
+      default_num_clients=FLAGS.num_clients_per_round)
 
   # Trained classifier model.
   classifier_model = ecm.get_trained_emnist_classifier_model()
