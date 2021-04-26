@@ -121,14 +121,6 @@ class ReconstructionModel(object, metaclass=abc.ABCMeta):
     parameters, that is, variables that influence the predictions. Rather, this
     is done by the training loop.
 
-    Uses in TFF:
-      * To implement model evaluation.
-      * To implement federated gradient descent and other
-        non-Federated-Averaging algorithms, where we want the model to run the
-        forward pass and update metrics, but there is no optimizer
-        (we might only compute gradients on the returned loss).
-      * To implement Federated Averaging.
-
     Args:
       batch_input: a nested structure that matches the structure of
         `ReconstructionModel.input_spec` and each tensor in `batch_input`
@@ -140,7 +132,6 @@ class ReconstructionModel(object, metaclass=abc.ABCMeta):
         dropout or batch normalization is handled.
 
     Returns:
-      A `BatchOutput` object. The object must include the `loss` tensor if the
-      model will be trained via a gradient-based algorithm.
+      A `BatchOutput` object.
     """
     pass

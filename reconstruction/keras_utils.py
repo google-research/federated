@@ -14,7 +14,7 @@
 """Utilities for constructing reconstruction models from Keras models."""
 
 import collections
-from typing import Iterable, List, Sequence, Union
+from typing import Iterable, List
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -207,92 +207,6 @@ class MeanLossMetric(tf.keras.metrics.Mean):
     return dict(list(base_config.items()) + list(config.items()))
 
 
-def federated_aggregate_keras_metric(
-    metrics: Union[tf.keras.metrics.Metric, Sequence[tf.keras.metrics.Metric]],
-    federated_values: Union[tff.Value, Sequence[tff.Value]]
-) -> tff.federated_computation:
-  """Aggregates variables a keras metric placed at CLIENTS to SERVER.
-
-  Args:
-    metrics: a single `tf.keras.metrics.Metric` or a `Sequence` of metrics . The
-      order must match the order of variables in `federated_values`.
-    federated_values: a single federated value, or a `Sequence` of federated
-      values. The values must all have `tff.CLIENTS` placement. If value is a
-      `Sequence` type, it must match the order of the sequence in `metrics.
-
-  Returns:
-    The result of performing a federated sum on federated_values, then assigning
-    the aggregated values into the variables of the corresponding
-    `tf.keras.metrics.Metric` and calling `tf.keras.metrics.Metric.result`. The
-    resulting structure has `tff.SERVER` placement.
-  """
-  member_types = tf.nest.map_structure(lambda t: t.type_signature.member,
-                                       federated_values)
-
-  @tff.tf_computation
-  def zeros_fn():
-    # `member_type` is a (potentially nested) `tff.StructType`, which is an
-    # `structure.Struct`.
-    return tff.structure.map_structure(
-        lambda v: tf.zeros(v.shape, dtype=v.dtype), member_types)
-
-  zeros = zeros_fn()
-
-  @tff.tf_computation(member_types, member_types)
-  def accumulate(accumulators, variables):
-    return tf.nest.map_structure(tf.add, accumulators, variables)
-
-  @tff.tf_computation(member_types, member_types)
-  def merge(a, b):
-    return tf.nest.map_structure(tf.add, a, b)
-
-  @tff.tf_computation(member_types)
-  def report(accumulators):
-    """Insert `accumulators` back into the keras metric to obtain result."""
-
-    def finalize_metric(
-        metric: tf.keras.metrics.Metric,
-        values: Union[Sequence[tf.Tensor],
-                      collections.OrderedDict]) -> tff.Value:
-      # Note: the following call requires that `type(metric)` have a no argument
-      # __init__ method, which will restrict the types of metrics that can be
-      # used. This is somewhat limiting, but the pattern to use default
-      # arguments and export the values in `get_config()` (see
-      # `tf.keras.metrics.TopKCategoricalAccuracy`) works well.
-      keras_metric = None
-      try:
-        # This is some trickery to reconstruct a metric object in the current
-        # scope, so that the `tf.Variable`s get created when we desire.
-        keras_metric = type(metric).from_config(metric.get_config())
-      except TypeError as e:
-        # Re-raise the error with a more helpful message, but the previous stack
-        # trace.
-        raise TypeError(
-            'Caught exception trying to call `{t}.from_config()` with '
-            'config {c}. Confirm that {t}.__init__() has an argument for '
-            'each member of the config.\nException: {e}'.format(
-                t=type(metric), c=metric.config(), e=e))
-
-      assignments = []
-      for v, a in zip(keras_metric.variables, values):
-        assignments.append(v.assign(a))
-      with tf.control_dependencies(assignments):
-        return keras_metric.result()
-
-    if isinstance(metrics, tf.keras.metrics.Metric):
-      # Only a single metric to aggregate.
-      return finalize_metric(metrics, accumulators)
-    else:
-      # Otherwise map over all the metrics.
-      return collections.OrderedDict([
-          (name, finalize_metric(metric, values))
-          for metric, (name, values) in zip(metrics, accumulators.items())
-      ])
-
-  return tff.federated_aggregate(federated_values, zeros, accumulate, merge,
-                                 report)
-
-
 def read_metric_variables(
     metrics: List[tf.keras.metrics.Metric]) -> collections.OrderedDict:
   """Reads values from Keras metric variables."""
@@ -309,7 +223,8 @@ def federated_output_computation_from_metrics(
   This can be used to evaluate both Keras and non-Keras models using Keras
   metrics. Aggregates metrics across clients by summing their internal
   variables, producing new metrics with summed internal variables, and calling
-  metric.result() on each. See `federated_aggregate_keras_metric` for details.
+  metric.result() on each. See `tff.learning.federated_aggregate_keras_metric`
+  for details.
 
   Args:
     metrics: A List of `tf.keras.metrics.Metric` to aggregate.
@@ -327,7 +242,7 @@ def federated_output_computation_from_metrics(
   federated_local_outputs_type = tff.type_at_clients(metric_variable_type_dict)
 
   def federated_output(local_outputs):
-    return federated_aggregate_keras_metric(metrics, local_outputs)
+    return tff.learning.federated_aggregate_keras_metric(metrics, local_outputs)
 
   federated_output_computation = tff.federated_computation(
       federated_output, federated_local_outputs_type)

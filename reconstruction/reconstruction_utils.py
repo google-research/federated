@@ -95,9 +95,8 @@ def build_dataset_split_fn(recon_epochs_max: int = 1,
       client data after reconstruction.
     post_recon_steps_max: If not None, the integer maximum number of steps
       (batches) to iterate through after reconstruction. This maximum number of
-      steps is across all reconstruction iterations, i.e. it is applied after
-      `recon_epochs_max` and `recon_epochs_constant`. If None, this has no
-      effect.
+      steps is across all post-reconstruction iterations, i.e. it is applied
+      after `post_recon_epochs`. If None, this has no effect.
     split_dataset: If True, splits `client_dataset` in half for each user, using
       even-indexed entries in reconstruction and odd-indexed entries after
       reconstruction. If False, `client_dataset` is used for both reconstruction
