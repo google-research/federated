@@ -104,7 +104,7 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
                learning_rate: float,
                momentum: float,
                noise_std: float,
-               model_weight_shape: Collection[tf.Tensor],
+               model_weight_specs: Collection[tf.TensorSpec],
                efficient_tree: bool = True,
                use_nesterov: bool = False):
     """Initialize the momemtum DPFTRL Optimizer."""
@@ -115,22 +115,18 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
 
     self.lr = learning_rate
     self.momentum = momentum
-    self.model_weight_shape = model_weight_shape
+    self.model_weight_specs = model_weight_specs
     self.use_nesterov = use_nesterov
 
-    random_generator = tf.random.Generator.from_non_deterministic_state()
-
-    def _noise_fn():
-      return tf.nest.map_structure(
-          lambda x: random_generator.normal(x, stddev=noise_std),
-          model_weight_shape)
+    random_generator = tree_aggregation.GaussianNoiseGenerator(
+        noise_std, model_weight_specs)
 
     if efficient_tree:
       self.noise_generator = tree_aggregation.TFEfficientTreeAggregator(
-          new_value_fn=_noise_fn)
+          value_generator=random_generator)
     else:
       self.noise_generator = tree_aggregation.TFTreeAggregator(
-          new_value_fn=_noise_fn)
+          value_generator=random_generator)
 
   @tf.function
   def model_update(self, state: FTRLState, weight: Collection[tf.Variable],
@@ -171,7 +167,8 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
     return state
 
   def _zero_state(self):
-    return tf.nest.map_structure(tf.zeros, self.model_weight_shape)
+    return tf.nest.map_structure(lambda v: tf.zeros(v.shape, v.dtype),
+                                 self.model_weight_specs)
 
   def init_state(self) -> FTRLState:
     """Returns initialized optimizer and tree aggregation states."""
@@ -194,11 +191,11 @@ class DPSGDMServerOptimizer(ServerOptimizerBase):
   """Momentum DPSGD Optimizer."""
 
   def __init__(self, learning_rate: float, momentum: float, noise_std: float,
-               model_weight_shape: Collection[tf.Tensor]):
+               model_weight_specs: Collection[tf.TensorSpec]):
     """Initialize the momemtum DPSGD Optimizer."""
     self.lr = learning_rate
     self.momentum = momentum
-    self.model_weight_shape = model_weight_shape
+    self.model_weight_specs = model_weight_specs
 
     self.noise_std = noise_std
     # TODO(b/177243233): possibly add the state of noise generator to the state
@@ -210,15 +207,14 @@ class DPSGDMServerOptimizer(ServerOptimizerBase):
   def _noise_fn(self):
     """Returns random noise to be added for differential privacy."""
 
-    def noise_tensor(model_weight_shape):
-      noise = self.random_generator.normal(
-          model_weight_shape, stddev=self.noise_std)
+    def noise_tensor(spec):
+      noise = self.random_generator.normal(spec.shape, stddev=self.noise_std)
       # TODO(b/177259859): reshape because the shape of the noise could have
       # None/? that fails TFF type check.
-      noise = tf.reshape(noise, model_weight_shape)
+      noise = tf.reshape(noise, spec.shape)
       return noise
 
-    return tf.nest.map_structure(noise_tensor, self.model_weight_shape)
+    return tf.nest.map_structure(noise_tensor, self.model_weight_specs)
 
   @tf.function
   def model_update(self, state: Dict[str, Any], weight: Collection[tf.Variable],
@@ -240,6 +236,7 @@ class DPSGDMServerOptimizer(ServerOptimizerBase):
     """Returns initialized momentum buffer."""
 
     def _zero_state():
-      return tf.nest.map_structure(tf.zeros, self.model_weight_shape)
+      return tf.nest.map_structure(lambda v: tf.zeros(v.shape, v.dtype),
+                                   self.model_weight_specs)
 
     return collections.OrderedDict(momentum_buffer=_zero_state())

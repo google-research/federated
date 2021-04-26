@@ -18,7 +18,6 @@ from absl.testing import parameterized
 
 import numpy as np
 import tensorflow as tf
-import tensorflow_federated as tff
 
 from dp_ftrl import optimizer_utils
 
@@ -66,13 +65,14 @@ class OptimizerTest(tf.test.TestCase, parameterized.TestCase):
       ('sgd_m0.9s3', optimizer_utils.DPSGDMServerOptimizer, 0.9, 3, 0.561))
   def test_deterministic(self, optimizer_fn, momentum, steps, result):
     model_variables = _create_model_variables()
-    model_weight_shape = tf.nest.map_structure(tf.shape, model_variables)
+    model_weight_specs = tf.nest.map_structure(
+        lambda v: tf.TensorSpec(v.shape, v.dtype), model_variables)
     grad = tf.nest.map_structure(tf.ones_like, model_variables)
     optimizer = optimizer_fn(
         learning_rate=0.1,
         momentum=momentum,
         noise_std=0.0,
-        model_weight_shape=model_weight_shape)
+        model_weight_specs=model_weight_specs)
 
     state = optimizer.init_state()
     for i in range(steps):
@@ -98,13 +98,14 @@ class OptimizerTest(tf.test.TestCase, parameterized.TestCase):
 
     def _run_ftrl():
       model_variables = _create_model_variables()
-      model_weight_shape = tf.nest.map_structure(tf.shape, model_variables)
+      model_weight_specs = tf.nest.map_structure(
+          lambda v: tf.TensorSpec(v.shape, v.dtype), model_variables)
       grad = tf.nest.map_structure(tf.ones_like, model_variables)
       optimizer = optimizer_utils.DPFTRLMServerOptimizer(
           learning_rate=lr,
           momentum=momentum,
           noise_std=0.0,
-          model_weight_shape=model_weight_shape,
+          model_weight_specs=model_weight_specs,
           use_nesterov=nesterov)
 
       state = optimizer.init_state()
@@ -124,74 +125,6 @@ class OptimizerTest(tf.test.TestCase, parameterized.TestCase):
       return model_variables
 
     self.assertAllClose(_run_ftrl(), _run_keras())
-
-
-def _build_noise_generator():
-  return tf.random.Generator.from_non_deterministic_state()
-
-
-class RandomNoiseTest(tf.test.TestCase, parameterized.TestCase):
-
-  def test_random_generator_tf(self,
-                               noise_mean=1.0,
-                               noise_std=1.0,
-                               samples=2000,
-                               tolerance=0.07):
-    g = _build_noise_generator()
-
-    @tf.function
-    def return_noise(_):
-      return noise_mean + g.normal([], stddev=noise_std)
-
-    noises = tf.stack([return_noise(i) for i in range(samples)])
-    self.assertAllClose(
-        [tf.math.reduce_mean(noises),
-         tf.math.reduce_std(noises)], [noise_mean, noise_std],
-        rtol=tolerance)
-
-  def test_random_generator_tff(self,
-                                noise_mean=1.0,
-                                noise_std=1.0,
-                                samples=50,
-                                tolerance=0.5):
-
-    @tff.tf_computation
-    def return_noise_vector():
-      g = _build_noise_generator()
-
-      @tf.function
-      def return_noise(_):
-        return noise_mean + g.normal([], stddev=noise_std)
-
-      return tf.stack([return_noise(i) for i in range(samples)])
-
-    noises = return_noise_vector()
-    self.assertAllClose(
-        [tf.math.reduce_mean(noises),
-         tf.math.reduce_std(noises)], [noise_mean, noise_std],
-        rtol=tolerance)
-
-  def test_random_generator_tff2(self,
-                                 noise_mean=1.0,
-                                 noise_std=1.0,
-                                 samples=50,
-                                 tolerance=0.5):
-
-    @tff.tf_computation
-    def return_noise_tff(_):
-      g = _build_noise_generator()
-
-      @tf.function
-      def return_noise(_):
-        return noise_mean + g.normal([], stddev=noise_std)
-
-      return return_noise(_)
-
-    noises = tf.stack([return_noise_tff(i) for i in range(samples)])
-    self.assertAllClose(
-        [tf.math.reduce_mean(noises),
-         tf.math.reduce_std(noises)], [noise_mean, noise_std],
-        rtol=tolerance)
 
 
 if __name__ == '__main__':

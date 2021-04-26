@@ -122,7 +122,8 @@ def _get_emnist_dataset(
 
 def _server_optimizer_fn(model_weights, name, learning_rate, noise_std):
   """Returns server optimizer."""
-  model_weight_shape = tf.nest.map_structure(tf.shape, model_weights)
+  model_weight_specs = tf.nest.map_structure(
+      lambda v: tf.TensorSpec(v.shape, v.dtype), model_weights)
   if name == 'sgd':
     return optimizer_utils.SGDServerOptimizer(learning_rate)
   elif name == 'sgdm':
@@ -130,31 +131,31 @@ def _server_optimizer_fn(model_weights, name, learning_rate, noise_std):
         learning_rate,
         momentum=FLAGS.server_momentum,
         noise_std=0,
-        model_weight_shape=model_weight_shape)
+        model_weight_specs=model_weight_specs)
   elif name == 'dpftrl':
     return optimizer_utils.DPFTRLMServerOptimizer(
         learning_rate,
         momentum=0,
         noise_std=noise_std,
-        model_weight_shape=model_weight_shape)
+        model_weight_specs=model_weight_specs)
   elif name == 'dpsgd':
     return optimizer_utils.DPSGDMServerOptimizer(
         learning_rate,
         momentum=0,
         noise_std=noise_std,
-        model_weight_shape=model_weight_shape)
+        model_weight_specs=model_weight_specs)
   elif name == 'dpsgdm':
     return optimizer_utils.DPSGDMServerOptimizer(
         learning_rate,
         momentum=FLAGS.server_momentum,
         noise_std=noise_std,
-        model_weight_shape=model_weight_shape)
+        model_weight_specs=model_weight_specs)
   elif name == 'dpftrlm':
     return optimizer_utils.DPFTRLMServerOptimizer(
         learning_rate,
         momentum=FLAGS.server_momentum,
         noise_std=noise_std,
-        model_weight_shape=model_weight_shape)
+        model_weight_specs=model_weight_specs)
   else:
     raise ValueError('Unknown server optimizer name {}'.format(name))
 

@@ -16,7 +16,20 @@ import math
 from absl.testing import parameterized
 
 import tensorflow as tf
+import tensorflow_federated as tff
 from dp_ftrl import tree_aggregation
+
+
+class ConstantValueGenerator(tree_aggregation.ValueGenerator):
+
+  def __init__(self, constant_value):
+    self.constant_value = constant_value
+
+  def initialize(self):
+    return ()
+
+  def next(self, state):
+    return self.constant_value, state
 
 
 class TreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
@@ -36,7 +49,7 @@ class TreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
     # node is a constant `node_value` for test purpose. Note that `node_value`
     # denotes the "noise" without private values in private algorithms.
     tree_aggregator = tree_aggregation.TFTreeAggregator(
-        new_value_fn=lambda: node_value)
+        value_generator=ConstantValueGenerator(node_value))
     state = tree_aggregator.init_state()
     for leaf_node_idx in range(total_steps):
       self.assertEqual(leaf_node_idx, tree_aggregation.get_step_idx(state))
@@ -64,7 +77,32 @@ class TreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
     # is a constant `node_value` for test purpose. Note that `node_value`
     # denotes the "noise" without private values in private algorithms.
     tree_aggregator = tree_aggregation.TFTreeAggregator(
-        new_value_fn=lambda: node_value)
+        value_generator=ConstantValueGenerator(node_value))
+    state = tree_aggregator.init_state()
+    for leaf_node_idx in range(total_steps):
+      self.assertEqual(leaf_node_idx, tree_aggregation.get_step_idx(state))
+      val, state = tree_aggregator.get_cumsum_and_update(state)
+    self.assertEqual(expected_value, val)
+
+  @parameterized.named_parameters(
+      ('total16_step1', 16, 1, 1),
+      ('total17_step1', 17, 2, 1),
+      ('total18_step1', 18, 2, 1),
+      ('total19_step1', 19, 3, 1),
+      ('total20_step0d5', 20, 1, 0.5),
+      ('total21_step2', 21, 6, 2),
+      ('total1024_step1', 1024, 1, 1),
+      ('total1025_step1', 1025, 2, 1),
+      ('total1026_step1', 1026, 2, 1),
+      ('total1027_step1', 1027, 3, 1),
+      ('total1028_step0d5', 1028, 1, 0.5),
+      ('total1029_step2', 1029, 6, 2),
+  )
+  def test_tree_sum_last_step_expected_value_fn(self, total_steps,
+                                                expected_value, node_value):
+    # Test no-arg function as stateless value generator.
+    tree_aggregator = tree_aggregation.TFTreeAggregator(
+        value_generator=lambda: node_value)
     state = tree_aggregator.init_state()
     for leaf_node_idx in range(total_steps):
       self.assertEqual(leaf_node_idx, tree_aggregation.get_step_idx(state))
@@ -81,7 +119,7 @@ class TreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_tree_sum_steps_max(self, total_steps, node_value):
     tree_aggregator = tree_aggregation.TFTreeAggregator(
-        new_value_fn=lambda: node_value)
+        value_generator=ConstantValueGenerator(node_value))
     max_val = node_value * math.ceil(math.log2(total_steps))
     state = tree_aggregator.init_state()
     for leaf_node_idx in range(total_steps):
@@ -90,25 +128,23 @@ class TreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
       self.assertLessEqual(val, max_val)
 
   @parameterized.named_parameters(
-      ('total4_std1_d1000', 4, [1, 1, 2, 1], 1, [1000], 0.1),
-      ('total4_std1_d10000', 4, [1, 1, 2, 1], 1, [10000], 0.03),
-      ('total7_std1_d1000', 7, [1, 1, 2, 1, 2, 2, 3], 1, [1000], 0.1),
-      ('total8_std1_d1000', 8, [1, 1, 2, 1, 2, 2, 3, 1], 1, [1000], 0.1),
-      ('total8_std2_d1000', 8, [4, 4, 8, 4, 8, 8, 12, 4], 2, [1000], 0.1),
+      ('total4_std1_d1000', 4, [1, 1, 2, 1], 1, [1000], 0.15),
+      ('total4_std1_d10000', 4, [1, 1, 2, 1], 1, [10000], 0.05),
+      ('total7_std1_d1000', 7, [1, 1, 2, 1, 2, 2, 3], 1, [1000], 0.15),
+      ('total8_std1_d1000', 8, [1, 1, 2, 1, 2, 2, 3, 1], 1, [1000], 0.15),
+      ('total8_std2_d1000', 8, [4, 4, 8, 4, 8, 8, 12, 4], 2, [1000], 0.15),
       ('total8_std0d5_d1000', 8, [0.25, 0.25, 0.5, 0.25, 0.5, 0.5, 0.75, 0.25
-                                 ], 0.5, [1000], 0.1))
+                                 ], 0.5, [1000], 0.15))
   def test_tree_sum_noise_expected(self, total_steps, expected_variance,
                                    noise_std, variable_shape, tolerance):
     # Test whether `tree_aggregator` will output `expected_variance` (within a
     # relative `tolerance`) in each step when `total_steps` of leaf nodes are
     # traversed. Each tree node is a `variable_shape` tensor of Gaussian noise
     # with `noise_std`.
-    random_generator = tf.random.Generator.from_seed(0)
-
-    def get_noise():
-      return random_generator.normal(shape=variable_shape, stddev=noise_std)
-
-    tree_aggregator = tree_aggregation.TFTreeAggregator(new_value_fn=get_noise)
+    random_generator = tree_aggregation.GaussianNoiseGenerator(
+        noise_std, tf.TensorSpec(variable_shape))
+    tree_aggregator = tree_aggregation.TFTreeAggregator(
+        value_generator=random_generator)
     state = tree_aggregator.init_state()
     for leaf_node_idx in range(total_steps):
       self.assertEqual(leaf_node_idx, tree_aggregation.get_step_idx(state))
@@ -120,16 +156,13 @@ class TreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_cumsum_vector(self, total_steps=15):
 
-    def new_value_fn():
-      return [
-          tf.ones([2, 2], dtype=tf.float32),
-          tf.constant([2], dtype=tf.float32)
-      ]
-
     tree_aggregator = tree_aggregation.TFTreeAggregator(
-        new_value_fn=new_value_fn)
+        value_generator=ConstantValueGenerator([
+            tf.ones([2, 2], dtype=tf.float32),
+            tf.constant([2], dtype=tf.float32)
+        ]))
     tree_aggregator_truth = tree_aggregation.TFTreeAggregator(
-        new_value_fn=lambda: 1)
+        value_generator=ConstantValueGenerator(1.))
     state = tree_aggregator.init_state()
     truth_state = tree_aggregator_truth.init_state()
     for leaf_node_idx in range(total_steps):
@@ -174,7 +207,7 @@ class EfficientTreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
     # `expected_value` is based on a weighting schema strongly depends on the
     # depth of the binary tree.
     tree_aggregator = tree_aggregation.TFEfficientTreeAggregator(
-        new_value_fn=lambda: step_value)
+        value_generator=ConstantValueGenerator(step_value))
     state = tree_aggregator.init_state()
     for leaf_node_idx in range(total_steps):
       self.assertEqual(leaf_node_idx, tree_aggregation.get_step_idx(state))
@@ -182,12 +215,12 @@ class EfficientTreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(expected_value, val)
 
   @parameterized.named_parameters(
-      ('total4_std1_d1000', 4, 4. / 7., 1., [1000], 0.1),
-      ('total4_std1_d10000', 4, 4. / 7., 1., [10000], 0.03),
-      ('total7_std1_d1000', 7, 4. / 7. + 2. / 3. + 1., 1, [1000], 0.1),
-      ('total8_std1_d1000', 8, 8. / 15., 1., [1000], 0.1),
-      ('total8_std2_d1000', 8, 8. / 15. * 4, 2., [1000], 0.1),
-      ('total8_std0d5_d1000', 8, 8. / 15. * .25, .5, [1000], 0.1))
+      ('total4_std1_d1000', 4, 4. / 7., 1., [1000], 0.15),
+      ('total4_std1_d10000', 4, 4. / 7., 1., [10000], 0.05),
+      ('total7_std1_d1000', 7, 4. / 7. + 2. / 3. + 1., 1, [1000], 0.15),
+      ('total8_std1_d1000', 8, 8. / 15., 1., [1000], 0.15),
+      ('total8_std2_d1000', 8, 8. / 15. * 4, 2., [1000], 0.15),
+      ('total8_std0d5_d1000', 8, 8. / 15. * .25, .5, [1000], 0.15))
   def test_tree_sum_noise_expected(self, total_steps, expected_variance,
                                    noise_std, variable_shape, tolerance):
     # Test whether `tree_aggregator` will output `expected_variance` (within a
@@ -196,13 +229,10 @@ class EfficientTreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
     # `noise_std`. Note that the variance of a tree node is smaller than
     # the given vanilla node `noise_std` because of the update rule of
     # `TFEfficientTreeAggregator`.
-    random_generator = tf.random.Generator.from_seed(0)
-
-    def get_noise():
-      return random_generator.normal(shape=variable_shape, stddev=noise_std)
-
+    random_generator = tree_aggregation.GaussianNoiseGenerator(
+        noise_std, tf.TensorSpec(variable_shape))
     tree_aggregator = tree_aggregation.TFEfficientTreeAggregator(
-        new_value_fn=get_noise)
+        value_generator=random_generator)
     state = tree_aggregator.init_state()
     for leaf_node_idx in range(total_steps):
       self.assertEqual(leaf_node_idx, tree_aggregation.get_step_idx(state))
@@ -224,15 +254,12 @@ class EfficientTreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
     # Gaussian noise with `noise_std`. A small `tolerance` is used for numerical
     # stability, `tolerance==0` means `TFEfficientTreeAggregator` is strictly
     # better than `TFTreeAggregator` for reducing variance.
-    random_generator = tf.random.Generator.from_seed(0)
-
-    def get_noise():
-      return random_generator.normal(shape=variable_shape, stddev=noise_std)
-
+    random_generator = tree_aggregation.GaussianNoiseGenerator(
+        noise_std, tf.TensorSpec(variable_shape))
     tree_aggregator = tree_aggregation.TFEfficientTreeAggregator(
-        new_value_fn=get_noise)
+        value_generator=random_generator)
     tree_aggregator_baseline = tree_aggregation.TFTreeAggregator(
-        new_value_fn=get_noise)
+        value_generator=random_generator)
 
     state = tree_aggregator.init_state()
     state_baseline = tree_aggregator_baseline.init_state()
@@ -247,16 +274,13 @@ class EfficientTreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_cumsum_vector(self, total_steps=15):
 
-    def new_value_fn():
-      return [
-          tf.ones([2, 2], dtype=tf.float32),
-          tf.constant([2], dtype=tf.float32)
-      ]
-
     tree_aggregator = tree_aggregation.TFEfficientTreeAggregator(
-        new_value_fn=new_value_fn)
+        value_generator=ConstantValueGenerator([
+            tf.ones([2, 2], dtype=tf.float32),
+            tf.constant([2], dtype=tf.float32)
+        ]))
     tree_aggregator_truth = tree_aggregation.TFEfficientTreeAggregator(
-        new_value_fn=lambda: 1.)
+        value_generator=ConstantValueGenerator(1.))
     state = tree_aggregator.init_state()
     truth_state = tree_aggregator_truth.init_state()
     for leaf_node_idx in range(total_steps):
@@ -272,6 +296,68 @@ class EfficientTreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
           expected_val * tf.constant([2], dtype=tf.float32),
       ]
       tf.nest.map_structure(self.assertAllClose, val, expected_result)
+
+
+class GaussianNoiseGeneratorTest(tf.test.TestCase):
+
+  def test_random_generator_tf(self,
+                               noise_mean=1.0,
+                               noise_std=1.0,
+                               samples=2000,
+                               tolerance=0.07):
+    g = tree_aggregation.GaussianNoiseGenerator(
+        noise_std, specs=tf.TensorSpec([]))
+    gstate = g.initialize()
+
+    @tf.function
+    def return_noise(state):
+      value, state = g.next(state)
+      return noise_mean + value, state
+
+    noise_values = []
+    for _ in range(samples):
+      value, gstate = return_noise(gstate)
+      noise_values.append(value)
+    noise_values = tf.stack(noise_values)
+    self.assertAllClose(
+        [tf.math.reduce_mean(noise_values),
+         tf.math.reduce_std(noise_values)], [noise_mean, noise_std],
+        rtol=tolerance)
+
+  def test_random_generator_tff(self,
+                                noise_mean=1.0,
+                                noise_std=1.0,
+                                samples=50,
+                                tolerance=0.5):
+
+    g = tree_aggregation.GaussianNoiseGenerator(
+        noise_std, specs=tf.TensorSpec([]))
+
+    @tff.tf_computation
+    def initialize_state():
+      return g.initialize()
+
+    @tff.tf_computation
+    def return_noise_tff(state):
+
+      @tf.function
+      def return_noise(state):
+        value, state = g.next(state)
+        return noise_mean + value, state
+
+      return return_noise(state)
+
+    noise_values = []
+    gstate = initialize_state()
+    for _ in range(samples):
+      value, gstate = return_noise_tff(gstate)
+      noise_values.append(value)
+    noise_values = tf.stack(noise_values)
+
+    self.assertAllClose(
+        [tf.math.reduce_mean(noise_values),
+         tf.math.reduce_std(noise_values)], [noise_mean, noise_std],
+        rtol=tolerance)
 
 
 if __name__ == '__main__':

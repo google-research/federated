@@ -249,12 +249,13 @@ class DPFedAvgTest(tf.test.TestCase, parameterized.TestCase):
   def test_dp_momentum_training(self, model_fn, optimzer_fn, total_rounds=3):
 
     def server_optimzier_fn(model_weights):
-      model_weight_shape = tf.nest.map_structure(tf.shape, model_weights)
+      model_weight_specs = tf.nest.map_structure(
+          lambda v: tf.TensorSpec(v.shape, v.dtype), model_weights)
       return optimzer_fn(
           learning_rate=1.0,
           momentum=0.9,
           noise_std=1e-5,
-          model_weight_shape=model_weight_shape)
+          model_weight_specs=model_weight_specs)
 
     it_process = dp_fedavg.build_federated_averaging_process(
         model_fn, server_optimizer_fn=server_optimzier_fn)
@@ -521,12 +522,13 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
                            nesterov):
 
     def server_optimzier_fn(model_weights):
-      model_weight_shape = tf.nest.map_structure(tf.shape, model_weights)
+      model_weight_specs = tf.nest.map_structure(
+          lambda v: tf.TensorSpec(v.shape, v.dtype), model_weights)
       return optimizer_utils.DPFTRLMServerOptimizer(
           learning_rate=0.1,
           momentum=0.9,
           noise_std=1e-5,
-          model_weight_shape=model_weight_shape,
+          model_weight_specs=model_weight_specs,
           efficient_tree=efficient_tree,
           use_nesterov=nesterov)
 
@@ -558,12 +560,13 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
   def test_dpftal_restart(self, total_rounds=3):
 
     def server_optimizer_fn(model_weights):
-      model_weight_shape = tf.nest.map_structure(tf.shape, model_weights)
+      model_weight_specs = tf.nest.map_structure(
+          lambda v: tf.TensorSpec(v.shape, v.dtype), model_weights)
       return optimizer_utils.DPFTRLMServerOptimizer(
           learning_rate=0.1,
           momentum=0.9,
           noise_std=1e-5,
-          model_weight_shape=model_weight_shape,
+          model_weight_specs=model_weight_specs,
           efficient_tree=True,
           use_nesterov=True)
 
