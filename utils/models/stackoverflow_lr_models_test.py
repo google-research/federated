@@ -19,7 +19,7 @@ from utils.models import stackoverflow_lr_models
 
 class ModelCollectionTest(tf.test.TestCase):
 
-  def test_lr_model(self):
+  def test_lr_model_constructs_with_expected_size(self):
     tokens = tf.random.normal([4, 1000])
     model = stackoverflow_lr_models.create_logistic_model(1000, 10)
     predicted_tags = model(tokens)
@@ -27,6 +27,24 @@ class ModelCollectionTest(tf.test.TestCase):
     self.assertIsNotNone(predicted_tags)
     self.assertEqual(predicted_tags.shape, [4, 10])
     self.assertEqual(model.count_params(), num_model_params)
+
+  def test_model_initialization_uses_random_seed(self):
+    vocab_size = 1000
+    tag_size = 10
+    model_1_with_seed_0 = stackoverflow_lr_models.create_logistic_model(
+        vocab_size, tag_size, seed=0)
+    model_2_with_seed_0 = stackoverflow_lr_models.create_logistic_model(
+        vocab_size, tag_size, seed=0)
+    model_1_with_seed_1 = stackoverflow_lr_models.create_logistic_model(
+        vocab_size, tag_size, seed=1)
+    model_2_with_seed_1 = stackoverflow_lr_models.create_logistic_model(
+        vocab_size, tag_size, seed=1)
+    self.assertAllClose(model_1_with_seed_0.weights,
+                        model_2_with_seed_0.weights)
+    self.assertAllClose(model_1_with_seed_1.weights,
+                        model_2_with_seed_1.weights)
+    self.assertNotAllClose(model_1_with_seed_0.weights,
+                           model_1_with_seed_1.weights)
 
 
 if __name__ == '__main__':

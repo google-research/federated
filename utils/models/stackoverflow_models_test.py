@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from absl.testing import absltest
 import numpy as np
 import tensorflow as tf
 
 from utils.models import stackoverflow_models
 
 
-class KerasSequenceModelsTest(absltest.TestCase):
+class KerasSequenceModelsTest(tf.test.TestCase):
 
   def test_constructs(self):
     model = stackoverflow_models.create_recurrent_model(10, name='rnn-lstm')
@@ -47,6 +46,22 @@ class KerasSequenceModelsTest(absltest.TestCase):
 
     self.assertTrue(np.all(np.linalg.norm(embedding_grad, axis=1) > 0.0))
 
+  def test_model_initialization_uses_random_seed(self):
+    model_1_with_seed_0 = stackoverflow_models.create_recurrent_model(
+        vocab_size=10, seed=0)
+    model_2_with_seed_0 = stackoverflow_models.create_recurrent_model(
+        vocab_size=10, seed=0)
+    model_1_with_seed_1 = stackoverflow_models.create_recurrent_model(
+        vocab_size=10, seed=1)
+    model_2_with_seed_1 = stackoverflow_models.create_recurrent_model(
+        vocab_size=10, seed=1)
+    self.assertAllClose(model_1_with_seed_0.weights,
+                        model_2_with_seed_0.weights)
+    self.assertAllClose(model_1_with_seed_1.weights,
+                        model_2_with_seed_1.weights)
+    self.assertNotAllClose(model_1_with_seed_0.weights,
+                           model_1_with_seed_1.weights)
+
 
 if __name__ == '__main__':
-  absltest.main()
+  tf.test.main()

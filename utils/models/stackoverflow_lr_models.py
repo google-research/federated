@@ -13,25 +13,31 @@
 # limitations under the License.
 """Sequence model functions for research baselines."""
 
+from typing import Optional
+
 import tensorflow as tf
 
 
-def create_logistic_model(vocab_tokens_size, vocab_tags_size):
+def create_logistic_model(vocab_tokens_size: int,
+                          vocab_tags_size: int,
+                          seed: Optional[int] = 0):
   """Logistic regression to predict tags of StackOverflow.
 
   Args:
-      vocab_tokens_size: Size of token vocabulary to use.
-      vocab_tags_size: Size of token vocabulary to use.
+    vocab_tokens_size: Size of token vocabulary to use.
+    vocab_tags_size: Size of token vocabulary to use.
+    seed: A random seed governing the model initialization and layer randomness.
+      If set to `None`, No random seed is used.
 
   Returns:
-    `tf.keras.Model`.
+    A `tf.keras.Model`.
   """
   model = tf.keras.models.Sequential([
       tf.keras.layers.Dense(
           vocab_tags_size,
           activation='sigmoid',
-          input_shape=(vocab_tokens_size,)
-          ),
+          input_shape=(vocab_tokens_size,),
+          kernel_initializer=tf.keras.initializers.GlorotNormal(seed=seed)),
   ])
 
   return model

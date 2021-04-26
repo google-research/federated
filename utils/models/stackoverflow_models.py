@@ -13,6 +13,9 @@
 # limitations under the License.
 """Sequence model functions for research baselines."""
 
+import functools
+from typing import Optional
+
 import tensorflow as tf
 
 
@@ -29,24 +32,27 @@ class TransposableEmbedding(tf.keras.layers.Layer):
     return tf.matmul(inputs, self.embeddings, transpose_b=True)
 
 
-def create_recurrent_model(vocab_size=10000,
-                           num_oov_buckets=1,
-                           embedding_size=96,
-                           latent_size=670,
-                           num_layers=1,
-                           name='rnn',
-                           shared_embedding=False):
+def create_recurrent_model(vocab_size: int = 10000,
+                           num_oov_buckets: int = 1,
+                           embedding_size: int = 96,
+                           latent_size: int = 670,
+                           num_layers: int = 1,
+                           name: str = 'rnn',
+                           shared_embedding: bool = False,
+                           seed: Optional[int] = 0):
   """Constructs zero-padded keras model with the given parameters and cell.
 
   Args:
-      vocab_size: Size of vocabulary to use.
-      num_oov_buckets: Number of out of vocabulary buckets.
-      embedding_size: The size of the embedding.
-      latent_size: The size of the recurrent state.
-      num_layers: The number of layers.
-      name: (Optional) string to name the returned `tf.keras.Model`.
-      shared_embedding: (Optional) Whether to tie the input and output
-        embeddings.
+    vocab_size: Size of vocabulary to use.
+    num_oov_buckets: Number of out of vocabulary buckets.
+    embedding_size: The size of the embedding.
+    latent_size: The size of the recurrent state.
+    num_layers: The number of layers.
+    name: (Optional) string to name the returned `tf.keras.Model`.
+    shared_embedding: (Optional) Whether to tie the input and output
+      embeddings.
+    seed: A random seed governing the model initialization and layer randomness.
+      If set to `None`, No random seed is used.
 
   Returns:
     `tf.keras.Model`.
@@ -54,22 +60,38 @@ def create_recurrent_model(vocab_size=10000,
   extended_vocab_size = vocab_size + 3 + num_oov_buckets  # For pad/bos/eos/oov.
   inputs = tf.keras.layers.Input(shape=(None,))
   input_embedding = tf.keras.layers.Embedding(
-      input_dim=extended_vocab_size, output_dim=embedding_size, mask_zero=True)
+      input_dim=extended_vocab_size,
+      output_dim=embedding_size,
+      mask_zero=True,
+      embeddings_initializer=tf.keras.initializers.RandomUniform(seed=seed),
+  )
   embedded = input_embedding(inputs)
   projected = embedded
 
+  lstm_layer_builder = functools.partial(
+      tf.keras.layers.LSTM,
+      units=latent_size,
+      return_sequences=True,
+      recurrent_initializer=tf.keras.initializers.Orthogonal(seed=seed),
+      kernel_initializer=tf.keras.initializers.HeNormal(seed=seed))
+
+  dense_layer_builder = functools.partial(
+      tf.keras.layers.Dense,
+      kernel_initializer=tf.keras.initializers.GlorotNormal(seed=seed))
+
   for _ in range(num_layers):
-    layer = tf.keras.layers.LSTM(latent_size, return_sequences=True)
+    layer = lstm_layer_builder()
     processed = layer(projected)
     # A projection changes dimension from rnn_layer_size to input_embedding_size
-    projected = tf.keras.layers.Dense(embedding_size)(processed)
+    dense_layer = dense_layer_builder(units=embedding_size)
+    projected = dense_layer(processed)
 
   if shared_embedding:
     transposed_embedding = TransposableEmbedding(input_embedding)
     logits = transposed_embedding(projected)
   else:
-    logits = tf.keras.layers.Dense(
-        extended_vocab_size, activation=None)(
-            projected)
+    final_dense_layer = dense_layer_builder(
+        units=extended_vocab_size, activation=None)
+    logits = final_dense_layer(projected)
 
   return tf.keras.Model(inputs=inputs, outputs=logits, name=name)

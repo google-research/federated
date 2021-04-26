@@ -56,6 +56,22 @@ class ModelsTest(tf.test.TestCase):
 
     self.assertNotAllClose(mask_metrics, no_mask_metrics, atol=1e-3)
 
+  def test_model_initialization_uses_random_seed(self):
+    model_1_with_seed_0 = shakespeare_models.create_recurrent_model(
+        vocab_size=6, sequence_length=5, seed=0)
+    model_2_with_seed_0 = shakespeare_models.create_recurrent_model(
+        vocab_size=6, sequence_length=5, seed=0)
+    model_1_with_seed_1 = shakespeare_models.create_recurrent_model(
+        vocab_size=6, sequence_length=5, seed=1)
+    model_2_with_seed_1 = shakespeare_models.create_recurrent_model(
+        vocab_size=6, sequence_length=5, seed=1)
+    self.assertAllClose(model_1_with_seed_0.weights,
+                        model_2_with_seed_0.weights)
+    self.assertAllClose(model_1_with_seed_1.weights,
+                        model_2_with_seed_1.weights)
+    self.assertNotAllClose(model_1_with_seed_0.weights,
+                           model_1_with_seed_1.weights)
+
 
 if __name__ == '__main__':
   tf.test.main()

@@ -48,7 +48,8 @@ def _conv_norm_relu(input_tensor,
                     filters,
                     kernel_size,
                     strides=(1, 1),
-                    norm='group'):
+                    norm='group',
+                    seed=0):
   """Helper function to make a Conv -> Norm -> ReLU block."""
   x = tf.keras.layers.Conv2D(
       filters,
@@ -56,7 +57,7 @@ def _conv_norm_relu(input_tensor,
       strides=strides,
       padding='same',
       use_bias=False,
-      kernel_initializer='he_normal',
+      kernel_initializer=tf.keras.initializers.HeNormal(seed=seed),
       kernel_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY))(
           input_tensor)
   return _norm_relu(x, norm=norm)
@@ -66,7 +67,8 @@ def _norm_relu_conv(input_tensor,
                     filters,
                     kernel_size,
                     strides=(1, 1),
-                    norm='group'):
+                    norm='group',
+                    seed=0):
   """Helper function to make a Norm -> ReLU -> Conv block."""
   x = _norm_relu(input_tensor, norm=norm)
   x = tf.keras.layers.Conv2D(
@@ -75,12 +77,13 @@ def _norm_relu_conv(input_tensor,
       strides=strides,
       padding='same',
       use_bias=False,
-      kernel_initializer='he_normal',
-      kernel_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY))(x)
+      kernel_initializer=tf.keras.initializers.HeNormal(seed=seed),
+      kernel_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY))(
+          x)
   return x
 
 
-def _shortcut(input_tensor, residual, norm='group'):
+def _shortcut(input_tensor, residual, norm='group', seed=0):
   """Adds a shortcut between input and the residual."""
   input_shape = tf.keras.backend.int_shape(input_tensor)
   residual_shape = tf.keras.backend.int_shape(residual)
@@ -107,7 +110,7 @@ def _shortcut(input_tensor, residual, norm='group'):
         strides=(stride_width, stride_height),
         padding='valid',
         use_bias=False,
-        kernel_initializer='he_normal',
+        kernel_initializer=tf.keras.initializers.HeNormal(seed=seed),
         kernel_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY))(
             shortcut)
 
@@ -126,7 +129,8 @@ def _basic_block(input_tensor,
                  filters,
                  strides=(1, 1),
                  avoid_norm=False,
-                 norm='group'):
+                 norm='group',
+                 seed=0):
   """Basic convolutional block for use on resnets with <= 34 layers."""
   if avoid_norm:
     x = tf.keras.layers.Conv2D(
@@ -135,7 +139,7 @@ def _basic_block(input_tensor,
         strides=strides,
         padding='same',
         use_bias=False,
-        kernel_initializer='he_normal',
+        kernel_initializer=tf.keras.initializers.HeNormal(seed=seed),
         kernel_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY))(
             input_tensor)
   else:
@@ -144,18 +148,25 @@ def _basic_block(input_tensor,
         filters=filters,
         kernel_size=(3, 3),
         strides=strides,
-        norm=norm)
+        norm=norm,
+        seed=seed)
 
   x = _norm_relu_conv(
-      x, filters=filters, kernel_size=(3, 3), strides=strides, norm=norm)
-  return _shortcut(input_tensor, x, norm=norm)
+      x,
+      filters=filters,
+      kernel_size=(3, 3),
+      strides=strides,
+      norm=norm,
+      seed=seed)
+  return _shortcut(input_tensor, x, norm=norm, seed=seed)
 
 
 def _bottleneck_block(input_tensor,
                       filters,
                       strides=(1, 1),
                       avoid_norm=False,
-                      norm='group'):
+                      norm='group',
+                      seed=0):
   """Bottleneck convolutional block for use on resnets with > 34 layers."""
   if avoid_norm:
     x = tf.keras.layers.Conv2D(
@@ -164,7 +175,7 @@ def _bottleneck_block(input_tensor,
         strides=strides,
         padding='same',
         use_bias=False,
-        kernel_initializer='he_normal',
+        kernel_initializer=tf.keras.initializers.HeNormal(seed=seed),
         kernel_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY))(
             input_tensor)
   else:
@@ -173,14 +184,25 @@ def _bottleneck_block(input_tensor,
         filters=filters,
         kernel_size=(1, 1),
         strides=strides,
-        norm=norm)
+        norm=norm,
+        seed=seed)
 
   x = _norm_relu_conv(
-      x, filters=filters, kernel_size=(3, 3), strides=strides, norm=norm)
+      x,
+      filters=filters,
+      kernel_size=(3, 3),
+      strides=strides,
+      norm=norm,
+      seed=seed)
 
   x = _norm_relu_conv(
-      x, filters=filters * 4, kernel_size=(1, 1), strides=strides, norm=norm)
-  return _shortcut(input_tensor, x, norm=norm)
+      x,
+      filters=filters * 4,
+      kernel_size=(1, 1),
+      strides=strides,
+      norm=norm,
+      seed=seed)
+  return _shortcut(input_tensor, x, norm=norm, seed=seed)
 
 
 def _residual_block(input_tensor,
@@ -189,7 +211,8 @@ def _residual_block(input_tensor,
                     num_blocks,
                     strides=(1, 1),
                     is_first_layer=False,
-                    norm='group'):
+                    norm='group',
+                    seed=0):
   """Builds a residual block with repeating bottleneck or basic blocks."""
   x = input_tensor
   for i in range(num_blocks):
@@ -199,7 +222,8 @@ def _residual_block(input_tensor,
         filters=filters,
         strides=strides,
         avoid_norm=avoid_norm,
-        norm=norm)
+        norm=norm,
+        seed=seed)
   return x
 
 
@@ -211,7 +235,8 @@ def create_resnet(input_shape,
                   initial_strides=(2, 2),
                   initial_kernel_size=(7, 7),
                   initial_pooling='max',
-                  norm='group'):
+                  norm='group',
+                  seed=0):
   """Instantiates a ResNet v2 model with Group Normalization.
 
   Instantiates the architecture from http://arxiv.org/pdf/1603.05027v2.pdf.
@@ -230,6 +255,8 @@ def create_resnet(input_shape,
     initial_kernel_size: The kernel size for the initial conv layer.
     initial_pooling: The type of pooling after the initial conv layer.
     norm: Type of normalization to be used. Can be 'group' or 'batch'.
+    seed: A random seed governing the model initialization and layer randomness.
+      If set to `None`, No random seed is used.
 
   Returns:
     A `tf.keras.Model`.
@@ -255,7 +282,8 @@ def create_resnet(input_shape,
       filters=initial_filters,
       kernel_size=initial_kernel_size,
       strides=initial_strides,
-      norm=norm)
+      norm=norm,
+      seed=seed)
 
   if initial_pooling == 'max':
     x = tf.keras.layers.MaxPooling2D(
@@ -270,7 +298,8 @@ def create_resnet(input_shape,
         filters=filters,
         num_blocks=r,
         is_first_layer=(i == 0),
-        norm=norm)
+        norm=norm,
+        seed=seed)
     filters *= 2
 
   # Final activation in the residual blocks
@@ -282,51 +311,66 @@ def create_resnet(input_shape,
   x = tf.keras.layers.Dense(
       num_classes,
       activation='softmax',
-      kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01),
+      kernel_initializer=tf.keras.initializers.RandomNormal(
+          stddev=0.01, seed=seed),
       kernel_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY),
-      bias_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY))(x)
+      bias_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY))(
+          x)
 
   model = tf.keras.models.Model(img_input, x)
   return model
 
 
-def create_resnet18(input_shape, num_classes, norm='group'):
+def create_resnet18(input_shape, num_classes, norm='group', seed=0):
   """ResNet with 18 layers and basic residual blocks."""
   return create_resnet(
-      input_shape, num_classes, 'basic', repetitions=[2, 2, 2, 2], norm=norm)
+      input_shape,
+      num_classes,
+      'basic',
+      repetitions=[2, 2, 2, 2],
+      norm=norm,
+      seed=seed)
 
 
-def create_resnet34(input_shape, num_classes, norm='group'):
+def create_resnet34(input_shape, num_classes, norm='group', seed=0):
   """ResNet with 34 layers and basic residual blocks."""
   return create_resnet(
-      input_shape, num_classes, 'basic', repetitions=[3, 4, 6, 3], norm=norm)
+      input_shape,
+      num_classes,
+      'basic',
+      repetitions=[3, 4, 6, 3],
+      norm=norm,
+      seed=seed)
 
 
-def create_resnet50(input_shape, num_classes, norm='group'):
+def create_resnet50(input_shape, num_classes, norm='group', seed=0):
   """ResNet with 50 layers and bottleneck residual blocks."""
   return create_resnet(
       input_shape,
       num_classes,
       'bottleneck',
       repetitions=[3, 4, 6, 3],
-      norm=norm)
+      norm=norm,
+      seed=seed)
 
 
-def create_resnet101(input_shape, num_classes, norm='group'):
+def create_resnet101(input_shape, num_classes, norm='group', seed=0):
   """ResNet with 101 layers and bottleneck residual blocks."""
   return create_resnet(
       input_shape,
       num_classes,
       'bottleneck',
       repetitions=[3, 4, 23, 3],
-      norm=norm)
+      norm=norm,
+      seed=seed)
 
 
-def create_resnet152(input_shape, num_classes, norm='group'):
+def create_resnet152(input_shape, num_classes, norm='group', seed=0):
   """ResNet with 152 layers and bottleneck residual blocks."""
   return create_resnet(
       input_shape,
       num_classes,
       'bottleneck',
       repetitions=[3, 8, 36, 3],
-      norm=norm)
+      norm=norm,
+      seed=seed)

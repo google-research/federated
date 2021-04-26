@@ -13,32 +13,23 @@
 # limitations under the License.
 """Tests for ResNet v2 models."""
 
+from absl.testing import parameterized
 import tensorflow as tf
 
 from utils.models import resnet_models
 
 
-class ResnetModelTest(tf.test.TestCase):
+class ResnetModelTest(tf.test.TestCase, parameterized.TestCase):
 
-  def test_resnet18_imagenet_inputs(self):
-    resnet18 = resnet_models.create_resnet18(
-        input_shape=(224, 224, 3), num_classes=1000)
-    self.assertIsInstance(resnet18, tf.keras.Model)
-
-  def test_resnet34_imagenet_inputs(self):
-    resnet34 = resnet_models.create_resnet34(
-        input_shape=(224, 224, 3), num_classes=1000)
-    self.assertIsInstance(resnet34, tf.keras.Model)
-
-  def test_resnet50_imagenet_inputs(self):
-    resnet50 = resnet_models.create_resnet50(
-        input_shape=(224, 224, 3), num_classes=1000)
-    self.assertIsInstance(resnet50, tf.keras.Model)
-
-  def test_resnet152_imagenet_inputs(self):
-    resnet152 = resnet_models.create_resnet152(
-        input_shape=(224, 224, 3), num_classes=1000)
-    self.assertIsInstance(resnet152, tf.keras.Model)
+  @parameterized.named_parameters(
+      ('resnet18', resnet_models.create_resnet18),
+      ('resnet34', resnet_models.create_resnet34),
+      ('resnet50', resnet_models.create_resnet50),
+      ('resnet152', resnet_models.create_resnet152),
+  )
+  def test_resnet_constructs_with_imagenet_inputs(self, resnet_constructor):
+    model = resnet_constructor(input_shape=(224, 224, 3), num_classes=1000)
+    self.assertIsInstance(model, tf.keras.Model)
 
   def test_bad_input_raises_exception(self):
     with self.assertRaises(Exception):
@@ -73,6 +64,28 @@ class ResnetModelTest(tf.test.TestCase):
     big_resnet = resnet_models.create_resnet(
         input_shape, num_classes, repetitions=[2, 2])
     self.assertLess(small_resnet.count_params(), big_resnet.count_params())
+
+  @parameterized.named_parameters(
+      ('resnet18', resnet_models.create_resnet18),
+      ('resnet34', resnet_models.create_resnet34),
+      ('resnet50', resnet_models.create_resnet50),
+      ('resnet152', resnet_models.create_resnet152),
+  )
+  def test_model_initialization_uses_random_seed(self, resnet_constructor):
+    model_1_with_seed_0 = resnet_constructor(
+        input_shape=(32, 32, 3), num_classes=100, seed=0)
+    model_2_with_seed_0 = resnet_constructor(
+        input_shape=(32, 32, 3), num_classes=100, seed=0)
+    model_1_with_seed_1 = resnet_constructor(
+        input_shape=(32, 32, 3), num_classes=100, seed=1)
+    model_2_with_seed_1 = resnet_constructor(
+        input_shape=(32, 32, 3), num_classes=100, seed=1)
+    self.assertAllClose(model_1_with_seed_0.weights,
+                        model_2_with_seed_0.weights)
+    self.assertAllClose(model_1_with_seed_1.weights,
+                        model_2_with_seed_1.weights)
+    self.assertNotAllClose(model_1_with_seed_0.weights,
+                           model_1_with_seed_1.weights)
 
 
 if __name__ == '__main__':

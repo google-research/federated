@@ -14,13 +14,15 @@
 """Libraries to prepare Shakespeare Keras models for CharRNN experiments."""
 
 import functools
+from typing import Optional
 
 import tensorflow as tf
 
 
 def create_recurrent_model(vocab_size: int,
                            sequence_length: int,
-                           mask_zero: bool = True) -> tf.keras.Model:
+                           mask_zero: bool = True,
+                           seed: Optional[int] = 0) -> tf.keras.Model:
   """Creates a RNN model using LSTM layers for Shakespeare language models.
 
   This replicates the model structure in the paper:
@@ -35,6 +37,8 @@ def create_recurrent_model(vocab_size: int,
       embedding.
     sequence_length: the length of input sequences.
     mask_zero: Whether to mask zero tokens in the input.
+    seed: A random seed governing the model initialization and layer randomness.
+      If set to `None`, No random seed is used.
 
   Returns:
     An uncompiled `tf.keras.Model`.
@@ -45,14 +49,21 @@ def create_recurrent_model(vocab_size: int,
           input_dim=vocab_size,
           input_length=sequence_length,
           output_dim=8,
-          mask_zero=mask_zero))
+          mask_zero=mask_zero,
+          embeddings_initializer=tf.keras.initializers.RandomUniform(seed=seed),
+      ))
   lstm_layer_builder = functools.partial(
       tf.keras.layers.LSTM,
       units=256,
-      kernel_initializer='he_normal',
+      recurrent_initializer=tf.keras.initializers.Orthogonal(seed=seed),
+      kernel_initializer=tf.keras.initializers.HeNormal(seed=seed),
       return_sequences=True,
       stateful=False)
   model.add(lstm_layer_builder())
   model.add(lstm_layer_builder())
-  model.add(tf.keras.layers.Dense(vocab_size))  # Note: logits, no softmax.
+  model.add(
+      tf.keras.layers.Dense(
+          vocab_size,
+          kernel_initializer=tf.keras.initializers.GlorotNormal(
+              seed=seed)))  # Note: logits, no softmax.
   return model
