@@ -157,7 +157,6 @@ def build_dataset_split_fn(
     A `SplitDatasetFn`.
   """
 
-  @tf.function
   def dataset_split_fn(
       client_dataset: tf.data.Dataset,
       round_num: tf.Tensor) -> Tuple[tf.data.Dataset, tf.data.Dataset]:

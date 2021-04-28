@@ -159,11 +159,6 @@ def create_client_data():
 
 class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
 
-  def setUp(self):
-    super().setUp()
-    if tf.config.list_logical_devices('GPU'):
-      self.skipTest('skip GPU test')
-
   @parameterized.named_parameters(('non_keras_model', LinearModel),
                                   ('keras_model', keras_linear_model_fn))
   def test_federated_reconstruction_no_split_data(self, model_fn):

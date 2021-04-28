@@ -20,11 +20,6 @@ from reconstruction.shared import federated_trainer_utils
 
 class FederatedTrainerUtilsTest(tf.test.TestCase):
 
-  def setUp(self):
-    super().setUp()
-    if tf.config.list_logical_devices('GPU'):
-      self.skipTest('skip GPU test')
-
   def test_build_dataset_split_fn_none(self):
     # 3 batches.
     client_dataset = tf.data.Dataset.range(6).batch(2)

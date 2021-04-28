@@ -116,7 +116,6 @@ def build_dataset_split_fn(recon_epochs_max: int = 1,
   post_recon_condition = lambda i, entry: tf.greater(tf.math.floormod(i, 2), 0)
   get_entry = lambda i, entry: entry
 
-  @tf.function
   def dataset_split_fn(
       client_dataset: tf.data.Dataset,
       round_num: tf.Tensor) -> Tuple[tf.data.Dataset, tf.data.Dataset]:

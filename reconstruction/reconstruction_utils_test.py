@@ -30,11 +30,6 @@ def _create_input_spec():
 
 class ReconstructionUtilsTest(tf.test.TestCase):
 
-  def setUp(self):
-    super().setUp()
-    if tf.config.list_logical_devices('GPU'):
-      self.skipTest('skip GPU test')
-
   def test_simple_dataset_split_fn(self):
     # 3 batches.
     client_dataset = tf.data.Dataset.range(6).batch(2)

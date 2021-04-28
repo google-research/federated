@@ -189,11 +189,6 @@ class _DPMean(tff.aggregators.UnweightedAggregationFactory):
 
 class TrainingProcessTest(tf.test.TestCase):
 
-  def setUp(self):
-    super().setUp()
-    if tf.config.list_logical_devices('GPU'):
-      self.skipTest('skip GPU test')
-
   def _run_rounds(self, iterproc, federated_data, num_rounds):
     train_outputs = []
     initial_state = iterproc.initialize()
