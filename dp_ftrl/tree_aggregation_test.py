@@ -359,6 +359,47 @@ class GaussianNoiseGeneratorTest(tf.test.TestCase):
          tf.math.reduce_std(noise_values)], [noise_mean, noise_std],
         rtol=tolerance)
 
+  def test_seed_state(self, seed=1, steps=32, noise_std=0.1):
+    g = tree_aggregation.GaussianNoiseGenerator(
+        noise_std=noise_std, specs=tf.TensorSpec([]), seed=seed)
+    gstate = g.initialize()
+    g2 = tree_aggregation.GaussianNoiseGenerator(
+        noise_std=noise_std, specs=tf.TensorSpec([]), seed=seed)
+    gstate2 = g.initialize()
+    self.assertAllEqual(gstate, gstate2)
+    for _ in range(steps):
+      value, gstate = g.next(gstate)
+      value2, gstate2 = g2.next(gstate2)
+      self.assertAllEqual(value, value2)
+      self.assertAllEqual(gstate, gstate2)
+
+  def test_seed_state_nondeterministic(self, steps=32, noise_std=0.1):
+    g = tree_aggregation.GaussianNoiseGenerator(
+        noise_std=noise_std, specs=tf.TensorSpec([]))
+    gstate = g.initialize()
+    g2 = tree_aggregation.GaussianNoiseGenerator(
+        noise_std=noise_std, specs=tf.TensorSpec([]))
+    gstate2 = g2.initialize()
+    for _ in range(steps):
+      value, gstate = g.next(gstate)
+      value2, gstate2 = g2.next(gstate2)
+      self.assertNotAllEqual(value, value2)
+      self.assertNotAllEqual(gstate, gstate2)
+
+  def test_seed_state_structure(self, seed=1, steps=32, noise_std=0.1):
+    specs = [tf.TensorSpec([]), tf.TensorSpec([1]), tf.TensorSpec([2, 2])]
+    g = tree_aggregation.GaussianNoiseGenerator(
+        noise_std=noise_std, specs=specs, seed=seed)
+    gstate = g.initialize()
+    g2 = tree_aggregation.GaussianNoiseGenerator(
+        noise_std=noise_std, specs=specs, seed=seed)
+    gstate2 = g2.initialize()
+    for _ in range(steps):
+      value, gstate = g.next(gstate)
+      value2, gstate2 = g2.next(gstate2)
+      self.assertAllClose(value, value2)
+      self.assertAllEqual(gstate, gstate2)
+
 
 if __name__ == '__main__':
   tf.test.main()
