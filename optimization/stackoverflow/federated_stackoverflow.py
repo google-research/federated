@@ -151,8 +151,7 @@ def configure_training(
 
   def test_fn(state):
     return evaluate_fn(
-        iterative_process.get_model_weights(state),
-        [validation_dataset.concatenate(test_dataset)])
+        iterative_process.get_model_weights(state), [test_dataset])
 
   return training_specs.RunnerSpec(
       iterative_process=training_process,

@@ -219,8 +219,7 @@ def run_federated(iterative_process_builder: Callable[
     return evaluate_fn(model_weights, [validation_dataset])
 
   def test_fn(model_weights):
-    return evaluate_fn(model_weights,
-                       [validation_dataset.concatenate(test_dataset)])
+    return evaluate_fn(model_weights, [test_dataset])
 
   logging.info('Training model:')
   logging.info(model_builder().summary())

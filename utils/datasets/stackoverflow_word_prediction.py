@@ -301,8 +301,10 @@ def get_centralized_datasets(
     train_batch_size: The batch size for the training dataset.
     validation_batch_size: The batch size for the validation dataset.
     test_batch_size: The batch size for the test dataset.
-    num_validation_examples: Number of examples from Stackoverflow test set to
-      use for validation on each round.
+    num_validation_examples: Number of examples from Stackoverflow validation
+      set to use for validation on each round. If set to -1, we use the entire
+      dataset. Note that this occurs before shuffling, and is therefore not a
+      random sample of examples.
     train_shuffle_buffer_size: The shuffle buffer size for the training dataset.
       If set to a number <= 1, no shuffling occurs.
     validation_shuffle_buffer_size: The shuffle buffer size for the validation
@@ -347,16 +349,17 @@ def get_centralized_datasets(
       max_elements_per_client=-1,
       max_shuffle_buffer_size=test_shuffle_buffer_size)
 
-  raw_train, _, raw_test = tff.simulation.datasets.stackoverflow.load_data()
+  raw_train, raw_validation, raw_test = (
+      tff.simulation.datasets.stackoverflow.load_data())
   stackoverflow_train = raw_train.create_tf_dataset_from_all_clients()
   stackoverflow_train = train_preprocess_fn(stackoverflow_train)
 
-  test_and_val_dataset = raw_test.create_tf_dataset_from_all_clients()
-
-  stackoverflow_validation = test_and_val_dataset.take(num_validation_examples)
+  stackoverflow_validation = raw_validation.create_tf_dataset_from_all_clients()
+  stackoverflow_validation = stackoverflow_validation.take(
+      num_validation_examples)
   stackoverflow_validation = validation_preprocess_fn(stackoverflow_validation)
 
-  stackoverflow_test = test_and_val_dataset.skip(num_validation_examples)
+  stackoverflow_test = raw_test.create_tf_dataset_from_all_clients()
   stackoverflow_test = test_preprocess_fn(stackoverflow_test)
 
   return stackoverflow_train, stackoverflow_validation, stackoverflow_test
