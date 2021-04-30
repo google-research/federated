@@ -5,20 +5,6 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])
 
 py_library(
-    name = "aggregate_fns",
-    srcs = ["aggregate_fns.py"],
-    srcs_version = "PY3",
-)
-
-py_test(
-    name = "aggregate_fns_test",
-    srcs = ["aggregate_fns_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":aggregate_fns"],
-)
-
-py_library(
     name = "centralized_training_loop",
     srcs = ["centralized_training_loop.py"],
     srcs_version = "PY3",
