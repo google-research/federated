@@ -69,10 +69,10 @@ def _compile_transform(angle: float = 0.0,
 def _make_transform_fn(client_id: str):
   """Generates a pseudorandom affine transform from the raw_client_id and index.
 
-  If the index is 0, `None` is returned so no transform is applied.
+  If the index is 0 no transform is applied.
 
   Args:
-    client_id: The client_id. Assumed to have structure {index}_{raw_client_id}.
+    client_id: The client_id.
 
   Returns:
     The data transform fn.
