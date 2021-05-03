@@ -13,7 +13,9 @@
 # limitations under the License.
 """Federated experiments on the Google Landmark dataset using TFF."""
 
+import functools
 from typing import Callable, Optional
+
 from absl import logging
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -149,11 +151,12 @@ def run_federated(
   else:
     trainer.get_model_weights = training_process.get_model_weights
 
-  client_ids_fn = tff.simulation.build_uniform_sampling_fn(
-      train_data.client_ids,
-      size=clients_per_round,
-      replace=False,
-      random_seed=client_datasets_random_seed)
+  client_ids_fn = functools.partial(
+      tff.simulation.build_uniform_sampling_fn(
+          train_data.client_ids,
+          replace=False,
+          random_seed=client_datasets_random_seed),
+      size=clients_per_round)
   # We convert the output to a list (instead of an np.ndarray) so that it can
   # be used as input to the iterative process.
   client_ids_fn_as_list = lambda x: list(client_ids_fn(x))

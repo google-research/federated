@@ -194,11 +194,12 @@ def run_federated(iterative_process_builder: Callable[
 
     training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
         train_dataset_computation, iterative_process)
-    client_ids_fn = tff.simulation.build_uniform_sampling_fn(
-        train_clientdata.client_ids,
-        size=clients_per_round,
-        replace=False,
-        random_seed=client_datasets_random_seed)
+    client_ids_fn = functools.partial(
+        tff.simulation.build_uniform_sampling_fn(
+            train_clientdata.client_ids,
+            replace=False,
+            random_seed=client_datasets_random_seed),
+        size=clients_per_round)
     # We convert the output to a list (instead of an np.ndarray) so that it can
     # be used as input to the iterative process.
     client_sampling_fn = lambda x: list(client_ids_fn(x))

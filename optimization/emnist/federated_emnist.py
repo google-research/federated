@@ -85,11 +85,12 @@ def configure_training(task_spec: training_specs.TaskSpec,
 
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
       build_train_dataset_from_client_id, iterative_process)
-  client_ids_fn = tff.simulation.build_uniform_sampling_fn(
-      emnist_train.client_ids,
-      size=task_spec.clients_per_round,
-      replace=False,
-      random_seed=task_spec.client_datasets_random_seed)
+  client_ids_fn = functools.partial(
+      tff.simulation.build_uniform_sampling_fn(
+          emnist_train.client_ids,
+          replace=False,
+          random_seed=task_spec.client_datasets_random_seed),
+      size=task_spec.clients_per_round)
   # We convert the output to a list (instead of an np.ndarray) so that it can
   # be used as input to the iterative process.
   client_sampling_fn = lambda x: list(client_ids_fn(x))

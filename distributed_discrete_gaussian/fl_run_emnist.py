@@ -192,11 +192,12 @@ def main(argv):
       build_train_dataset_from_client_id, iterative_process)
   training_process.get_model_weights = iterative_process.get_model_weights
 
-  client_ids_fn = tff.simulation.build_uniform_sampling_fn(
-      emnist_train.client_ids,
-      size=FLAGS.clients_per_round,
-      replace=False,
-      random_seed=FLAGS.client_datasets_random_seed)
+  client_ids_fn = functools.partial(
+      tff.simulation.build_uniform_sampling_fn(
+          emnist_train.client_ids,
+          replace=False,
+          random_seed=FLAGS.client_datasets_random_seed),
+      size=FLAGS.clients_per_round)
 
   # We convert the output to a list (instead of an np.ndarray) so that it can
   # be used as input to the iterative process.
