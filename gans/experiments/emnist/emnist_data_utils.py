@@ -31,21 +31,21 @@ def create_real_images_tff_client_data(split='train', num_pseudo_clients=1):
   if split == 'synthetic':
     return infinite_emnist.get_infinite(
         tff.simulation.datasets.emnist.get_synthetic(),
-        num_pseudo_clients=num_pseudo_clients)
+        client_expansion_factor=num_pseudo_clients)
 
   train_tff_data, eval_tff_data = tff.simulation.datasets.emnist.load_data(
       only_digits=False)
   if split == 'train':
     return infinite_emnist.get_infinite(
-        train_tff_data, num_pseudo_clients=num_pseudo_clients)
+        train_tff_data, client_expansion_factor=num_pseudo_clients)
   elif split == 'test':
     return infinite_emnist.get_infinite(
-        eval_tff_data, num_pseudo_clients=num_pseudo_clients)
+        eval_tff_data, client_expansion_factor=num_pseudo_clients)
   elif split == 'both':
     return (infinite_emnist.get_infinite(
-        train_tff_data, num_pseudo_clients=num_pseudo_clients),
+        train_tff_data, client_expansion_factor=num_pseudo_clients),
             infinite_emnist.get_infinite(
-                eval_tff_data, num_pseudo_clients=num_pseudo_clients))
+                eval_tff_data, client_expansion_factor=num_pseudo_clients))
   else:
     raise ValueError('Unknown dataset split ' + split)
 
