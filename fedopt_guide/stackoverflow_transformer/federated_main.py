@@ -206,10 +206,11 @@ def run_federated(iterative_process_builder: Callable[
   else:
     training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
         train_dataset_preprocess_comp, iterative_process)
-    client_sampling_fn = tff.simulation.build_uniform_client_sampling_fn(
-        dataset=train_clientdata,
-        clients_per_round=clients_per_round,
-        random_seed=client_datasets_random_seed)
+    client_sampling_fn = functools.partial(
+        tff.simulation.build_uniform_sampling_fn(
+            dataset=train_clientdata.client_ids,
+            random_seed=client_datasets_random_seed),
+        size=clients_per_round)
 
   training_process.get_model_weights = iterative_process.get_model_weights
 

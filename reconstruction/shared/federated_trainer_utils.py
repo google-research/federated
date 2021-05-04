@@ -67,8 +67,7 @@ def build_eval_fn(
   Args:
     evaluation_computation: A `tff.Computation` performing evaluation.
     client_datasets_fn: A function taking in an integer round number and
-      returning the expected input of `evaluation_computation`. See
-      `tff.simulation.build_uniform_client_sampling_fn` for an example. For
+      returning the expected input of `evaluation_computation`. For
       evaluation, the round number passed is always 0, so this function should
       typically return a different result each time it is called with the same
       argument, e.g. if it is sampling a subset of users from the evaluation

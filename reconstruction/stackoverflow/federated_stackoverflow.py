@@ -235,12 +235,16 @@ def run_federated(
     test_clientdata = test_clientdata.preprocess(dataset_preprocess_comp)
 
     # Create client sampling functions for each of train/val/test.
-    train_client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
-        train_clientdata, clients_per_round=clients_per_round)
-    val_client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
-        validation_clientdata, clients_per_round=clients_per_round)
-    test_client_datasets_fn = tff.simulation.build_uniform_client_sampling_fn(
-        test_clientdata, clients_per_round=clients_per_round)
+    train_client_datasets_fn = functools.partial(
+        tff.simulation.build_uniform_sampling_fn(train_clientdata.client_ids),
+        size=clients_per_round)
+    val_client_datasets_fn = functools.partial(
+        tff.simulation.build_uniform_sampling_fn(
+            validation_clientdata.client_ids),
+        size=clients_per_round)
+    test_client_datasets_fn = functools.partial(
+        tff.simulation.build_uniform_sampling_fn(test_clientdata.client_ids),
+        size=clients_per_round)
 
   # Create final evaluation functions to pass to `training_loop`.
   val_fn = federated_trainer_utils.build_eval_fn(

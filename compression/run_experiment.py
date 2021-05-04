@@ -164,8 +164,9 @@ def run_experiment():
       emnist_train.client_ids[0])
   input_spec = example_dataset.element_spec
 
-  client_dataset_ids_fn = tff.simulation.build_uniform_client_sampling_fn(
-      emnist_train, FLAGS.clients_per_round)
+  client_dataset_ids_fn = functools.partial(
+      tff.simulation.build_uniform_sampling_fn(emnist_train.client_ids),
+      size=FLAGS.clients_per_round)
 
   client_optimizer_fn = functools.partial(
       utils_impl.create_optimizer_from_flags, 'client')
