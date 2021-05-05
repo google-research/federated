@@ -44,11 +44,6 @@ py_test(
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
-    tags = [
-        "manual",
-        "nokokoro",
-        "nopresubmit",
-    ],
     deps = [":tree_aggregation"],
 )
 

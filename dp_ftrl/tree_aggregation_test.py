@@ -142,7 +142,7 @@ class TreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
     # traversed. Each tree node is a `variable_shape` tensor of Gaussian noise
     # with `noise_std`.
     random_generator = tree_aggregation.GaussianNoiseGenerator(
-        noise_std, tf.TensorSpec(variable_shape))
+        noise_std, tf.TensorSpec(variable_shape), seed=2020)
     tree_aggregator = tree_aggregation.TFTreeAggregator(
         value_generator=random_generator)
     state = tree_aggregator.init_state()
@@ -150,8 +150,8 @@ class TreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(leaf_node_idx, tree_aggregation.get_step_idx(state))
       val, state = tree_aggregator.get_cumsum_and_update(state)
       self.assertAllClose(
-          expected_variance[leaf_node_idx],
-          tf.math.reduce_variance(val),
+          math.sqrt(expected_variance[leaf_node_idx]),
+          tf.math.reduce_std(val),
           rtol=tolerance)
 
   def test_cumsum_vector(self, total_steps=15):
@@ -230,7 +230,7 @@ class EfficientTreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
     # the given vanilla node `noise_std` because of the update rule of
     # `TFEfficientTreeAggregator`.
     random_generator = tree_aggregation.GaussianNoiseGenerator(
-        noise_std, tf.TensorSpec(variable_shape))
+        noise_std, tf.TensorSpec(variable_shape), seed=2020)
     tree_aggregator = tree_aggregation.TFEfficientTreeAggregator(
         value_generator=random_generator)
     state = tree_aggregator.init_state()
@@ -238,7 +238,7 @@ class EfficientTreeAggregatorTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(leaf_node_idx, tree_aggregation.get_step_idx(state))
       val, state = tree_aggregator.get_cumsum_and_update(state)
     self.assertAllClose(
-        expected_variance, tf.math.reduce_variance(val), rtol=tolerance)
+        math.sqrt(expected_variance), tf.math.reduce_std(val), rtol=tolerance)
 
   @parameterized.named_parameters(
       ('total4_std1_d1000', 4, 1., [1000], 1e-6),
@@ -303,10 +303,10 @@ class GaussianNoiseGeneratorTest(tf.test.TestCase):
   def test_random_generator_tf(self,
                                noise_mean=1.0,
                                noise_std=1.0,
-                               samples=2000,
-                               tolerance=0.07):
+                               samples=1000,
+                               tolerance=0.15):
     g = tree_aggregation.GaussianNoiseGenerator(
-        noise_std, specs=tf.TensorSpec([]))
+        noise_std, specs=tf.TensorSpec([]), seed=2020)
     gstate = g.initialize()
 
     @tf.function
@@ -327,11 +327,11 @@ class GaussianNoiseGeneratorTest(tf.test.TestCase):
   def test_random_generator_tff(self,
                                 noise_mean=1.0,
                                 noise_std=1.0,
-                                samples=50,
-                                tolerance=0.5):
+                                samples=100,
+                                tolerance=0.7):
 
     g = tree_aggregation.GaussianNoiseGenerator(
-        noise_std, specs=tf.TensorSpec([]))
+        noise_std, specs=tf.TensorSpec([]), seed=2020)
 
     @tff.tf_computation
     def initialize_state():
