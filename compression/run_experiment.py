@@ -29,11 +29,11 @@ import os.path
 
 from absl import app
 from absl import flags
+from absl import logging
 import tensorflow as tf
 import tensorflow_federated as tff
 
 from compression import sparsity
-from utils import training_loop
 from utils import utils_impl
 from utils.datasets import emnist_dataset
 from utils.models import emnist_models
@@ -151,6 +151,30 @@ def _mean_encoder_fn(spec):
     return te.encoders.as_gather_encoder(te.encoders.identity(), spec)
 
 
+def _configure_managers():
+  """Configures checkpoint and metrics managers from flags."""
+  root_output_dir = FLAGS.root_output_dir
+  experiment_name = FLAGS.experiment_name
+
+  checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
+  checkpoint_manager = tff.simulation.FileCheckpointManager(
+      checkpoint_dir, step=FLAGS.rounds_per_checkpoint)
+
+  results_dir = os.path.join(root_output_dir, 'results', experiment_name)
+  csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
+  csv_manager = tff.simulation.CSVMetricsManager(csv_file)
+
+  summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
+  tensorboard_manager = tff.simulation.TensorBoardManager(summary_dir)
+
+  logging.info('Writing...')
+  logging.info('    checkpoints to: %s', checkpoint_dir)
+  logging.info('    CSV metrics to: %s', csv_file)
+  logging.info('    TensorBoard summaries to: %s', summary_dir)
+
+  return checkpoint_manager, [csv_manager, tensorboard_manager]
+
+
 def run_experiment():
   """Data preprocessing and experiment execution."""
   emnist_train, _ = emnist_dataset.get_federated_datasets(
@@ -164,10 +188,7 @@ def run_experiment():
       emnist_train.client_ids[0])
   input_spec = example_dataset.element_spec
 
-  client_dataset_ids_fn = functools.partial(
-      tff.simulation.build_uniform_sampling_fn(emnist_train.client_ids),
-      size=FLAGS.clients_per_round)
-
+  # Build optimizer functions from flags
   client_optimizer_fn = functools.partial(
       utils_impl.create_optimizer_from_flags, 'client')
   server_optimizer_fn = functools.partial(
@@ -179,12 +200,6 @@ def run_experiment():
         input_spec=input_spec,
         loss=tf.keras.losses.SparseCategoricalCrossentropy(),
         metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
-
-  evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
-
-  def validation_fn(state, round_num):
-    del round_num
-    return evaluate_fn(state.model, [emnist_test])
 
   if FLAGS.use_compression:
     # We create a `tff.templates.MeasuredProcess` for broadcast process and a
@@ -201,6 +216,7 @@ def run_experiment():
     encoded_broadcast_process = None
     aggregator = None
 
+  # Construct the iterative process
   iterative_process = tff.learning.build_federated_averaging_process(
       model_fn=tff_model_fn,
       client_optimizer_fn=client_optimizer_fn,
@@ -212,6 +228,21 @@ def run_experiment():
       tff.simulation.compose_dataset_computation_with_iterative_process(
           emnist_train.dataset_computation, iterative_process))
 
+  # Create a client sampling function, mapping integer round numbers to lists
+  # of client ids.
+  client_selection_fn = functools.partial(
+      tff.simulation.build_uniform_sampling_fn(emnist_train.client_ids),
+      size=FLAGS.clients_per_round)
+
+  # Create a validation function
+  evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
+
+  def validation_fn(state, round_num):
+    if round_num % FLAGS.rounds_per_eval == 0:
+      return evaluate_fn(state.model, [emnist_test])
+    else:
+      return {}
+
   # Log hyperparameters to CSV
   hparam_dict = utils_impl.lookup_flag_values(utils_impl.get_hparam_flags())
   results_dir = os.path.join(FLAGS.root_output_dir, 'results',
@@ -220,15 +251,15 @@ def run_experiment():
   hparam_file = os.path.join(results_dir, 'hparams.csv')
   utils_impl.atomic_write_series_to_csv(hparam_dict, hparam_file)
 
-  training_loop.run(
-      iterative_process=iterative_process,
-      client_datasets_fn=client_dataset_ids_fn,
+  checkpoint_manager, metrics_managers = _configure_managers()
+
+  tff.simulation.run_simulation(
+      process=iterative_process,
+      client_selection_fn=client_selection_fn,
       validation_fn=validation_fn,
       total_rounds=FLAGS.total_rounds,
-      experiment_name=FLAGS.experiment_name,
-      root_output_dir=FLAGS.root_output_dir,
-      rounds_per_eval=FLAGS.rounds_per_eval,
-      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint)
+      file_checkpoint_manager=checkpoint_manager,
+      metrics_managers=metrics_managers)
 
 
 def main(argv):

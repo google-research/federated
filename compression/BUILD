@@ -11,7 +11,6 @@ py_binary(
     srcs_version = "PY3",
     deps = [
         ":sparsity",
-        "//utils:training_loop",
         "//utils:utils_impl",
         "//utils/datasets:emnist_dataset",
         "//utils/models:emnist_models",
