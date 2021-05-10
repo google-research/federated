@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -21,4 +21,18 @@ py_binary(
         "//utils:training_loop",
         "//utils:utils_impl",
     ],
+)
+
+py_library(
+    name = "secret_sharer",
+    srcs = ["secret_sharer.py"],
+    srcs_version = "PY3",
+)
+
+py_test(
+    name = "secret_sharer_test",
+    srcs = ["secret_sharer_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":secret_sharer"],
 )
