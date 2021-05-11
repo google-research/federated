@@ -305,10 +305,8 @@ class AggregationTest(tf.test.TestCase):
     l2_norm = 0.01
     query = tensorflow_privacy.GaussianAverageQuery(l2_norm, 0.0, 1.0)
     dp_agg_factory = tff.aggregators.DifferentiallyPrivateFactory(query)
-    aggregation_process = dp_agg_factory.create(
-        tff.learning.framework.weights_type_from_model(_model_fn).trainable)
     trainer = build_federated_averaging_process_attacked(
-        _model_fn, aggregation_process=aggregation_process)
+        _model_fn, model_update_aggregation_factory=dp_agg_factory)
     state = trainer.initialize()
     initial_weights = state.model.trainable
     state, _ = trainer.next(state, train_data, malicious_data, client_type_list)

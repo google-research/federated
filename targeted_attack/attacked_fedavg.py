@@ -397,10 +397,7 @@ def build_run_one_round_fn_attacked(server_update_fn, client_update_fn,
 
     weight_denom = client_outputs.weights_delta_weight
 
-    # If the aggregation process' next function takes three arguments it is
-    # weighted, otherwise, unweighted. Unfortunately there is no better way
-    # to determine this.
-    if len(aggregation_process.next.type_signature.parameter) == 3:
+    if aggregation_process.is_weighted:
       aggregate_output = aggregation_process.next(
           server_state.delta_aggregate_state,
           client_outputs.weights_delta,
@@ -429,7 +426,7 @@ def build_federated_averaging_process_attacked(
     model_fn,
     client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
     server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
-    aggregation_process=None,
+    model_update_aggregation_factory=None,
     client_update_tf=ClientExplicitBoosting(boost_factor=1.0)):
   """Builds the TFF computations for optimization using federated averaging with potentially malicious clients.
 
@@ -439,8 +436,11 @@ def build_federated_averaging_process_attacked(
       `tf.keras.optimizers.Optimizer`, use during local client training.
     server_optimizer_fn: A no-arg function that returns a
       `tf.keras.optimizers.Optimizer`, use to apply updates to the global model.
-    aggregation_process: A 'tff.templates.MeasuredProcess' that aggregates model
-      deltas placed@CLIENTS to an aggregated model delta placed@SERVER.
+    model_update_aggregation_factory: An optional
+      `tff.aggregators.AggregationFactory` that contstructs
+      `tff.templates.AggregationProcess` for aggregating the client model
+      updates on the server. If `None`, uses a default constructed
+      `tff.aggregators.MeanFactory`, creating a stateless mean aggregation.
     client_update_tf: a 'tf.function' computes the ClientOutput.
 
   Returns:
@@ -451,9 +451,16 @@ def build_federated_averaging_process_attacked(
     weights_type = tff.learning.framework.weights_type_from_model(
         dummy_model_for_metadata)
 
-  if aggregation_process is None:
-    aggregation_process = tff.learning.framework.build_stateless_mean(
-        model_delta_type=weights_type.trainable)
+  if model_update_aggregation_factory is None:
+    model_update_aggregation_factory = tff.aggregators.MeanFactory()
+
+  if isinstance(model_update_aggregation_factory,
+                tff.aggregators.WeightedAggregationFactory):
+    aggregation_process = model_update_aggregation_factory.create(
+        weights_type.trainable, tff.TensorType(tf.float32))
+  else:
+    aggregation_process = model_update_aggregation_factory.create(
+        weights_type.trainable)
 
   server_init = build_server_init_fn(model_fn, server_optimizer_fn,
                                      aggregation_process.initialize)
