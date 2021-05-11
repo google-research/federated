@@ -54,6 +54,35 @@ class ModelCollectionTest(tf.test.TestCase, parameterized.TestCase):
     num_model_params = (28 * 28 + 1) * 200 + 201 * 200 + 201 * 10
     self.assertEqual(model.count_params(), num_model_params)
 
+  def test_1m_cnn_only_digits_shape(self):
+    image = tf.random.normal([4, 28, 28, 1])
+    model = emnist_models.create_1m_cnn_model(only_digits=True)
+    logits = model(image)
+    self.assertIsNotNone(logits)
+    self.assertEqual(logits.shape, [4, 10])
+
+  def test_1m_cnn_shape(self):
+    image = tf.random.normal([3, 28, 28, 1])
+    model = emnist_models.create_1m_cnn_model(only_digits=False)
+    logits = model(image)
+
+    self.assertIsNotNone(logits)
+    self.assertEqual(logits.shape, [3, 62])
+
+  def test_1m_cnn_number_of_parameters(self):
+    model = emnist_models.create_1m_cnn_model(only_digits=False)
+
+    # Manually calculate the number of parameters.
+    num_model_params = 3 * 3 * 1 * 32 + 32  # 1st 3x3 conv (kernel + bias).
+    num_model_params += 3 * 3 * 32 * 64 + 64  # 2nd 3x3 conv (kernel + bias).
+    output_size = (28 - 2) // 2 - 2  # conv --> maxpool --> conv.
+    output_numel = output_size * output_size * 64
+    num_model_params += output_numel * 128 + 128  # 1st dense layer, 128 units.
+    num_model_params += 128 * 62 + 62  # output layer, 62 units.
+
+    self.assertEqual(model.count_params(), num_model_params)
+    self.assertLess(model.count_params(), 2**20)
+
   @parameterized.named_parameters(
       ('cnn_dropout', emnist_models.create_conv_dropout_model, False),
       ('cnn_dropout_digits', emnist_models.create_conv_dropout_model, True),
@@ -61,6 +90,8 @@ class ModelCollectionTest(tf.test.TestCase, parameterized.TestCase):
       ('cnn_digits', emnist_models.create_original_fedavg_cnn_model, True),
       ('2nn', emnist_models.create_two_hidden_layer_model, False),
       ('2nn_digits', emnist_models.create_two_hidden_layer_model, True),
+      ('1m_cnn', emnist_models.create_1m_cnn_model, False),
+      ('1m_cnn_digits', emnist_models.create_1m_cnn_model, True),
   )
   def test_model_initialization_uses_random_seed(self, model_function,
                                                  only_digits):

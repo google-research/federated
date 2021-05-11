@@ -22,7 +22,7 @@ from optimization.shared import training_specs
 from utils.datasets import emnist_dataset
 from utils.models import emnist_models
 
-EMNIST_MODELS = ['cnn', '2nn']
+EMNIST_MODELS = ['cnn', '2nn', '1m_cnn']
 
 
 def configure_training(task_spec: training_specs.TaskSpec,
@@ -36,8 +36,9 @@ def configure_training(task_spec: training_specs.TaskSpec,
   Args:
     task_spec: A `TaskSpec` class for creating federated training tasks.
     model: A string specifying the model used for character recognition. Can be
-      one of `cnn` and `2nn`, corresponding to a CNN model and a densely
-      connected 2-layer model (respectively).
+      one of `cnn`, `2nn`, or `1m_cnn`, corresponding to a simple CNN model,
+      a densely connected 2-layer model, and a CNN model with roughly 1 miilion
+      (< 2^20) parameters, respectively.
 
   Returns:
     A `RunnerSpec` containing attributes used for running the newly created
@@ -61,6 +62,9 @@ def configure_training(task_spec: training_specs.TaskSpec,
   elif model == '2nn':
     model_builder = functools.partial(
         emnist_models.create_two_hidden_layer_model, only_digits=False)
+  elif model == '1m_cnn':
+    model_builder = functools.partial(
+        emnist_models.create_1m_cnn_model, only_digits=False)
   else:
     raise ValueError(
         'Cannot handle model flag [{!s}], must be one of {!s}.'.format(

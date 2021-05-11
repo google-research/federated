@@ -21,7 +21,7 @@ from utils import centralized_training_loop
 from utils.datasets import emnist_dataset
 from utils.models import emnist_models
 
-EMNIST_MODELS = ['cnn', '2nn']
+EMNIST_MODELS = ['cnn', '2nn', '1m_cnn']
 
 
 def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
@@ -52,8 +52,9 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
     hparams_dict: A mapping with string keys representing the hyperparameters
       and their values. If not None, this is written to CSV.
     emnist_model: A string specifying the model used for character recognition.
-      Can be one of `cnn` and `2nn`, corresponding to a CNN model and a densely
-      connected 2-layer model (respectively).
+      Can be one of `cnn`, `2nn`, or `1m_cnn`, corresponding to a simple CNN
+      model, a densely connected 2-layer model, and a CNN model with roughly 1
+      miilion (< 2^20) parameters, respectively.
     max_batches: If set to a positive integer, datasets are capped to at most
       that many batches. If set to None or a nonpositive integer, the full
       datasets are used.
@@ -71,6 +72,8 @@ def run_centralized(optimizer: tf.keras.optimizers.Optimizer,
     model = emnist_models.create_conv_dropout_model(only_digits=False)
   elif emnist_model == '2nn':
     model = emnist_models.create_two_hidden_layer_model(only_digits=False)
+  elif emnist_model == '1m_cnn':
+    model = emnist_models.create_1m_cnn_model(only_digits=False)
   else:
     raise ValueError('Cannot handle model flag [{!s}].'.format(emnist_model))
 
