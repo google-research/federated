@@ -16,6 +16,7 @@ py_test(
     size = "large",
     srcs = ["adaptive_fed_avg_test.py"],
     python_version = "PY3",
+    shard_count = 2,
     srcs_version = "PY3",
     tags = [
         "manual",
