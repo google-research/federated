@@ -49,7 +49,7 @@ def build_compressed_dp_query(mechanism, clip, padded_dim, gamma, stddev, beta,
   """Construct a DPQuery with quantization operations."""
   # Scaling up the noise for the quantized query.
   scaled_stddev = np.ceil(stddev / gamma)
-  # Compute the (scaled) inflated norm bound after random Hadamard transform.
+  # Compute the post-rounding inflated norm bound.
   sq_l2_norm_bound = accounting_utils.compute_l2_sensitivy_squared(
       l2_clip_norm=clip, gamma=gamma, beta=beta, dimension=padded_dim)
   # Add some norm leeway to peacefully allow for numerical/precision errors.

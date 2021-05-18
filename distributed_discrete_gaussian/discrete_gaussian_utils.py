@@ -71,44 +71,50 @@ def _check_input_args(scale, shape, dtype):
     return tf.identity(scale), shape, dtype
 
 
+@tf.function
 def _sample_discrete_gaussian_helper(scale, shape, dtype):
   """Draw samples from discrete Gaussian, assuming scale >= 0."""
   scale = tf.cast(scale, tf.int64)
   sq_scale = tf.square(scale)
 
-  # Do rejection sampling by oversampling.
-  oversample_factor = 2
+  # Scale for discrete Laplace. The sampling algorithm should be correct
+  # for any discrete Laplace scale, and the original paper uses
+  # `dlap_scale = floor(scale) + 1`. Here we use `dlap_scale = scale` (where
+  # input `scale` is restricted to integers >= 1) to simplify the fraction
+  # below. It turns out that for integer scales >= 1, `dlap_scale = scale` gives
+  # a good minimum success rate of ~70%, allowing a small oversampling factor.
+  dlap_scale = scale
+  oversample_factor = 1.5
+
   # Draw at least some samples in case we got unlucky with small input shape.
-  min_n = tf.cast(1000, tf.int64)
+  min_n = 1000
   target_n = tf.reduce_prod(tf.cast(shape, tf.int64))
-  draw_n = tf.maximum(min_n, oversample_factor * target_n)
+  oversample_n = oversample_factor * tf.cast(target_n, tf.float32)
+  draw_n = tf.maximum(min_n, tf.cast(oversample_n, tf.int32))
 
-  # Scale for discrete Laplace.
-  t = tf.cast(scale, tf.int64) + 1
+  accepted_n = tf.constant(0, dtype=target_n.dtype)
+  result = tf.zeros((0,), dtype=tf.int64)
 
-  def draw_samples(inp_samples, inp_accept):
-    """Sample with rejection."""
-    y = _sample_discrete_laplace(t, shape=(draw_n,))
-    z_numer = tf.pow((tf.abs(y) * t - sq_scale), 2)
-    z_denom = 2 * sq_scale * t * t
-    bern_probs = tf.exp(-tf.cast(z_numer, tf.float64) /
-                        tf.cast(z_denom, tf.float64))
+  while accepted_n < target_n:
+    # Since the number of samples could be different in every retry, we need to
+    # manually specify the shape info for TF.
+    tf.autograph.experimental.set_loop_options(
+        shape_invariants=[(result, tf.TensorShape([None]))])
+    # Draw samples.
+    samples = _sample_discrete_laplace(dlap_scale, shape=(draw_n,))
+    z_numer = tf.pow((tf.abs(samples) - scale), 2)
+    z_denom = 2 * sq_scale
+    bern_probs = tf.exp(-tf.divide(z_numer, z_denom))
     accept = _sample_bernoulli(bern_probs)
-    # Outputs from previous iterations are only used for restoring shapes.
-    y.set_shape(inp_samples.get_shape())
-    accept.set_shape(inp_accept.get_shape())
-    return [y, accept]
+    # Keep successful samples and increment counter.
+    accepted_samples = samples[tf.equal(accept, 1)]
+    accepted_n += tf.size(accepted_samples, out_type=accepted_n.dtype)
+    result = tf.concat([result, accepted_samples], axis=0)
+    # Reduce the number of draws for any retries.
+    draw_n = tf.cast(target_n - accepted_n, tf.float32) * oversample_factor
+    draw_n = tf.maximum(min_n, tf.cast(draw_n, tf.int32))
 
-  # Retry in the (extremely unlikely) case that oversampling doesn't suffice.
-  samples = tf.zeros((draw_n,), dtype=tf.int64)
-  accept = tf.zeros((draw_n,), dtype=tf.int64)
-  samples, accept = tf.while_loop(
-      cond=lambda _, accept: tf.reduce_sum(accept) < target_n,
-      body=draw_samples,
-      loop_vars=[samples, accept])
-
-  accepted_samples = samples[tf.equal(accept, 1)][:target_n]
-  return tf.cast(tf.reshape(accepted_samples, shape), dtype)
+  return tf.cast(tf.reshape(result[:target_n], shape), dtype)
 
 
 def sample_discrete_gaussian(scale, shape, dtype=tf.int32):
