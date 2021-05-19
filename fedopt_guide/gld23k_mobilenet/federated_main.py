@@ -161,7 +161,8 @@ def run_federated(
   # be used as input to the iterative process.
   client_ids_fn_as_list = lambda x: list(client_ids_fn(x))
 
-  evaluate_fn = tff.learning.build_federated_evaluation(model_fn)
+  evaluate_fn = tff.learning.build_federated_evaluation(
+      model_fn, use_experimental_simulation_loop=True)
 
   def validation_fn(model_weights, round_num):
     del round_num
