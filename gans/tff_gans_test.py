@@ -45,13 +45,15 @@ def _get_gan(with_dp=False):
       gan_loss_fns, client_disc_optimizer)
 
   if with_dp:
-    dp_average_query = tensorflow_privacy.QuantileAdaptiveClipAverageQuery(
-        initial_l2_norm_clip=BEFORE_DP_L2_NORM_CLIP,
-        noise_multiplier=0.3,
-        target_unclipped_quantile=3,
-        learning_rate=0.1,
-        clipped_count_stddev=0.0,
-        expected_num_records=10,
+    dp_average_query = tensorflow_privacy.NormalizedQuery(
+        tensorflow_privacy.QuantileAdaptiveClipSumQuery(
+            initial_l2_norm_clip=BEFORE_DP_L2_NORM_CLIP,
+            noise_multiplier=0.3,
+            target_unclipped_quantile=3,
+            learning_rate=0.1,
+            clipped_count_stddev=0.0,
+            expected_num_records=10,
+            geometric_update=False),
         denominator=10.0)
   else:
     dp_average_query = None
