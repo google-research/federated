@@ -75,9 +75,8 @@ class GanFnsAndTypes(object):
   # (https://github.com/tensorflow/privacy/blob/v.0.2.2/tensorflow_privacy/privacy/dp_query/dp_query.py#L54)
   # Defaults to `None`, meaning no differential privacy query is used, no
   # clipping or noising is performed, and standard stateless weighted
-  # aggregation occurs. If specified, it MUST be an instance of an average query
-  # class (as opposed to a sum query). E.g., valid classes are
-  # `privacy.NoPrivacyAverageQuery`, `privacy.GaussianAverageQuery`, etc.
+  # aggregation occurs. If specified, it MUST be an instance of a
+  # `privacy.NormalizedQuery`.
   train_discriminator_dp_average_query = attr.ib(
       type=tensorflow_privacy.DPQuery, default=None)
 

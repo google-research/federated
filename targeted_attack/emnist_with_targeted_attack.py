@@ -125,8 +125,9 @@ def make_federated_data_with_malicious(client_data,
   ]
   malicious_dataset = [dataset_malicious for x in client_ids]
   if with_attack:
-    client_type_list = \
-        [tf.cast(0, tf.bool)] * (len(client_ids)-1) + [tf.cast(1, tf.bool)]
+    client_type_list = [tf.cast(0, tf.bool)] * (len(client_ids) - 1) + [
+        tf.cast(1, tf.bool)
+    ]
   else:
     client_type_list = [tf.cast(0, tf.bool)] * len(client_ids)
   return benign_dataset, malicious_dataset, client_type_list
@@ -139,9 +140,8 @@ def sample_clients_with_malicious(client_data,
                                   with_attack=1):
   """Sample client and make federated dataset."""
   sampled_clients = np.random.choice(client_ids, num_clients)
-  federated_train_data, federated_malicious_data, client_type_list = \
-      make_federated_data_with_malicious(client_data, dataset_malicious,
-                                         sampled_clients, with_attack)
+  federated_train_data, federated_malicious_data, client_type_list = make_federated_data_with_malicious(
+      client_data, dataset_malicious, sampled_clients, with_attack)
   return federated_train_data, federated_malicious_data, client_type_list
 
 
@@ -261,9 +261,9 @@ def main(argv):
       boost_factor=float(FLAGS.num_clients_per_round),
       norm_bound=FLAGS.norm_bound,
       round_num=FLAGS.client_round_num)
-  query = tensorflow_privacy.GaussianAverageQuery(FLAGS.l2_norm_clip,
-                                                  FLAGS.mul_factor,
-                                                  FLAGS.num_clients_per_round)
+  query = tensorflow_privacy.GaussianSumQuery(FLAGS.l2_norm_clip,
+                                              FLAGS.mul_factor)
+  query = tensorflow_privacy.NormalizedQuery(query, FLAGS.num_clients_per_round)
   dp_agg_factory = tff.aggregators.DifferentiallyPrivateFactory(query)
   iterative_process = attacked_fedavg.build_federated_averaging_process_attacked(
       model_fn=model_fn,
@@ -281,11 +281,12 @@ def main(argv):
       with_attack = 0
 
     # sample clients and make federated dataset
-    federated_train_data, federated_malicious_data, client_type_list = \
-        sample_clients_with_malicious(
-            emnist_train, client_ids=emnist_train.client_ids,
-            dataset_malicious=dataset_malicious,
-            num_clients=FLAGS.num_clients_per_round, with_attack=with_attack)
+    federated_train_data, federated_malicious_data, client_type_list = sample_clients_with_malicious(
+        emnist_train,
+        client_ids=emnist_train.client_ids,
+        dataset_malicious=dataset_malicious,
+        num_clients=FLAGS.num_clients_per_round,
+        with_attack=with_attack)
 
     # one round of attacked federated averaging
     write_print(file_handle, 'Round starts!')

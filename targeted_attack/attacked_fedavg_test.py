@@ -303,7 +303,7 @@ class AggregationTest(tf.test.TestCase):
     malicious_data = [batch]
     client_type_list = [tf.constant(False)]
     l2_norm = 0.01
-    query = tensorflow_privacy.GaussianAverageQuery(l2_norm, 0.0, 1.0)
+    query = tensorflow_privacy.GaussianSumQuery(l2_norm, 0.0)
     dp_agg_factory = tff.aggregators.DifferentiallyPrivateFactory(query)
     trainer = build_federated_averaging_process_attacked(
         _model_fn, model_update_aggregation_factory=dp_agg_factory)

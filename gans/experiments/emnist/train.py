@@ -242,8 +242,8 @@ def _get_emnist_eval_hook_fn(exp_name, output_dir, hparams_dict, gan_loss_fns,
                              emnist_classifier_for_metrics):
   """Returns an eval_hook function to pass to training loops."""
   tf.io.gfile.makedirs(path_to_output_images)
-  logging.info(
-      'Directory %s created (or already exists).', path_to_output_images)
+  logging.info('Directory %s created (or already exists).',
+               path_to_output_images)
 
   gen_inputs_iter = iter(gen_input_eval_dataset)
   real_images_iter = iter(real_images_eval_dataset)
@@ -318,9 +318,10 @@ def _get_gan(gen_model_fn, disc_model_fn, gan_loss_fns, gen_optimizer,
 
   dp_average_query = None
   if use_dp:
-    dp_average_query = tensorflow_privacy.GaussianAverageQuery(
-        l2_norm_clip=dp_l2_norm_clip,
-        sum_stddev=dp_l2_norm_clip * dp_noise_multiplier,
+    dp_average_query = tensorflow_privacy.NormalizedQuery(
+        tensorflow_privacy.GaussianSumQuery(
+            l2_norm_clip=dp_l2_norm_clip,
+            stddev=dp_l2_norm_clip * dp_noise_multiplier),
         denominator=clients_per_round)
 
   return tff_gans.GanFnsAndTypes(
