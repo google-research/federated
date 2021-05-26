@@ -30,7 +30,7 @@ def create_if_not_exists(path):
     logging.info('Skipping creation of directory [%s], already exists', path)
 
 
-def _setup_outputs(root_output_dir, experiment_name):
+def _setup_outputs(root_output_dir, experiment_name, save_mode):
   """Set up directories for experiment loops, write hyperparameters to disk."""
 
   if not experiment_name:
@@ -45,7 +45,7 @@ def _setup_outputs(root_output_dir, experiment_name):
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   create_if_not_exists(results_dir)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  metrics_mngr = tff.simulation.CSVMetricsManager(csv_file)
+  metrics_mngr = tff.simulation.CSVMetricsManager(csv_file, save_mode=save_mode)
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
   tb_mngr = tff.simulation.TensorBoardManager(summary_dir=summary_logdir)
@@ -79,7 +79,8 @@ def run(iterative_process: tff.templates.IterativeProcess,
         test_fn: Optional[Callable[[Any], Dict[str, float]]] = None,
         root_output_dir: Optional[str] = '/tmp/fed_opt',
         rounds_per_eval: Optional[int] = 1,
-        rounds_per_checkpoint: Optional[int] = 50):
+        rounds_per_checkpoint: Optional[int] = 50,
+        save_mode: tff.simulation.SaveMode = tff.simulation.SaveMode.APPEND):
   """Runs federated training for a given `tff.templates.IterativeProcess`.
 
   We assume that the iterative process has the following functional type
@@ -110,6 +111,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
     rounds_per_checkpoint: How often to checkpoint the iterative process state.
       If you expect the job to restart frequently, this should be small. If no
       interruptions are expected, this can be made larger.
+    save_mode: A `tff.simulation.SaveMode` specifying the save mode for metrics.
 
   Returns:
     The final `state` of the iterative process after training.
@@ -128,7 +130,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
   initial_state = iterative_process.initialize()
 
   checkpoint_mngr, metrics_mngr, tb_mngr = _setup_outputs(
-      root_output_dir, experiment_name)
+      root_output_dir, experiment_name, save_mode)
 
   logging.info('Asking checkpoint manager to load checkpoint.')
   state, round_num = checkpoint_mngr.load_latest_checkpoint(initial_state)
