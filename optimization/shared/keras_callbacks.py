@@ -13,7 +13,7 @@
 # limitations under the License.
 """Library for shared Keras callbacks."""
 import os.path
-from typing import Dict, Any
+from typing import Any, Dict, Optional
 
 import pandas as pd
 import tensorflow as tf
@@ -27,7 +27,7 @@ class AtomicCSVLogger(tf.keras.callbacks.Callback):
   def __init__(self, path: str):
     self._path = path
 
-  def on_epoch_end(self, epoch: int, logs: Dict[Any, Any] = None):
+  def on_epoch_end(self, epoch: int, logs: Optional[Dict[Any, Any]] = None):
     results_path = os.path.join(self._path, 'metric_results.csv')
     if tf.io.gfile.exists(results_path):
       # Read the results until now.

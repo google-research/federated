@@ -28,7 +28,7 @@ Usage:
 """
 
 import collections
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import attr
 import tensorflow as tf
@@ -482,9 +482,10 @@ class ReconstructionAccuracyMetric(tf.keras.metrics.Mean):
     super().__init__(name=name, **kwargs)
     self.threshold = threshold
 
-  def update_state(self, y_true: tf.Tensor,
+  def update_state(self,
+                   y_true: tf.Tensor,
                    y_pred: tf.Tensor,
-                   sample_weight: tf.Tensor = None):
+                   sample_weight: Optional[tf.Tensor] = None):
     y_true = tf.keras.backend.cast(y_true, self._dtype)
     y_pred = tf.keras.backend.cast(y_pred, self._dtype)
     absolute_diffs = tf.keras.backend.abs(y_true - y_pred)
