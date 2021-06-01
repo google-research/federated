@@ -44,8 +44,8 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":transformer_models",
-        "//optimization/shared:keras_metrics",
         "//utils:centralized_training_loop",
+        "//utils:keras_metrics",
         "//utils/datasets:stackoverflow_word_prediction",
     ],
 )
@@ -70,7 +70,7 @@ py_library(
     deps = [
         ":transformer_models",
         "//fedopt_guide:training_loop",
-        "//optimization/shared:keras_metrics",
+        "//utils:keras_metrics",
         "//utils/datasets:stackoverflow_word_prediction",
     ],
 )

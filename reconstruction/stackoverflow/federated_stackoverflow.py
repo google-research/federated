@@ -19,10 +19,10 @@ from typing import Callable
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.shared import keras_metrics
 from reconstruction.shared import federated_trainer_utils
 from reconstruction.stackoverflow import models
 from reconstruction.stackoverflow import stackoverflow_dataset
+from utils import keras_metrics
 from utils import training_loop
 from utils.datasets import stackoverflow_word_prediction
 

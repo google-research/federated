@@ -94,7 +94,7 @@ py_library(
         ":dp_fedavg",
         ":optimizer_utils",
         ":training_loop",
-        "//optimization/shared:keras_metrics",
+        "//utils:keras_metrics",
         "//utils/datasets:stackoverflow_word_prediction",
         "//utils/models:stackoverflow_models",
     ],

@@ -9,8 +9,8 @@ py_library(
     srcs = ["centralized_shakespeare.py"],
     srcs_version = "PY3",
     deps = [
-        "//optimization/shared:keras_metrics",
         "//utils:centralized_training_loop",
+        "//utils:keras_metrics",
         "//utils/datasets:shakespeare_dataset",
         "//utils/models:shakespeare_models",
     ],
@@ -21,8 +21,8 @@ py_library(
     srcs = ["federated_shakespeare.py"],
     srcs_version = "PY3",
     deps = [
-        "//optimization/shared:keras_metrics",
         "//optimization/shared:training_specs",
+        "//utils:keras_metrics",
         "//utils/datasets:shakespeare_dataset",
         "//utils/models:shakespeare_models",
     ],

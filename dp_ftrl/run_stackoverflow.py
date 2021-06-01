@@ -27,7 +27,7 @@ import tensorflow_federated as tff
 from dp_ftrl import dp_fedavg
 from dp_ftrl import optimizer_utils
 from dp_ftrl import training_loop
-from optimization.shared import keras_metrics
+from utils import keras_metrics
 from utils.datasets import stackoverflow_word_prediction as stackoverflow_dataset
 from utils.models import stackoverflow_models as models
 

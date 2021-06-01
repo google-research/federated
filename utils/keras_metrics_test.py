@@ -14,7 +14,7 @@
 
 import tensorflow as tf
 
-from optimization.shared import keras_metrics
+from utils import keras_metrics
 
 
 class NumTokensCounterTest(tf.test.TestCase):

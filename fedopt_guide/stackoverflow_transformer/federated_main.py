@@ -22,7 +22,7 @@ import tensorflow_federated as tff
 
 from fedopt_guide import training_loop
 from fedopt_guide.stackoverflow_transformer import transformer_models
-from optimization.shared import keras_metrics
+from utils import keras_metrics
 from utils.datasets import stackoverflow_word_prediction
 
 

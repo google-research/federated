@@ -62,7 +62,7 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":shakespeare_models",
-        "//optimization/shared:keras_metrics",
+        "//utils:keras_metrics",
     ],
 )
 
