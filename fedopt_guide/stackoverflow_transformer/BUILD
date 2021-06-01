@@ -33,8 +33,8 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":centralized_main",
-        "//optimization/shared:optimizer_utils",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )
 
@@ -105,7 +105,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":federated_main",
-        "//optimization/shared:optimizer_utils",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )

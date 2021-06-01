@@ -12,7 +12,6 @@ py_binary(
     deps = [
         ":federated_evaluation",
         ":federated_trainer_utils",
-        "//optimization/shared:optimizer_utils",
         "//reconstruction:evaluation_computation",
         "//reconstruction:reconstruction_model",
         "//reconstruction:reconstruction_utils",
@@ -20,6 +19,7 @@ py_binary(
         "//reconstruction/movielens:federated_movielens",
         "//reconstruction/stackoverflow:federated_stackoverflow",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )
 

@@ -20,18 +20,23 @@ py_test(
 )
 
 py_library(
-    name = "yogi",
-    srcs = ["yogi.py"],
+    name = "optimizer_utils",
+    srcs = ["optimizer_utils.py"],
     srcs_version = "PY3",
+    deps = [
+        ":lars",
+        ":shampoo",
+        ":yogi",
+    ],
 )
 
 py_test(
-    name = "yogi_test",
-    size = "medium",
-    srcs = ["yogi_test.py"],
+    name = "optimizer_utils_test",
+    size = "small",
+    srcs = ["optimizer_utils_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    deps = [":yogi"],
+    deps = [":optimizer_utils"],
 )
 
 py_library(
@@ -47,4 +52,19 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [":shampoo"],
+)
+
+py_library(
+    name = "yogi",
+    srcs = ["yogi.py"],
+    srcs_version = "PY3",
+)
+
+py_test(
+    name = "yogi_test",
+    size = "medium",
+    srcs = ["yogi_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":yogi"],
 )

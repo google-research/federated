@@ -103,8 +103,8 @@ py_library(
     deps = [
         ":dataset",
         ":federated_main",
-        "//optimization/shared:optimizer_utils",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )
 
@@ -123,7 +123,7 @@ py_library(
     deps = [
         ":centralized_main",
         ":dataset",
-        "//optimization/shared:optimizer_utils",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )

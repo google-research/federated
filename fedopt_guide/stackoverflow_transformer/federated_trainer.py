@@ -21,8 +21,8 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from fedopt_guide.stackoverflow_transformer import federated_main
-from optimization.shared import optimizer_utils
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 
 with utils_impl.record_hparam_flags() as optimizer_flags:

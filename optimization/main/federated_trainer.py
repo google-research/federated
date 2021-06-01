@@ -34,12 +34,12 @@ from optimization.emnist import federated_emnist
 from optimization.emnist_ae import federated_emnist_ae
 from optimization.shakespeare import federated_shakespeare
 from optimization.shared import fed_avg_schedule
-from optimization.shared import optimizer_utils
 from optimization.shared import training_specs
 from optimization.stackoverflow import federated_stackoverflow
 from optimization.stackoverflow_lr import federated_stackoverflow_lr
 from utils import training_loop
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 _SUPPORTED_TASKS = [
     'cifar100', 'emnist_cr', 'emnist_ae', 'shakespeare', 'stackoverflow_nwp',

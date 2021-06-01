@@ -14,15 +14,15 @@
 """Runs federated training on CIFAR-10 dataset."""
 
 from typing import Any, Callable, Optional
+
 from absl import app
 from absl import flags
-
 import tensorflow as tf
 import tensorflow_federated as tff
 
 from fedopt_guide.cifar10_resnet import federated_cifar10
-from optimization.shared import optimizer_utils
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 _SUPPORTED_TASKS = ['cifar10']
 

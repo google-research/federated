@@ -19,9 +19,8 @@ from absl import app
 from absl import flags
 
 from fedopt_guide.cifar10_resnet import centralized_cifar10
-from optimization.shared import optimizer_utils
-
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 _SUPPORTED_TASKS = ['cifar10']
 
@@ -77,7 +76,7 @@ def main(argv):
 
   if FLAGS.task == 'cifar10':
     centralized_cifar10.run_centralized(
-        **common_args, crop_size=FLAGS.cifar100_crop_size)
+        **common_args, crop_size=FLAGS.cifar10_crop_size)
 
   else:
     raise ValueError(

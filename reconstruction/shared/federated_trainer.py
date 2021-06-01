@@ -23,7 +23,6 @@ from absl import flags
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.shared import optimizer_utils
 from reconstruction import evaluation_computation
 from reconstruction import reconstruction_model
 from reconstruction import reconstruction_utils
@@ -33,6 +32,7 @@ from reconstruction.shared import federated_evaluation
 from reconstruction.shared import federated_trainer_utils
 from reconstruction.stackoverflow import federated_stackoverflow
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 _SUPPORTED_TASKS = [
     'stackoverflow_nwp', 'movielens_mf', 'stackoverflow_nwp_finetune'

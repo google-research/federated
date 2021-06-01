@@ -18,8 +18,8 @@ from absl import flags
 
 from fedopt_guide.gld23k_mobilenet import centralized_main
 from fedopt_guide.gld23k_mobilenet import dataset
-from optimization.shared import optimizer_utils
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 with utils_impl.record_new_flags() as hparam_flags:
   # Generic centralized training flags

@@ -68,8 +68,8 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":federated_cifar10",
-        "//optimization/shared:optimizer_utils",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )
 
@@ -80,7 +80,7 @@ py_binary(
     srcs_version = "PY3",
     deps = [
         ":centralized_cifar10",
-        "//optimization/shared:optimizer_utils",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )

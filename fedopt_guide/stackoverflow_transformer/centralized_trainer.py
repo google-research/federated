@@ -17,8 +17,8 @@ from absl import app
 from absl import flags
 
 from fedopt_guide.stackoverflow_transformer import centralized_main
-from optimization.shared import optimizer_utils
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 with utils_impl.record_new_flags() as hparam_flags:
   # Generic centralized training flags

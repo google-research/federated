@@ -574,9 +574,10 @@ class Shampoo(tf.keras.optimizers.Optimizer):
         preconditioned_grad = self._preconditioned_update(
             var, partitioned_grads, gbar_updated)
         # slowly adapt from diagonal to preconditioned gradient.
-        w = tf.minimum(1.0, tf.maximum(
-            (local_step - start_preconditioning_steps) \
-            / start_preconditioning_steps, 0.0))
+        w = tf.minimum(
+            1.0,
+            tf.maximum((local_step - start_preconditioning_steps) /
+                       start_preconditioning_steps, 0.0))
         warmup_update = s * lr * (
             w * preconditioned_grad + (1.0 - w) * gbar_updated)
         fallback_update = (1 - s) * (lr * gbar_updated)

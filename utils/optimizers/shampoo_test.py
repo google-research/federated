@@ -16,7 +16,7 @@
 import numpy as np
 import tensorflow as tf
 
-from optimization.shared.keras_optimizers import shampoo
+from utils.optimizers import shampoo
 
 
 class ShampooTest(tf.test.TestCase):
@@ -75,8 +75,8 @@ class ShampooTest(tf.test.TestCase):
     var_step_1_val = self.evaluate(var)
 
     # New update has the scale of the second diagonal adagrad update.
-    adagrad_update = grad_np / (np.sqrt(np.square(grad_np)) + epsilon) \
-        * (1.0 - momentum)
+    adagrad_update = grad_np / (np.sqrt(np.square(grad_np)) +
+                                epsilon) * (1.0 - momentum)
     preconditioned_grad_update = np.dot(np.dot(mat_left, grad_np), mat_right)
 
     # With normalization by diagonal enabled.
@@ -150,8 +150,8 @@ class ShampooTest(tf.test.TestCase):
     var_step_1_val = self.evaluate(var)
 
     # New update has the scale of the second diagonal adagrad update.
-    adagrad_update = grad_np / (np.sqrt(np.square(grad_np)) + epsilon) \
-        * (1.0 - momentum)
+    adagrad_update = grad_np / (np.sqrt(np.square(grad_np)) +
+                                epsilon) * (1.0 - momentum)
     preconditioned_grad_update = np.matmul(grad_np, mat_right)
 
     # With normalization by diagonal enabled.
@@ -261,8 +261,8 @@ class ShampooTest(tf.test.TestCase):
     var_step_1_val = self.evaluate(var)
 
     # New update has the scale of the second diagonal adagrad update.
-    adagrad_update = grad_np / (np.sqrt(np.square(grad_np)) + epsilon) \
-        * (1.0 - momentum)
+    adagrad_update = grad_np / (np.sqrt(np.square(grad_np)) +
+                                epsilon) * (1.0 - momentum)
 
     block_0_update = np.dot(
         np.dot(block_0_mat_left, block_0_grad_np), block_0_mat_right)

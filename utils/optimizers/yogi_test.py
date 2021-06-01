@@ -17,7 +17,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 
-from optimization.shared.keras_optimizers import yogi
+from utils.optimizers import yogi
 
 
 def yogi_update_numpy(param,

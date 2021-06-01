@@ -22,7 +22,7 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 from local_adaptivity import fed_avg_local_adaptivity
-from optimization.shared.keras_optimizers import yogi
+from utils.optimizers import yogi
 
 _Batch = collections.namedtuple('Batch', ['x', 'y'])
 

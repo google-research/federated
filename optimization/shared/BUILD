@@ -39,26 +39,6 @@ py_test(
 )
 
 py_library(
-    name = "optimizer_utils",
-    srcs = ["optimizer_utils.py"],
-    srcs_version = "PY3",
-    deps = [
-        "//optimization/shared/keras_optimizers:lars",
-        "//optimization/shared/keras_optimizers:shampoo",
-        "//optimization/shared/keras_optimizers:yogi",
-    ],
-)
-
-py_test(
-    name = "optimizer_utils_test",
-    size = "small",
-    srcs = ["optimizer_utils_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":optimizer_utils"],
-)
-
-py_library(
     name = "training_specs",
     srcs = ["training_specs.py"],
     srcs_version = "PY3",

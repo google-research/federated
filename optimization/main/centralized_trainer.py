@@ -28,10 +28,10 @@ from optimization.cifar100 import centralized_cifar100
 from optimization.emnist import centralized_emnist
 from optimization.emnist_ae import centralized_emnist_ae
 from optimization.shakespeare import centralized_shakespeare
-from optimization.shared import optimizer_utils
 from optimization.stackoverflow import centralized_stackoverflow
 from optimization.stackoverflow_lr import centralized_stackoverflow_lr
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 _SUPPORTED_TASKS = [
     'cifar100', 'emnist_cr', 'emnist_ae', 'shakespeare', 'stackoverflow_nwp',

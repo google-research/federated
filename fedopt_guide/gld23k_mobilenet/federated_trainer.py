@@ -22,8 +22,8 @@ import tensorflow_federated as tff
 
 from fedopt_guide.gld23k_mobilenet import dataset
 from fedopt_guide.gld23k_mobilenet import federated_main
-from optimization.shared import optimizer_utils
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 with utils_impl.record_hparam_flags() as optimizer_flags:
   # Defining optimizer flags

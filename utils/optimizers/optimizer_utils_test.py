@@ -19,7 +19,7 @@ from absl import flags
 from absl.testing import parameterized
 import tensorflow as tf
 
-from optimization.shared import optimizer_utils
+from utils.optimizers import optimizer_utils
 
 FLAGS = flags.FLAGS
 TEST_CLIENT_FLAG_PREFIX = 'test_client'

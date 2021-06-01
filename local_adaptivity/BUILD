@@ -29,12 +29,12 @@ py_library(
         "//optimization/emnist:federated_emnist",
         "//optimization/emnist_ae:federated_emnist_ae",
         "//optimization/shakespeare:federated_shakespeare",
-        "//optimization/shared:optimizer_utils",
         "//optimization/shared:training_specs",
         "//optimization/stackoverflow:federated_stackoverflow",
         "//optimization/stackoverflow_lr:federated_stackoverflow_lr",
         "//utils:training_loop",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )
 
@@ -45,6 +45,6 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":fed_avg_local_adaptivity",
-        "//optimization/shared/keras_optimizers:yogi",
+        "//utils/optimizers:yogi",
     ],
 )
