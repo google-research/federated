@@ -39,22 +39,6 @@ py_test(
 )
 
 py_library(
-    name = "keras_callbacks",
-    srcs = ["keras_callbacks.py"],
-    srcs_version = "PY3",
-    deps = ["//utils:utils_impl"],
-)
-
-py_test(
-    name = "keras_callbacks_test",
-    size = "small",
-    srcs = ["keras_callbacks_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":keras_callbacks"],
-)
-
-py_library(
     name = "optimizer_utils",
     srcs = ["optimizer_utils.py"],
     srcs_version = "PY3",

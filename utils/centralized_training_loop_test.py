@@ -209,5 +209,32 @@ class CentralizedTrainingLoopTest(tf.test.TestCase):
     self.assertTrue(tf.io.gfile.exists(hparams_file))
 
 
+class KerasCallbacksTest(tf.test.TestCase):
+
+  def test_initializes(self):
+    tmpdir = self.get_temp_dir()
+    logger = centralized_training_loop.AtomicCSVLogger(tmpdir)
+    self.assertIsInstance(logger, tf.keras.callbacks.Callback)
+
+  def test_writes_dict_as_csv(self):
+    tmpdir = self.get_temp_dir()
+    logger = centralized_training_loop.AtomicCSVLogger(tmpdir)
+    logger.on_epoch_end(epoch=0, logs={'value': 0, 'value_1': 'a'})
+    logger.on_epoch_end(epoch=1, logs={'value': 2, 'value_1': 'b'})
+    logger.on_epoch_end(epoch=2, logs={'value': 3, 'value_1': 'c'})
+    logger.on_epoch_end(epoch=1, logs={'value': 4, 'value_1': 'd'})
+    read_logs = pd.read_csv(
+        os.path.join(tmpdir, 'metric_results.csv'),
+        index_col=0,
+        header=0,
+        engine='c')
+    self.assertNotEmpty(read_logs)
+    pd.testing.assert_frame_equal(
+        read_logs, pd.DataFrame({
+            'value': [0, 4],
+            'value_1': ['a', 'd'],
+        }))
+
+
 if __name__ == '__main__':
   tf.test.main()

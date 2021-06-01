@@ -8,10 +8,7 @@ py_library(
     name = "centralized_training_loop",
     srcs = ["centralized_training_loop.py"],
     srcs_version = "PY3",
-    deps = [
-        ":utils_impl",
-        "//optimization/shared:keras_callbacks",
-    ],
+    deps = [":utils_impl"],
 )
 
 py_test(

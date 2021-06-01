@@ -13,14 +13,35 @@
 # limitations under the License.
 """Dispatcher for centralized training loops."""
 
-import os
+import os.path
 from typing import Any, Dict, Optional
 
 from absl import logging
+import pandas as pd
 import tensorflow as tf
 
-from optimization.shared import keras_callbacks
 from utils import utils_impl
+
+
+class AtomicCSVLogger(tf.keras.callbacks.Callback):
+  """A callback that writes per-epoch values to a CSV file."""
+
+  def __init__(self, path: str):
+    self._path = path
+
+  def on_epoch_end(self, epoch: int, logs: Optional[Dict[Any, Any]] = None):
+    results_path = os.path.join(self._path, 'metric_results.csv')
+    if tf.io.gfile.exists(results_path):
+      # Read the results until now.
+      results_df = utils_impl.atomic_read_from_csv(results_path)
+      # Slice off results after the current epoch, this indicates the job
+      # restarted.
+      results_df = results_df[:epoch]
+      # Add the new epoch.
+      results_df = results_df.append(logs, ignore_index=True)
+    else:
+      results_df = pd.DataFrame(logs, index=[epoch])
+    utils_impl.atomic_write_to_csv(results_df, results_path)
 
 
 def run(
@@ -69,7 +90,7 @@ def run(
     logging.info('Saving hyper parameters to: [%s]', hparams_file)
     utils_impl.atomic_write_series_to_csv(hparams_dict, hparams_file)
 
-  csv_logger_callback = keras_callbacks.AtomicCSVLogger(results_dir)
+  csv_logger_callback = AtomicCSVLogger(results_dir)
   tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_dir)
   training_callbacks = [tensorboard_callback, csv_logger_callback]
 
