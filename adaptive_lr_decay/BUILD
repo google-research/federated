@@ -58,7 +58,6 @@ py_binary(
         "//optimization/tasks:stackoverflow_nwp",
         "//optimization/tasks:stackoverflow_tp",
         "//optimization/tasks:training_specs",
-        "//utils:training_loop",
         "//utils:utils_impl",
         "//utils/optimizers:optimizer_utils",
     ],

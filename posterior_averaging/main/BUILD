@@ -18,7 +18,6 @@ py_binary(
         "//optimization/tasks:stackoverflow_tp",
         "//optimization/tasks:training_specs",
         "//posterior_averaging/shared:fed_pa_schedule",
-        "//utils:training_loop",
         "//utils:utils_impl",
         "//utils/optimizers:optimizer_utils",
     ],
