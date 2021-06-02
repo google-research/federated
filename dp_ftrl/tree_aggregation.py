@@ -19,6 +19,8 @@ function, it  allows for efficient differentially private algorithms under
 continual observation, without prior subsampling or shuffling assumptions.
 """
 
+# TODO(b/187312400): Remove this file and use TFP after TFP make a release.
+
 import abc
 from typing import Any, Callable, Collection, Optional, Tuple, Union
 
