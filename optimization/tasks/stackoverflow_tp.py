@@ -18,7 +18,7 @@ import functools
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.shared import training_specs
+from optimization.tasks import training_specs
 from utils.datasets import stackoverflow_tag_prediction
 from utils.models import stackoverflow_lr_models
 

@@ -20,7 +20,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.shared import fed_avg_client_opt
+from optimization import fed_avg_client_opt
 
 
 def _batch_fn(batch_size=1):

@@ -27,13 +27,13 @@ import tensorflow_federated as tff
 
 from adaptive_lr_decay import adaptive_fed_avg
 from adaptive_lr_decay import callbacks
-from optimization.cifar100 import federated_cifar100
-from optimization.emnist import federated_emnist
-from optimization.emnist_ae import federated_emnist_ae
-from optimization.shakespeare import federated_shakespeare
-from optimization.shared import training_specs
-from optimization.stackoverflow import federated_stackoverflow
-from optimization.stackoverflow_lr import federated_stackoverflow_lr
+from optimization.tasks import cifar100
+from optimization.tasks import emnist
+from optimization.tasks import emnist_ae
+from optimization.tasks import shakespeare
+from optimization.tasks import stackoverflow_nwp
+from optimization.tasks import stackoverflow_tp
+from optimization.tasks import training_specs
 from utils import training_loop
 from utils import utils_impl
 from utils.optimizers import optimizer_utils
@@ -121,13 +121,13 @@ with utils_impl.record_hparam_flags() as task_flags:
       'to use from test set for per-round validation.')
 
   # Stack Overflow LR flags
-  flags.DEFINE_integer('so_lr_vocab_tokens_size', 10000,
+  flags.DEFINE_integer('so_tp_vocab_tokens_size', 10000,
                        'Vocab tokens size used.')
-  flags.DEFINE_integer('so_lr_vocab_tags_size', 500, 'Vocab tags size used.')
+  flags.DEFINE_integer('so_tp_vocab_tags_size', 500, 'Vocab tags size used.')
   flags.DEFINE_integer(
-      'so_lr_num_validation_examples', 10000, 'Number of examples '
+      'so_tp_num_validation_examples', 10000, 'Number of examples '
       'to use from test set for per-round validation.')
-  flags.DEFINE_integer('so_lr_max_elements_per_user', 1000,
+  flags.DEFINE_integer('so_tp_max_elements_per_user', 1000,
                        'Max number of training '
                        'sentences to use per user.')
 
@@ -185,31 +185,31 @@ def main(argv):
       client_datasets_random_seed=FLAGS.client_datasets_random_seed)
 
   if FLAGS.task == 'cifar100':
-    runner_spec = federated_cifar100.configure_training(
+    runner_spec = cifar100.configure_training(
         task_spec, crop_size=FLAGS.cifar100_crop_size)
   elif FLAGS.task == 'emnist_cr':
-    runner_spec = federated_emnist.configure_training(
+    runner_spec = emnist.configure_training(
         task_spec, model=FLAGS.emnist_cr_model)
   elif FLAGS.task == 'emnist_ae':
-    runner_spec = federated_emnist_ae.configure_training(task_spec)
+    runner_spec = emnist_ae.configure_training(task_spec)
   elif FLAGS.task == 'shakespeare':
-    runner_spec = federated_shakespeare.configure_training(
+    runner_spec = shakespeare.configure_training(
         task_spec, sequence_length=FLAGS.shakespeare_sequence_length)
   elif FLAGS.task == 'stackoverflow_nwp':
-    runner_spec = federated_stackoverflow.configure_training(
+    runner_spec = stackoverflow_nwp.configure_training(
         task_spec,
         vocab_size=FLAGS.so_nwp_vocab_size,
         num_oov_buckets=FLAGS.so_nwp_num_oov_buckets,
         sequence_length=FLAGS.so_nwp_sequence_length,
         max_elements_per_user=FLAGS.so_nwp_max_elements_per_user,
         num_validation_examples=FLAGS.so_nwp_num_validation_examples)
-  elif FLAGS.task == 'stackoverflow_lr':
-    runner_spec = federated_stackoverflow_lr.configure_training(
+  elif FLAGS.task == 'stackoverflow_tp':
+    runner_spec = stackoverflow_tp.configure_training(
         task_spec,
-        vocab_tokens_size=FLAGS.so_lr_vocab_tokens_size,
-        vocab_tags_size=FLAGS.so_lr_vocab_tags_size,
-        max_elements_per_user=FLAGS.so_lr_max_elements_per_user,
-        num_validation_examples=FLAGS.so_lr_num_validation_examples)
+        vocab_tokens_size=FLAGS.so_tp_vocab_tokens_size,
+        vocab_tags_size=FLAGS.so_tp_vocab_tags_size,
+        max_elements_per_user=FLAGS.so_tp_max_elements_per_user,
+        num_validation_examples=FLAGS.so_tp_num_validation_examples)
   else:
     raise ValueError(
         '--task flag {} is not supported, must be one of {}.'.format(

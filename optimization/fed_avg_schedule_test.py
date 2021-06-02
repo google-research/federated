@@ -20,7 +20,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.shared import fed_avg_schedule
+from optimization import fed_avg_schedule
 
 
 def create_dataset(has_nan=False):

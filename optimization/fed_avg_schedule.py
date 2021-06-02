@@ -266,7 +266,7 @@ def build_fed_avg_process(
   if not callable(server_lr_schedule):
     server_lr_schedule = lambda round_num: server_lr
 
-  dummy_model = model_fn()
+  placeholder_model = model_fn()
 
   server_init_tf = build_server_init_fn(
       model_fn,
@@ -276,8 +276,8 @@ def build_fed_avg_process(
   model_weights_type = server_state_type.model
   round_num_type = server_state_type.round_num
 
-  tf_dataset_type = tff.SequenceType(dummy_model.input_spec)
-  model_input_type = tff.SequenceType(dummy_model.input_spec)
+  tf_dataset_type = tff.SequenceType(placeholder_model.input_spec)
+  model_input_type = tff.SequenceType(placeholder_model.input_spec)
 
   @tff.tf_computation(model_input_type, model_weights_type, round_num_type)
   def client_update_fn(tf_dataset, initial_model_weights, round_num):
@@ -325,7 +325,7 @@ def build_fed_avg_process(
     server_state = tff.federated_map(server_update_fn,
                                      (server_state, model_delta))
 
-    aggregated_outputs = dummy_model.federated_output_computation(
+    aggregated_outputs = placeholder_model.federated_output_computation(
         client_outputs.model_output)
     if aggregated_outputs.type_signature.is_struct():
       aggregated_outputs = tff.federated_zip(aggregated_outputs)

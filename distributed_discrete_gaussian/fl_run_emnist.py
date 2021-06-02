@@ -21,8 +21,8 @@ from absl import flags
 import tensorflow_federated as tff
 
 from distributed_discrete_gaussian import fl_utils
-from optimization.emnist import federated_emnist
-from optimization.shared import training_specs
+from optimization.tasks import emnist
+from optimization.tasks import training_specs
 from utils import training_loop
 from utils import utils_impl
 
@@ -122,7 +122,7 @@ def main(argv):
       clients_per_round=FLAGS.clients_per_round,
       client_datasets_random_seed=FLAGS.client_datasets_random_seed)
 
-  runner_spec = federated_emnist.configure_training(task_spec, FLAGS.model)
+  runner_spec = emnist.configure_training(task_spec, FLAGS.model)
 
   training_loop.run(
       iterative_process=runner_spec.iterative_process,

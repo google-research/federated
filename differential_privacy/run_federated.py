@@ -22,13 +22,13 @@ from absl import logging
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.cifar100 import federated_cifar100
-from optimization.emnist import federated_emnist
-from optimization.emnist_ae import federated_emnist_ae
-from optimization.shakespeare import federated_shakespeare
-from optimization.shared import training_specs
-from optimization.stackoverflow import federated_stackoverflow
-from optimization.stackoverflow_lr import federated_stackoverflow_lr
+from optimization.tasks import cifar100
+from optimization.tasks import emnist
+from optimization.tasks import emnist_ae
+from optimization.tasks import shakespeare
+from optimization.tasks import stackoverflow_nwp
+from optimization.tasks import stackoverflow_tp
+from optimization.tasks import training_specs
 from utils import training_loop
 from utils import utils_impl
 from utils.optimizers import optimizer_utils
@@ -197,17 +197,17 @@ def main(argv):
       client_datasets_random_seed=FLAGS.client_datasets_random_seed)
 
   if FLAGS.task == 'cifar100':
-    runner_spec = federated_cifar100.configure_training(task_spec)
+    runner_spec = cifar100.configure_training(task_spec)
   elif FLAGS.task == 'emnist_cr':
-    runner_spec = federated_emnist.configure_training(task_spec)
+    runner_spec = emnist.configure_training(task_spec)
   elif FLAGS.task == 'emnist_ae':
-    runner_spec = federated_emnist_ae.configure_training(task_spec)
+    runner_spec = emnist_ae.configure_training(task_spec)
   elif FLAGS.task == 'shakespeare':
-    runner_spec = federated_shakespeare.configure_training(task_spec)
+    runner_spec = shakespeare.configure_training(task_spec)
   elif FLAGS.task == 'stackoverflow_nwp':
-    runner_spec = federated_stackoverflow.configure_training(task_spec)
+    runner_spec = stackoverflow_nwp.configure_training(task_spec)
   elif FLAGS.task == 'stackoverflow_lr':
-    runner_spec = federated_stackoverflow_lr.configure_training(task_spec)
+    runner_spec = stackoverflow_tp.configure_training(task_spec)
   else:
     raise ValueError(
         '--task flag {} is not supported, must be one of {}.'.format(

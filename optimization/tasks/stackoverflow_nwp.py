@@ -18,7 +18,7 @@ import functools
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.shared import training_specs
+from optimization.tasks import training_specs
 from utils import keras_metrics
 from utils.datasets import stackoverflow_word_prediction
 from utils.models import stackoverflow_models

@@ -37,8 +37,8 @@ CIFAR-100          | 10                | 20         | 4000
 EMNIST AE          | 10                | 20         | 3000
 EMNIST CR          | 10                | 20         | 1500
 Shakespeare        | 10                | 4          | 1200
-Stack Overflow LR  | 10                | 100        | 1500
 Stack Overflow NWP | 50                | 16         | 1500
+Stack Overflow TP  | 10                | 100        | 1500
 
 ### Task-specific hyperparameters
 
@@ -63,15 +63,6 @@ Hyperparameter            | Flag                          | Value
 ------------------------- | ----------------------------- | -----
 Character sequence length | `shakespeare_sequence_length` | 80
 
-**Stack Overflow LR**
-
-Hyperparameter          | Flag                            | Value
------------------------ | ------------------------------- | -----
-Vocabulary size         | `so_lr_vocab_tokens_size`       | 10000
-Number of labels        | `so_lr_vocab_tags_size`         | 500
-Validation set size     | `so_lr_num_validation_examples` | 10000
-Max examples per client | `so_lr_max_elements_per_user`   | 1000
-
 **Stack Overflow NWP**
 
 Hyperparameter                     | Flag                             | Value
@@ -84,6 +75,15 @@ Max examples per client            | `so_nwp_max_elements_per_user`   | 1000
 Embedding layer size               | `so_nwp_embedding_size`          | 96
 LSTM layer size                    | `so_nwp_latent_size`             | 670
 Number of LSTM layers              | `so_nwp_num_layers`              | 1
+
+**Stack Overflow TP**
+
+Hyperparameter          | Flag                            | Value
+----------------------- | ------------------------------- | -----
+Vocabulary size         | `so_tp_vocab_tokens_size`       | 10000
+Number of labels        | `so_tp_vocab_tags_size`         | 500
+Validation set size     | `so_tp_num_validation_examples` | 10000
+Max examples per client | `so_tp_max_elements_per_user`   | 1000
 
 ## Configuring optimizers
 
@@ -153,8 +153,8 @@ CIFAR-100          | FedYogi
 EMNIST AE          | FedYogi
 EMNIST CR          | FedAdam, FedYogi, FedAvgM
 Shakespeare        | FedAdagrad, FedYogi, FedAvgM
-Stack Overflow LR  | FedAdagrad
 Stack Overflow NWP | FedAdam, FedYogi
+Stack Overflow TP  | FedAdagrad
 
 In general, we found FedYogi to be the most consistently good optimizer.
 
@@ -172,8 +172,8 @@ CIFAR-100          | -1      | -1.5 | -1.5 | -1.5 | -1
 EMNIST AE          | 1.5     | 1    | 1    | 0.5  | 1
 EMNIST CR          | -1.5    | -1.5 | -1.5 | -1.5 | -1
 Shakespeare        | 0       | 0    | 0    | 0    | 0
-Stack Overflow LR  | 2       | 2    | 2    | 2    | 2
 Stack Overflow NWP | -0.5    | -0.5 | -0.5 | -0.5 | -0.5
+Stack Overflow TP  | 2       | 2    | 2    | 2    | 2
 
 We see that in most cases, the client learning rate can be fixed at a
 task-level.
@@ -186,8 +186,8 @@ CIFAR-100          | -1      | 0    | 0    | 0    | 0.5
 EMNIST AE          | -1.5    | -1.5 | -1.5 | 0    | 0
 EMNIST CR          | -1      | -2.5 | -2.5 | -0.5 | 0
 Shakespeare        | -0.5    | -2   | -2   | -0.5 | 0
-Stack Overflow LR  | 1       | -0.5 | -0.5 | 0    | 0
 Stack Overflow NWP | -1.5    | -2   | -2   | 0    | 0
+Stack Overflow TP  | 1       | -0.5 | -0.5 | 0    | 0
 
 **Epsilon values**
 
@@ -197,5 +197,5 @@ CIFAR-100          | -2      | -1   | -1
 EMNIST AE          | -3      | -3   | -3
 EMNIST CR          | -2      | -4   | -4
 Shakespeare        | -1      | -3   | -3
-Stack Overflow LR  | -2      | -5   | -5
 Stack Overflow NWP | -4      | -5   | -5
+Stack Overflow TP  | -2      | -5   | -5

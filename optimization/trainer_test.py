@@ -19,13 +19,13 @@ from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.cifar100 import federated_cifar100
-from optimization.emnist import federated_emnist
-from optimization.emnist_ae import federated_emnist_ae
-from optimization.shakespeare import federated_shakespeare
-from optimization.shared import training_specs
-from optimization.stackoverflow import federated_stackoverflow
-from optimization.stackoverflow_lr import federated_stackoverflow_lr
+from optimization.tasks import cifar100
+from optimization.tasks import emnist
+from optimization.tasks import emnist_ae
+from optimization.tasks import shakespeare
+from optimization.tasks import stackoverflow_nwp
+from optimization.tasks import stackoverflow_tp
+from optimization.tasks import training_specs
 from utils import training_loop
 
 
@@ -39,14 +39,14 @@ def iterative_process_builder(model_fn):
 class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('cifar100', 'cifar100', federated_cifar100.configure_training),
-      ('emnist_cr', 'emnist_cr', federated_emnist.configure_training),
-      ('emnist_ae', 'emnist_ae', federated_emnist_ae.configure_training),
-      ('shakespeare', 'shakespeare', federated_shakespeare.configure_training),
+      ('cifar100', 'cifar100', cifar100.configure_training),
+      ('emnist_cr', 'emnist_cr', emnist.configure_training),
+      ('emnist_ae', 'emnist_ae', emnist_ae.configure_training),
+      ('shakespeare', 'shakespeare', shakespeare.configure_training),
       ('stackoverflow_nwp', 'stackoverflow_nwp',
-       federated_stackoverflow.configure_training),
-      ('stackoverflow_lr', 'stackoverflow_lr',
-       federated_stackoverflow_lr.configure_training),
+       stackoverflow_nwp.configure_training),
+      ('stackoverflow_tp', 'stackoverflow_tp',
+       stackoverflow_tp.configure_training),
   )
   def test_run_federated(self, task_name, config_fn):
     task_spec = training_specs.TaskSpec(

@@ -21,8 +21,8 @@ from absl import flags
 import tensorflow_federated as tff
 
 from distributed_discrete_gaussian import fl_utils
-from optimization.shared import training_specs
-from optimization.stackoverflow_lr import federated_stackoverflow_lr
+from optimization.tasks import stackoverflow_tp
+from optimization.tasks import training_specs
 from utils import training_loop
 from utils import utils_impl
 
@@ -136,7 +136,7 @@ def main(argv):
       client_datasets_random_seed=FLAGS.client_datasets_random_seed)
 
   if FLAGS.task == 'stackoverflow_lr':
-    runner_spec = federated_stackoverflow_lr.configure_training(task_spec)
+    runner_spec = stackoverflow_tp.configure_training(task_spec)
   else:
     raise ValueError(
         '--task flag {} is not supported, must be one of {}.'.format(

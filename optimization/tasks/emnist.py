@@ -11,26 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Federated CIFAR-100 classification library using TFF."""
+"""Federated EMNIST character recognition library using TFF."""
 
 import functools
 
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from optimization.shared import training_specs
-from utils.datasets import cifar100_dataset
-from utils.models import resnet_models
+from optimization.tasks import training_specs
+from utils.datasets import emnist_dataset
+from utils.models import emnist_models
 
-CIFAR_SHAPE = (32, 32, 3)
-NUM_CLASSES = 100
+EMNIST_MODELS = ['cnn', '2nn', '1m_cnn']
 
 
-def configure_training(
-    task_spec: training_specs.TaskSpec,
-    crop_size: int = 24,
-    distort_train_images: bool = True) -> training_specs.RunnerSpec:
-  """Configures training for the CIFAR-100 classification task.
+def configure_training(task_spec: training_specs.TaskSpec,
+                       model: str = 'cnn') -> training_specs.RunnerSpec:
+  """Configures training for the EMNIST character recognition task.
 
   This method will load and pre-process datasets and construct a model used for
   the task. It then uses `iterative_process_builder` to create an iterative
@@ -38,33 +35,40 @@ def configure_training(
 
   Args:
     task_spec: A `TaskSpec` class for creating federated training tasks.
-    crop_size: An optional integer representing the resulting size of input
-      images after preprocessing.
-    distort_train_images: A boolean indicating whether to distort training
-      images during preprocessing via random crops, as opposed to simply
-      resizing the image.
+    model: A string specifying the model used for character recognition. Can be
+      one of `cnn`, `2nn`, or `1m_cnn`, corresponding to a simple CNN model,
+      a densely connected 2-layer model, and a CNN model with roughly 1 miilion
+      (< 2^20) parameters, respectively.
 
   Returns:
     A `RunnerSpec` containing attributes used for running the newly created
     federated task.
   """
-  crop_shape = (crop_size, crop_size, 3)
+  emnist_task = 'digit_recognition'
+  emnist_train, _ = tff.simulation.datasets.emnist.load_data(only_digits=False)
+  _, emnist_test = emnist_dataset.get_centralized_datasets(
+      only_digits=False, emnist_task=emnist_task)
 
-  cifar_train, _ = tff.simulation.datasets.cifar100.load_data()
-  _, cifar_test = cifar100_dataset.get_centralized_datasets(
-      train_batch_size=task_spec.client_batch_size, crop_shape=crop_shape)
-
-  train_preprocess_fn = cifar100_dataset.create_preprocess_fn(
+  train_preprocess_fn = emnist_dataset.create_preprocess_fn(
       num_epochs=task_spec.client_epochs_per_round,
       batch_size=task_spec.client_batch_size,
-      crop_shape=crop_shape,
-      distort_image=distort_train_images)
+      emnist_task=emnist_task)
+
   input_spec = train_preprocess_fn.type_signature.result.element
 
-  model_builder = functools.partial(
-      resnet_models.create_resnet18,
-      input_shape=crop_shape,
-      num_classes=NUM_CLASSES)
+  if model == 'cnn':
+    model_builder = functools.partial(
+        emnist_models.create_conv_dropout_model, only_digits=False)
+  elif model == '2nn':
+    model_builder = functools.partial(
+        emnist_models.create_two_hidden_layer_model, only_digits=False)
+  elif model == '1m_cnn':
+    model_builder = functools.partial(
+        emnist_models.create_1m_cnn_model, only_digits=False)
+  else:
+    raise ValueError(
+        'Cannot handle model flag [{!s}], must be one of {!s}.'.format(
+            model, EMNIST_MODELS))
 
   loss_builder = tf.keras.losses.SparseCategoricalCrossentropy
   metrics_builder = lambda: [tf.keras.metrics.SparseCategoricalAccuracy()]
@@ -80,14 +84,14 @@ def configure_training(
 
   @tff.tf_computation(tf.string)
   def build_train_dataset_from_client_id(client_id):
-    client_dataset = cifar_train.dataset_computation(client_id)
+    client_dataset = emnist_train.dataset_computation(client_id)
     return train_preprocess_fn(client_dataset)
 
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
       build_train_dataset_from_client_id, iterative_process)
   client_ids_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
-          cifar_train.client_ids,
+          emnist_train.client_ids,
           replace=False,
           random_seed=task_spec.client_datasets_random_seed),
       size=task_spec.clients_per_round)
@@ -100,11 +104,13 @@ def configure_training(
   evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
 
   def test_fn(state):
-    return evaluate_fn(iterative_process.get_model_weights(state), [cifar_test])
+    return evaluate_fn(
+        iterative_process.get_model_weights(state), [emnist_test])
 
   def validation_fn(state, round_num):
     del round_num
-    return evaluate_fn(iterative_process.get_model_weights(state), [cifar_test])
+    return evaluate_fn(
+        iterative_process.get_model_weights(state), [emnist_test])
 
   return training_specs.RunnerSpec(
       iterative_process=training_process,

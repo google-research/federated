@@ -108,8 +108,8 @@ py_binary(
     srcs_version = "PY3",
     deps = [
         ":fl_utils",
-        "//optimization/emnist:federated_emnist",
-        "//optimization/shared:training_specs",
+        "//optimization/tasks:emnist",
+        "//optimization/tasks:training_specs",
         "//utils:training_loop",
         "//utils:utils_impl",
     ],
@@ -122,8 +122,8 @@ py_binary(
     srcs_version = "PY3",
     deps = [
         ":fl_utils",
-        "//optimization/shared:training_specs",
-        "//optimization/stackoverflow_lr:federated_stackoverflow_lr",
+        "//optimization/tasks:stackoverflow_tp",
+        "//optimization/tasks:training_specs",
         "//utils:training_loop",
         "//utils:utils_impl",
     ],
