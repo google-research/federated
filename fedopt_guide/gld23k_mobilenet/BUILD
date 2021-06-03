@@ -84,7 +84,7 @@ py_library(
     deps = [
         ":dataset",
         ":mobilenet_v2",
-        "//utils:centralized_training_loop",
+        "//fedopt_guide:centralized_training_loop",
     ],
 )
 

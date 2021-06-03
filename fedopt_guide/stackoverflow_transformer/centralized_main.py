@@ -17,8 +17,8 @@ from typing import Any, Mapping, Optional
 
 import tensorflow as tf
 
+from fedopt_guide import centralized_training_loop
 from fedopt_guide.stackoverflow_transformer import transformer_models
-from utils import centralized_training_loop
 from utils import keras_metrics
 from utils.datasets import stackoverflow_word_prediction
 

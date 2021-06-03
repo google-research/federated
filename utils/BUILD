@@ -5,21 +5,6 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])
 
 py_library(
-    name = "centralized_training_loop",
-    srcs = ["centralized_training_loop.py"],
-    srcs_version = "PY3",
-    deps = [":utils_impl"],
-)
-
-py_test(
-    name = "centralized_training_loop_test",
-    srcs = ["centralized_training_loop_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":centralized_training_loop"],
-)
-
-py_library(
     name = "keras_metrics",
     srcs = ["keras_metrics.py"],
     srcs_version = "PY3",

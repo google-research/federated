@@ -48,7 +48,7 @@ py_library(
     srcs = ["centralized_cifar10.py"],
     srcs_version = "PY3",
     deps = [
-        "//utils:centralized_training_loop",
+        "//fedopt_guide:centralized_training_loop",
         "//utils/datasets:cifar10_dataset",
         "//utils/models:resnet_models",
     ],

@@ -17,9 +17,9 @@ from typing import Any, Mapping, Optional
 
 import tensorflow as tf
 
+from fedopt_guide import centralized_training_loop
 from fedopt_guide.gld23k_mobilenet import dataset
 from fedopt_guide.gld23k_mobilenet import mobilenet_v2
-from utils import centralized_training_loop
 
 
 def run_centralized(

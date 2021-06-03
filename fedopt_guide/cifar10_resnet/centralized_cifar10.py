@@ -17,7 +17,7 @@ from typing import Any, Mapping, Optional
 
 import tensorflow as tf
 
-from utils import centralized_training_loop
+from fedopt_guide import centralized_training_loop
 from utils.datasets import cifar10_dataset
 from utils.models import resnet_models
 

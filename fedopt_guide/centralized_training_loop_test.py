@@ -17,7 +17,7 @@ import os.path
 import pandas as pd
 import tensorflow as tf
 
-from utils import centralized_training_loop
+from fedopt_guide import centralized_training_loop
 
 
 def create_dataset():
