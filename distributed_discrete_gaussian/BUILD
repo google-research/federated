@@ -110,7 +110,6 @@ py_binary(
         ":fl_utils",
         "//optimization/tasks:emnist",
         "//optimization/tasks:training_specs",
-        "//utils:training_loop",
         "//utils:utils_impl",
     ],
 )
@@ -124,7 +123,6 @@ py_binary(
         ":fl_utils",
         "//optimization/tasks:stackoverflow_tp",
         "//optimization/tasks:training_specs",
-        "//utils:training_loop",
         "//utils:utils_impl",
     ],
 )

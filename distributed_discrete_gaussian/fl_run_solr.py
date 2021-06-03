@@ -14,16 +14,18 @@
 """Runs federated training with differential privacy on StackOverflow LR."""
 
 import math
-from typing import Callable
+import os.path
+import pprint
+from typing import Callable, List, Tuple
 
 from absl import app
 from absl import flags
+from absl import logging
 import tensorflow_federated as tff
 
 from distributed_discrete_gaussian import fl_utils
 from optimization.tasks import stackoverflow_tp
 from optimization.tasks import training_specs
-from utils import training_loop
 from utils import utils_impl
 
 # We use a separate run_file for EMNIST for now as we might update the model.
@@ -86,6 +88,34 @@ flags.DEFINE_enum('task', 'stackoverflow_lr', _SUPPORTED_TASKS,
 FLAGS = flags.FLAGS
 
 
+def _configure_managers() -> Tuple[tff.simulation.FileCheckpointManager,
+                                   List[tff.simulation.MetricsManager]]:
+  """Configures checkpoint and metrics managers from flags."""
+  root_output_dir = FLAGS.root_output_dir
+  experiment_name = FLAGS.experiment_name
+  utils_impl.create_directory_if_not_exists(root_output_dir)
+
+  checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
+  utils_impl.create_directory_if_not_exists(checkpoint_dir)
+  checkpoint_manager = tff.simulation.FileCheckpointManager(
+      checkpoint_dir, step=FLAGS.rounds_per_checkpoint)
+
+  results_dir = os.path.join(root_output_dir, 'results', experiment_name)
+  utils_impl.create_directory_if_not_exists(results_dir)
+  csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
+  csv_manager = tff.simulation.CSVMetricsManager(csv_file)
+
+  summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
+  tensorboard_manager = tff.simulation.TensorBoardManager(summary_dir)
+
+  logging.info('Writing...')
+  logging.info('    checkpoints to: %s', checkpoint_dir)
+  logging.info('    CSV metrics to: %s', csv_file)
+  logging.info('    TensorBoard summaries to: %s', summary_dir)
+
+  return checkpoint_manager, [csv_manager, tensorboard_manager]
+
+
 def get_total_num_clients(task):
   """Hardcode the total number of clients for the dataset."""
   if task == 'stackoverflow_lr':
@@ -142,16 +172,29 @@ def main(argv):
         '--task flag {} is not supported, must be one of {}.'.format(
             FLAGS.task, _SUPPORTED_TASKS))
 
-  training_loop.run(
-      iterative_process=runner_spec.iterative_process,
-      client_datasets_fn=runner_spec.client_datasets_fn,
-      validation_fn=runner_spec.validation_fn,
-      test_fn=runner_spec.test_fn,
+  def round_end_evaluation_fn(state, round_num):
+    if round_num % FLAGS.rounds_per_eval == 0:
+      validation_metrics = runner_spec.validation_fn(state, round_num)
+    else:
+      validation_metrics = {}
+    return validation_metrics
+
+  checkpoint_manager, metrics_managers = _configure_managers()
+
+  state = tff.simulation.run_simulation(
+      process=runner_spec.iterative_process,
+      client_selection_fn=runner_spec.client_datasets_fn,
       total_rounds=FLAGS.total_rounds,
-      experiment_name=FLAGS.experiment_name,
-      root_output_dir=FLAGS.root_output_dir,
-      rounds_per_eval=FLAGS.rounds_per_eval,
-      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint)
+      validation_fn=round_end_evaluation_fn,
+      file_checkpoint_manager=checkpoint_manager,
+      metrics_managers=metrics_managers)
+
+  test_metrics = runner_spec.test_fn(state)
+
+  logging.info('Test metrics:\n %s', pprint.pformat(test_metrics))
+
+  for metrics_manager in metrics_managers:
+    metrics_manager.save_metrics(test_metrics, FLAGS.total_rounds + 1)
 
 
 if __name__ == '__main__':
