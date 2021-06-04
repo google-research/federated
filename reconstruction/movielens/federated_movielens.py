@@ -14,7 +14,7 @@
 """Federated MovieLens matrix factorization runner library."""
 
 import functools
-import os
+import os.path
 from typing import Callable, List, Optional
 
 from absl import logging
@@ -23,7 +23,6 @@ import tensorflow_federated as tff
 from reconstruction.movielens import models
 from reconstruction.movielens import movielens_dataset
 from reconstruction.shared import federated_trainer_utils
-from utils import training_loop
 
 
 def run_federated(
@@ -51,7 +50,8 @@ def run_federated(
     total_rounds: int,
     experiment_name: Optional[str] = 'federated_ml_mf',
     root_output_dir: Optional[str] = '/tmp/fed_recon',
-    **kwargs):
+    rounds_per_eval: int = 1,
+    rounds_per_checkpoint: int = 50):
   """Runs an iterative process on the MovieLens matrix factorization task.
 
   This method will load and pre-process dataset and construct a model used for
@@ -128,8 +128,10 @@ def run_federated(
       to the `root_output_dir` for purposes of writing outputs.
     root_output_dir: The name of the root output directory for writing
       experiment outputs.
-    **kwargs: Additional arguments configuring the training loop. For details on
-      supported arguments, see training_loop.py`.
+    rounds_per_eval: How often to compute validation metrics.
+    rounds_per_checkpoint: How often to checkpoint the iterative process state.
+      If you expect the job to restart frequently, this should be small. If no
+      interruptions are expected, this can be made larger.
   """
 
   logging.info('Copying MovieLens data.')
@@ -248,13 +250,27 @@ def run_federated(
       get_model=training_process.get_model_weights)
   test_fn = functools.partial(test_fn, round_num=0)
 
+  def round_end_evaluation_fn(state, round_num):
+    if round_num % rounds_per_eval == 0:
+      validation_metrics = val_fn(state, round_num)
+    else:
+      validation_metrics = {}
+    return validation_metrics
+
+  checkpoint_manager, metrics_managers = federated_trainer_utils.configure_managers(
+      root_output_dir, experiment_name, rounds_per_checkpoint)
+
   logging.info('Starting training loop.')
-  training_loop.run(
-      iterative_process=training_process,
-      client_datasets_fn=train_client_datasets_fn,
-      validation_fn=val_fn,
-      test_fn=test_fn,
+  state = tff.simulation.run_simulation(
+      process=training_process,
+      client_selection_fn=train_client_datasets_fn,
       total_rounds=total_rounds,
-      experiment_name=experiment_name,
-      root_output_dir=root_output_dir,
-      **kwargs)
+      validation_fn=round_end_evaluation_fn,
+      file_checkpoint_manager=checkpoint_manager,
+      metrics_managers=metrics_managers)
+
+  test_metrics = test_fn(state)
+  logging.info('Test metrics:\n %s', test_metrics)
+
+  for metrics_manager in metrics_managers:
+    metrics_manager.save_metrics(test_metrics, total_rounds + 1)

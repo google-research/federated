@@ -27,7 +27,10 @@ py_library(
     name = "federated_trainer_utils",
     srcs = ["federated_trainer_utils.py"],
     srcs_version = "PY3",
-    deps = ["//reconstruction:reconstruction_utils"],
+    deps = [
+        "//reconstruction:reconstruction_utils",
+        "//utils:utils_impl",
+    ],
 )
 
 py_library(

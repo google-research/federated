@@ -13,13 +13,16 @@
 # limitations under the License.
 """Shared utilities for federated reconstruction training."""
 
+import os.path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+from absl import logging
 import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
 
 from reconstruction import reconstruction_utils
+from utils import utils_impl
 
 # Dataset split strategies.
 
@@ -229,3 +232,32 @@ def build_dataset_split_fn(
     return recon_dataset, post_recon_dataset
 
   return dataset_split_fn
+
+
+def configure_managers(
+    root_output_dir: str, experiment_name: str, rounds_per_checkpoint: int
+) -> Tuple[tff.simulation.FileCheckpointManager,
+           List[tff.simulation.MetricsManager]]:
+  """Configures checkpoint and metrics managers."""
+  utils_impl.create_directory_if_not_exists(root_output_dir)
+
+  checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
+  utils_impl.create_directory_if_not_exists(checkpoint_dir)
+  checkpoint_manager = tff.simulation.FileCheckpointManager(
+      checkpoint_dir, step=rounds_per_checkpoint)
+
+  results_dir = os.path.join(root_output_dir, 'results', experiment_name)
+  utils_impl.create_directory_if_not_exists(results_dir)
+  csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
+  csv_manager = tff.simulation.CSVMetricsManager(
+      csv_file, save_mode=tff.simulation.SaveMode.WRITE)
+
+  summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
+  tensorboard_manager = tff.simulation.TensorBoardManager(summary_dir)
+
+  logging.info('Writing...')
+  logging.info('    checkpoints to: %s', checkpoint_dir)
+  logging.info('    CSV metrics to: %s', csv_file)
+  logging.info('    TensorBoard summaries to: %s', summary_dir)
+
+  return checkpoint_manager, [csv_manager, tensorboard_manager]
