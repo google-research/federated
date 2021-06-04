@@ -26,8 +26,6 @@ import tensorflow as tf
 from utils import utils_impl
 
 FLAGS = flags.FLAGS
-TEST_CLIENT_FLAG_PREFIX = 'test_client'
-TEST_SERVER_FLAG_PREFIX = 'test_server'
 
 
 @contextlib.contextmanager
@@ -50,105 +48,7 @@ def flag_sandbox(flag_value_dict):
   _set_flags(preserved_value_dict)
 
 
-def setUpModule():
-  # Create flags here to ensure duplicate flags are not created.
-  utils_impl.define_optimizer_flags(TEST_SERVER_FLAG_PREFIX)
-  utils_impl.define_optimizer_flags(TEST_CLIENT_FLAG_PREFIX)
-
-
-# Create a list of `(test name, optimizer name flag value, optimizer class)`
-# for parameterized tests.
-_OPTIMIZERS_TO_TEST = [
-    (name, name, cls) for name, cls in utils_impl._SUPPORTED_OPTIMIZERS.items()
-]
-
-
 class UtilsTest(tf.test.TestCase, parameterized.TestCase):
-
-  def test_create_optimizer_from_flags_invalid_optimizer(self):
-    FLAGS['{}_optimizer'.format(TEST_CLIENT_FLAG_PREFIX)].value = 'foo'
-    with self.assertRaisesRegex(ValueError, 'not a valid optimizer'):
-      _ = utils_impl.create_optimizer_from_flags(TEST_CLIENT_FLAG_PREFIX)
-
-  def test_create_optimizer_from_flags_invalid_overrides(self):
-    with flag_sandbox({'{}_optimizer'.format(TEST_CLIENT_FLAG_PREFIX): 'sgd'}):
-      with self.assertRaisesRegex(TypeError, 'type `collections.abc.Mapping`'):
-        _ = utils_impl.create_optimizer_from_flags(
-            TEST_CLIENT_FLAG_PREFIX, overrides=[1, 2, 3])
-
-  def test_create_optimizer_from_flags_flags_set_not_for_optimizer(self):
-    with flag_sandbox({'{}_optimizer'.format(TEST_CLIENT_FLAG_PREFIX): 'sgd'}):
-      # Set an Adam flag that isn't used in SGD.
-      # We need to use `_parse_args` because that is the only way FLAGS is
-      # notified that a non-default value is being used.
-      bad_adam_flag = '{}_adam_beta_1'.format(TEST_CLIENT_FLAG_PREFIX)
-      FLAGS._parse_args(
-          args=['--{}=0.5'.format(bad_adam_flag)], known_only=True)
-      with self.assertRaisesRegex(
-          ValueError,
-          r'Commandline flags for .*\[sgd\].*\'test_client_adam_beta_1\'.*'):
-        _ = utils_impl.create_optimizer_from_flags(TEST_CLIENT_FLAG_PREFIX)
-      FLAGS[bad_adam_flag].unparse()
-
-  @parameterized.named_parameters(_OPTIMIZERS_TO_TEST)
-  def test_create_client_optimizer_from_flags(self, optimizer_name,
-                                              optimizer_cls):
-    with flag_sandbox(
-        {'{}_optimizer'.format(TEST_CLIENT_FLAG_PREFIX): optimizer_name}):
-      # Construct a default optimizer.
-      default_optimizer = utils_impl.create_optimizer_from_flags(
-          TEST_CLIENT_FLAG_PREFIX)
-      self.assertIsInstance(default_optimizer, optimizer_cls)
-      # Override the default flag value.
-      overridden_learning_rate = 5.0
-      custom_optimizer = utils_impl.create_optimizer_from_flags(
-          TEST_CLIENT_FLAG_PREFIX,
-          overrides={'learning_rate': overridden_learning_rate})
-      self.assertIsInstance(custom_optimizer, optimizer_cls)
-      self.assertEqual(custom_optimizer.get_config()['learning_rate'],
-                       overridden_learning_rate)
-      # Override learning rate flag.
-      commandline_set_learning_rate = 100.0
-      with flag_sandbox({
-          '{}_learning_rate'.format(TEST_CLIENT_FLAG_PREFIX):
-              commandline_set_learning_rate
-      }):
-        custom_optimizer = utils_impl.create_optimizer_from_flags(
-            TEST_CLIENT_FLAG_PREFIX)
-        self.assertIsInstance(custom_optimizer, optimizer_cls)
-        self.assertEqual(custom_optimizer.get_config()['learning_rate'],
-                         commandline_set_learning_rate)
-
-  @parameterized.named_parameters(_OPTIMIZERS_TO_TEST)
-  def test_create_server_optimizer_from_flags(self, optimizer_name,
-                                              optimizer_cls):
-    with flag_sandbox(
-        {'{}_optimizer'.format(TEST_SERVER_FLAG_PREFIX): optimizer_name}):
-      FLAGS['{}_optimizer'.format(
-          TEST_SERVER_FLAG_PREFIX)].value = optimizer_name
-      # Construct a default optimizer.
-      default_optimizer = utils_impl.create_optimizer_from_flags(
-          TEST_SERVER_FLAG_PREFIX)
-      self.assertIsInstance(default_optimizer, optimizer_cls)
-      # Override the default flag value.
-      overridden_learning_rate = 5.0
-      custom_optimizer = utils_impl.create_optimizer_from_flags(
-          TEST_SERVER_FLAG_PREFIX,
-          overrides={'learning_rate': overridden_learning_rate})
-      self.assertIsInstance(custom_optimizer, optimizer_cls)
-      self.assertEqual(custom_optimizer.get_config()['learning_rate'],
-                       overridden_learning_rate)
-      # Set a flag to a non-default.
-      commandline_set_learning_rate = 100.0
-      with flag_sandbox({
-          '{}_learning_rate'.format(TEST_SERVER_FLAG_PREFIX):
-              commandline_set_learning_rate
-      }):
-        custom_optimizer = utils_impl.create_optimizer_from_flags(
-            TEST_SERVER_FLAG_PREFIX)
-        self.assertIsInstance(custom_optimizer, optimizer_cls)
-        self.assertEqual(custom_optimizer.get_config()['learning_rate'],
-                         commandline_set_learning_rate)
 
   def test_atomic_write_raises_on_pandas_series_input(self):
     output_file = os.path.join(absltest.get_default_test_tmpdir(), 'foo.csv')
@@ -277,58 +177,6 @@ class UtilsTest(tf.test.TestCase, parameterized.TestCase):
     result = pool.apply_async.call_args_list
     result = [args[0][1][0] for args in result]
     self.assertCountEqual(result, expected)
-
-  def test_remove_unused_flags_without_optimizer_flag(self):
-    hparam_dict = collections.OrderedDict([('client_opt_fn', 'sgd'),
-                                           ('client_sgd_momentum', 0.3)])
-    with self.assertRaisesRegex(ValueError,
-                                'The flag client_optimizer was not defined.'):
-      _ = utils_impl.remove_unused_flags('client', hparam_dict)
-
-  def test_remove_unused_flags_with_empty_optimizer(self):
-    hparam_dict = collections.OrderedDict([('optimizer', '')])
-
-    with self.assertRaisesRegex(
-        ValueError, 'The flag optimizer was not set. '
-        'Unable to determine the relevant optimizer.'):
-      _ = utils_impl.remove_unused_flags(prefix=None, hparam_dict=hparam_dict)
-
-  def test_remove_unused_flags_with_prefix(self):
-    hparam_dict = collections.OrderedDict([('client_optimizer', 'sgd'),
-                                           ('non_client_value', 0.1),
-                                           ('client_sgd_momentum', 0.3),
-                                           ('client_adam_momentum', 0.5)])
-
-    relevant_hparam_dict = utils_impl.remove_unused_flags('client', hparam_dict)
-    expected_flag_names = [
-        'client_optimizer', 'non_client_value', 'client_sgd_momentum'
-    ]
-    self.assertCountEqual(relevant_hparam_dict.keys(), expected_flag_names)
-    self.assertEqual(relevant_hparam_dict['client_optimizer'], 'sgd')
-    self.assertEqual(relevant_hparam_dict['non_client_value'], 0.1)
-    self.assertEqual(relevant_hparam_dict['client_sgd_momentum'], 0.3)
-
-  def test_remove_unused_flags_without_prefix(self):
-    hparam_dict = collections.OrderedDict([('optimizer', 'sgd'), ('value', 0.1),
-                                           ('sgd_momentum', 0.3),
-                                           ('adam_momentum', 0.5)])
-    relevant_hparam_dict = utils_impl.remove_unused_flags(
-        prefix=None, hparam_dict=hparam_dict)
-    expected_flag_names = ['optimizer', 'value', 'sgd_momentum']
-    self.assertCountEqual(relevant_hparam_dict.keys(), expected_flag_names)
-    self.assertEqual(relevant_hparam_dict['optimizer'], 'sgd')
-    self.assertEqual(relevant_hparam_dict['value'], 0.1)
-    self.assertEqual(relevant_hparam_dict['sgd_momentum'], 0.3)
-
-  def test_remove_flags_with_optimizers_sharing_a_prefix(self):
-    hparam_dict = collections.OrderedDict([('client_optimizer', 'adamW'),
-                                           ('client_adam_momentum', 0.3),
-                                           ('client_adamW_momentum', 0.5)])
-    relevant_hparam_dict = utils_impl.remove_unused_flags('client', hparam_dict)
-    expected_flag_names = ['client_optimizer', 'client_adamW_momentum']
-    self.assertCountEqual(relevant_hparam_dict.keys(), expected_flag_names)
-    self.assertEqual(relevant_hparam_dict['client_optimizer'], 'adamW')
-    self.assertEqual(relevant_hparam_dict['client_adamW_momentum'], 0.5)
 
 
 if __name__ == '__main__':

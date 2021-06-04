@@ -50,5 +50,6 @@ py_binary(
         ":flars_optimizer",
         "//utils:utils_impl",
         "//utils/models:emnist_models",
+        "//utils/optimizers:optimizer_utils",
     ],
 )

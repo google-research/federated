@@ -27,14 +27,15 @@ from distributed_discrete_gaussian import fl_utils
 from optimization.tasks import stackoverflow_tp
 from optimization.tasks import training_specs
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 # We use a separate run_file for EMNIST for now as we might update the model.
 _SUPPORTED_TASKS = ['stackoverflow_lr']
 
 with utils_impl.record_hparam_flags() as optimizer_flags:
   # Defining optimizer flags
-  utils_impl.define_optimizer_flags('client')
-  utils_impl.define_optimizer_flags('server')
+  optimizer_utils.define_optimizer_flags('client')
+  optimizer_utils.define_optimizer_flags('server')
 
 with utils_impl.record_hparam_flags() as shared_flags:
   # Federated training hyperparameters
@@ -129,8 +130,8 @@ def main(argv):
     raise app.UsageError('Expected no command-line arguments, '
                          'got: {}'.format(argv))
 
-  client_optimizer_fn = lambda: utils_impl.create_optimizer_from_flags('client')
-  server_optimizer_fn = lambda: utils_impl.create_optimizer_from_flags('server')
+  client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
+  server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
 
   compression_dict = utils_impl.lookup_flag_values(compression_flags)
   dp_dict = utils_impl.lookup_flag_values(dp_flags)

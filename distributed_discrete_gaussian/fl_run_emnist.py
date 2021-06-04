@@ -27,6 +27,7 @@ from distributed_discrete_gaussian import fl_utils
 from optimization.tasks import emnist
 from optimization.tasks import training_specs
 from utils import utils_impl
+from utils.optimizers import optimizer_utils
 
 with utils_impl.record_hparam_flags():
   # Experiment hyperparameters
@@ -47,8 +48,8 @@ with utils_impl.record_hparam_flags():
                        'Random seed for client sampling.')
 
   # Optimizer configuration (this defines one or more flags per optimizer).
-  utils_impl.define_optimizer_flags('server')
-  utils_impl.define_optimizer_flags('client')
+  optimizer_utils.define_optimizer_flags('server')
+  optimizer_utils.define_optimizer_flags('client')
 
 with utils_impl.record_new_flags() as training_loop_flags:
   flags.DEFINE_integer('total_rounds', 1500, 'Number of total training rounds.')
@@ -116,8 +117,8 @@ def main(argv):
     raise app.UsageError('Expected no command-line arguments, '
                          'got: {}'.format(argv))
 
-  client_optimizer_fn = lambda: utils_impl.create_optimizer_from_flags('client')
-  server_optimizer_fn = lambda: utils_impl.create_optimizer_from_flags('server')
+  client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
+  server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
 
   compression_dict = utils_impl.lookup_flag_values(compression_flags)
   dp_dict = utils_impl.lookup_flag_values(dp_flags)

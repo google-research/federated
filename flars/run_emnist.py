@@ -33,6 +33,7 @@ from flars import flars_fedavg
 from flars import flars_optimizer
 from utils import utils_impl
 from utils.models import emnist_models
+from utils.optimizers import optimizer_utils
 from tensorboard.plugins.hparams import api as hp
 
 with utils_impl.record_new_flags() as hparam_flags:
@@ -60,7 +61,7 @@ with utils_impl.record_new_flags() as hparam_flags:
   flags.DEFINE_integer('batch_size', 20, 'Batch size used on the client.')
 
   # Client optimizer configuration (it defines one or more flags per optimizer).
-  utils_impl.define_optimizer_flags('client')
+  optimizer_utils.define_optimizer_flags('client')
 
   # Server optimizer configuration (it defines one or more flags per optimizer).
   flags.DEFINE_enum('server_optimizer', 'flars', ['sgd', 'flars'],
@@ -367,12 +368,12 @@ def _run_experiment():
   hparam_dict = collections.OrderedDict([
       (name, FLAGS[name].value) for name in hparam_flags
   ])
-  hparam_dict = utils_impl.remove_unused_flags('client', hparam_dict)
+  hparam_dict = optimizer_utils.remove_unused_flags('client', hparam_dict)
 
   metrics_hook = _MetricsHook(FLAGS.exp_name, FLAGS.root_output_dir,
                               hparam_dict)
 
-  client_optimizer_fn = lambda: utils_impl.create_optimizer_from_flags('client')
+  client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
 
   if FLAGS.server_optimizer == 'sgd':
     server_optimizer_fn = functools.partial(

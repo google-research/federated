@@ -14,6 +14,7 @@ py_binary(
         "//utils:utils_impl",
         "//utils/datasets:emnist_dataset",
         "//utils/models:emnist_models",
+        "//utils/optimizers:optimizer_utils",
     ],
 )
 

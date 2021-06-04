@@ -111,6 +111,7 @@ py_binary(
         "//optimization/tasks:emnist",
         "//optimization/tasks:training_specs",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )
 
@@ -124,6 +125,7 @@ py_binary(
         "//optimization/tasks:stackoverflow_tp",
         "//optimization/tasks:training_specs",
         "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
     ],
 )
 

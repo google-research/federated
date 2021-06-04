@@ -37,6 +37,7 @@ from compression import sparsity
 from utils import utils_impl
 from utils.datasets import emnist_dataset
 from utils.models import emnist_models
+from utils.optimizers import optimizer_utils
 from tensorflow_model_optimization.python.core.internal import tensor_encoding as te
 
 
@@ -54,8 +55,8 @@ with utils_impl.record_new_flags():
       'dataset (62 characters).')
 
   # Optimizer configuration (this defines one or more flags per optimizer).
-  utils_impl.define_optimizer_flags('server')
-  utils_impl.define_optimizer_flags('client')
+  optimizer_utils.define_optimizer_flags('server')
+  optimizer_utils.define_optimizer_flags('client')
 
   # Compression hyperparameters.
   flags.DEFINE_boolean('use_compression', True,
@@ -189,10 +190,8 @@ def run_experiment():
   input_spec = example_dataset.element_spec
 
   # Build optimizer functions from flags
-  client_optimizer_fn = functools.partial(
-      utils_impl.create_optimizer_from_flags, 'client')
-  server_optimizer_fn = functools.partial(
-      utils_impl.create_optimizer_from_flags, 'server')
+  client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
+  server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
 
   def tff_model_fn():
     return tff.learning.from_keras_model(
