@@ -45,7 +45,11 @@ py_test(
     srcs = ["resnet_models_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["nokokoro"],  # TODO(b/186459094): fix failure due to tensorflow addon.
+    tags = [
+        "manual",
+        "nokokoro",
+        "notap",
+    ],  # TODO(b/186459094): fix failure due to tensorflow addon.
     deps = [":resnet_models"],
 )
 
