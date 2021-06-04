@@ -85,13 +85,6 @@ def _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num):
   tensorboard_mngr.save_metrics(metrics, round_num)
 
 
-def _compute_numpy_l2_difference(model, previous_model):
-  squared_norms = tf.nest.map_structure(lambda x, y: tf.linalg.norm(x - y)**2,
-                                        model, previous_model)
-  l2_total_tensor = tf.reduce_sum(tf.nest.flatten(squared_norms))**0.5
-  return l2_total_tensor.numpy()
-
-
 def run(
     iterative_process: tff.templates.IterativeProcess,
     client_datasets_fn: Callable[[int, int], Tuple[List, int]],  # pylint: disable=g-bare-generic
@@ -209,15 +202,9 @@ def run(
     train_metrics = {
         'prepare_datasets_secs': time.time() - data_prep_start_time
     }
-
     training_start_time = time.time()
-    prev_model = state.model
-    state, loss = iterative_process.next(state, federated_train_data)
-
+    state, _ = iterative_process.next(state, federated_train_data)
     train_metrics['training_secs'] = time.time() - training_start_time
-    train_metrics['model_delta_l2_norm'] = _compute_numpy_l2_difference(
-        state.model, prev_model)
-    train_metrics['loss'] = loss
 
     logging.info('Round {:2d}, {:.2f}s per round in average.'.format(
         round_num, (time.time() - loop_start_time) / (round_num + 1)))

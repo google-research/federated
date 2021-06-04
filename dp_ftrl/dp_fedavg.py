@@ -17,15 +17,21 @@ This is forked from TFF/simple_fedavg with the following changes for DP:
 (1) clip the norm of the model delta from clients;
 (2) aggregate the model delta from clients with uniform weighting.
 """
-
 import collections
+from typing import Callable, Collection, Optional
 import attr
 
 import tensorflow as tf
 import tensorflow_federated as tff
+import tensorflow_privacy as tfp
 
 from dp_ftrl import optimizer_utils
 from utils import tensor_utils
+
+
+DEFAULT_SERVER_OPTIMIZER_FN = lambda w: optimizer_utils.SGDServerOptimizer(  # pylint: disable=g-long-lambda
+    learning_rate=1.0)
+DEFAULT_CLIENT_OPTIMIZER_FN = lambda: tf.keras.optimizers.SGD(learning_rate=0.1)
 
 
 def _dataset_reduce_fn(reduce_fn, dataset, initial_state_fn):
@@ -309,9 +315,8 @@ def server_update(model, server_optimizer, server_state, weights_delta):
 def build_federated_averaging_process(
     model_fn,
     dp_clip_norm=1.0,
-    server_optimizer_fn=lambda w: optimizer_utils.SGDServerOptimizer(  # pylint: disable=g-long-lambda
-        learning_rate=1.0),
-    client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
+    server_optimizer_fn=DEFAULT_SERVER_OPTIMIZER_FN,
+    client_optimizer_fn=DEFAULT_CLIENT_OPTIMIZER_FN,
     use_simulation_loop=True):
   """Builds the TFF computations for optimization using federated averaging.
 
@@ -404,3 +409,131 @@ def build_federated_averaging_process(
 
   return tff.templates.IterativeProcess(
       initialize_fn=server_init_tff, next_fn=run_one_round)
+
+
+def _create_tree_aggregation_factory(
+    noise_multiplier: float,
+    clients_per_round: float,
+    l2_norm_clip: float,
+    record_specs: Collection[tf.TensorSpec],
+    noise_seed: Optional[int] = None,
+    use_efficient: bool = True,
+) -> tff.aggregators.DifferentiallyPrivateFactory:
+  """`DifferentiallyPrivateFactory` with post-processed tree aggregation noise.
+
+  Performs clipping on client, averages clients records, and adds noise for
+  differential privacy. The noise is estimated based on tree aggregation for
+  the cumulative summation over rounds, and then take the residual between the
+  current round and the previous round. Combining this aggregator with a SGD
+  optimizer on server can be used to implement the DP-FTRL algorithm in
+  "Practical and Private (Deep) Learning without Sampling or Shuffling".
+
+  Args:
+      noise_multiplier: Noise multiplier for the Gaussian mechanism for model
+        updates. Note that this is the effective noise multiplier for the sum of
+        client results in each round.
+      clients_per_round: A positive number specifying the expected number of
+        clients per round.
+      l2_norm_clip: The initial value of the adaptive clipping norm.
+      record_specs: The specs of client results to be aggregated.
+      noise_seed: Random seed for the Gaussian noise generator. If `None`, a
+        nondeterministic seed based on system time will be generated.
+      use_efficient: If ture, use the efficient tree aggregation algorithm based
+        on the paper "Efficient Use of Differentially Private Binary Trees".
+
+  Returns:
+      A `DifferentiallyPrivateFactory` with Gaussian noise by tree aggregation.
+  """
+  sum_query = tfp.TreeResidualSumQuery.build_l2_gaussian_query(
+      l2_norm_clip,
+      noise_multiplier,
+      record_specs,
+      noise_seed=noise_seed,
+      use_efficient=use_efficient)
+  mean_query = tfp.NormalizedQuery(sum_query, denominator=clients_per_round)
+  return tff.aggregators.DifferentiallyPrivateFactory(mean_query)
+
+
+def build_dpftrl_fedavg_process(
+    model_fn: Callable[[], tff.learning.Model],
+    client_optimizer_fn: Callable[
+        [], tf.keras.optimizers.Optimizer] = DEFAULT_CLIENT_OPTIMIZER_FN,
+    *,  # Require named (non-positional) parameters for the following kwargs:
+    server_learning_rate: float = .1,
+    server_momentum: float = .9,
+    server_nesterov: bool = False,
+    clip_norm: Optional[float] = None,
+    noise_multiplier: Optional[float] = None,
+    report_goal: Optional[int] = None,
+    noise_seed: Optional[int] = None,
+    use_experimental_simulation_loop: bool = False
+) -> tff.templates.IterativeProcess:
+  """Builds an iterative process that performs federated averaging with differential privacy.
+
+  This function creates a `tff.templates.IterativeProcess` based on
+  `tff.learning.build_federated_averaging_process`. The server optimizer is
+  DP-FTRL described in
+
+  "Practical and Private (Deep) Learning without Sampling or Shuffling".
+
+  Args:
+    model_fn: A no-arg function that returns a `tff.learning.Model`. This method
+      must *not* capture TensorFlow tensors or variables and use them. The model
+      must be constructed entirely from scratch on each invocation, returning
+      the same pre-constructed model each call will result in an error.
+    client_optimizer_fn: A no-arg callable that returns a `tf.keras.Optimizer`.
+    server_learning_rate: The learning rate of server DP-FTRL optimizer.
+    server_momentum: The momentum of server DP-FTRL optimizer.
+    server_nesterov: If true, use Nesterov momentum instead of heavyball.
+    clip_norm: The l2 clip norm of client delta for differential privacy. Must
+      be positive when `noise_multiplier` is not `None`.
+    noise_multiplier: The noise multiplier for differential privacy. The noise
+      std for the sum of client deltas is equal to `clip_norm*noise_multiplier`.
+      If `None`, no differential privacy mechanism is applied.
+    report_goal: The report goal/minimum expected clients per round. Must be
+      positive when `noise_multiplier` is not `None`.
+    noise_seed: Seed for random noise generation. If `None` and
+      `noise_multiplier` is not `None`, non-deterministic noise will be used.
+    use_experimental_simulation_loop: Controls the reduce loop function for
+      input dataset. An experimental reduce loop is used for simulation. It is
+      currently necessary to set this flag to True for performant GPU
+      simulations.
+
+  Returns:
+    A `tff.templates.IterativeProcess`.
+  """
+
+  def server_optimizer_fn():
+    return tf.keras.optimizers.SGD(
+        learning_rate=server_learning_rate,
+        momentum=server_momentum,
+        nesterov=server_nesterov)
+
+  if noise_multiplier is not None:
+    if clip_norm is None or clip_norm <= 0:
+      raise ValueError(
+          '`clip_norm` must be positive when `noise_multiplier` is not None, '
+          f'get {clip_norm}.')
+    if report_goal is None or report_goal <= 0:
+      raise ValueError(
+          '`report_goal` must be positive when `noise_multiplier` is not None, '
+          f'get {report_goal}.')
+    model = model_fn()
+    model_weights = _get_model_weights(model)
+    model_weight_specs = tf.nest.map_structure(
+        lambda v: tf.TensorSpec(v.shape, v.dtype), model_weights.trainable)
+    aggregator = _create_tree_aggregation_factory(
+        noise_multiplier=noise_multiplier,
+        clients_per_round=report_goal,
+        l2_norm_clip=clip_norm,
+        record_specs=model_weight_specs,
+        noise_seed=noise_seed,
+        use_efficient=True)
+  else:
+    aggregator = None
+  return tff.learning.build_federated_averaging_process(
+      model_fn,
+      client_optimizer_fn,
+      server_optimizer_fn,
+      model_update_aggregation_factory=aggregator,
+      use_experimental_simulation_loop=use_experimental_simulation_loop)

@@ -442,43 +442,52 @@ class ClientTest(tf.test.TestCase, parameterized.TestCase):
 
 def _create_test_rnn_model(vocab_size: int = 6,
                            sequence_length: int = 5,
-                           mask_zero: bool = True) -> tf.keras.Model:
+                           mask_zero: bool = True,
+                           seed: int = 1) -> tf.keras.Model:
   """A simple RNN model for test."""
+  initializer = tf.keras.initializers.GlorotUniform(seed=seed)
   model = tf.keras.Sequential()
   model.add(
       tf.keras.layers.Embedding(
           input_dim=vocab_size,
           input_length=sequence_length,
           output_dim=8,
-          mask_zero=mask_zero))
+          mask_zero=mask_zero,
+          embeddings_initializer=initializer))
   model.add(
       tf.keras.layers.LSTM(
           units=16,
-          kernel_initializer='he_normal',
+          kernel_initializer=initializer,
+          recurrent_initializer='zeros',
           return_sequences=True,
           stateful=False))
-  model.add(tf.keras.layers.Dense(vocab_size))
+  model.add(tf.keras.layers.Dense(vocab_size, kernel_initializer=initializer))
   return model
 
 
-def _rnn_model_fn(use_tff_learning=False) -> tff.learning.Model:
-  keras_model = _create_test_rnn_model()
-  loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-  input_spec = collections.OrderedDict(
-      x=tf.TensorSpec([None, 5], tf.int32),
-      y=tf.TensorSpec([None, 5], tf.int32))
-  if use_tff_learning:
-    return tff.learning.from_keras_model(
-        keras_model=keras_model, input_spec=input_spec, loss=loss)
-  else:
-    return dp_fedavg.KerasModelWrapper(
-        keras_model=keras_model, input_spec=input_spec, loss=loss)
+def _create_rnn_model_fn(use_tff_learning=True):
+
+  def _rnn_model_fn():
+    keras_model = _create_test_rnn_model()
+    loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    input_spec = collections.OrderedDict(
+        x=tf.TensorSpec([None, 5], tf.int32),
+        y=tf.TensorSpec([None, 5], tf.int32))
+    if use_tff_learning:
+      return tff.learning.from_keras_model(
+          keras_model=keras_model, input_spec=input_spec, loss=loss)
+    else:
+      return dp_fedavg.KerasModelWrapper(
+          keras_model=keras_model, input_spec=input_spec, loss=loss)
+
+  return _rnn_model_fn
 
 
 class RNNTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_build_fedavg_process(self):
-    it_process = dp_fedavg.build_federated_averaging_process(_rnn_model_fn)
+    it_process = dp_fedavg.build_federated_averaging_process(
+        _create_rnn_model_fn())
     self.assertIsInstance(it_process, tff.templates.IterativeProcess)
     federated_type = it_process.next.type_signature.parameter
     self.assertEqual(
@@ -486,7 +495,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_client_adagrad_train(self):
     it_process = dp_fedavg.build_federated_averaging_process(
-        _rnn_model_fn,
+        _create_rnn_model_fn(),
         client_optimizer_fn=functools.partial(
             tf.keras.optimizers.Adagrad, learning_rate=0.01))
     server_state = it_process.initialize()
@@ -533,7 +542,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
           use_nesterov=nesterov)
 
     it_process = dp_fedavg.build_federated_averaging_process(
-        _rnn_model_fn,
+        _create_rnn_model_fn(),
         server_optimizer_fn=server_optimzier_fn,
         use_simulation_loop=simulation_flag)
     server_state = it_process.initialize()
@@ -571,12 +580,12 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
           use_nesterov=True)
 
     it_process = dp_fedavg.build_federated_averaging_process(
-        _rnn_model_fn,
+        _create_rnn_model_fn(),
         server_optimizer_fn=server_optimizer_fn,
         use_simulation_loop=True)
     server_state = it_process.initialize()
 
-    model = _rnn_model_fn()
+    model = _create_rnn_model_fn()()
     optimizer = server_optimizer_fn(model.weights.trainable)
 
     def server_state_update(state):
@@ -646,6 +655,108 @@ class DatasetReduceTest(parameterized.TestCase):
         initial_state_fn=lambda: (tf.constant(0), tf.constant(0.1)))
     self.assertEqual(total_cnt, np.float32(10))
     self.assertEqual(total_sum, np.float32(4.6))
+
+
+class TFFLearningDPFTRLTest(tf.test.TestCase, parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      ('total4_std1_d1000', [1, 1, 2, 1], 1., [1000], 0.15, False),
+      ('total4_std1_d10000', [1, 1, 2, 1], 1., [10000], 0.05, False),
+      ('total8_std1_d1000', [1, 1, 2, 1, 2, 2, 3, 1], 1., [1000], 0.15, False),
+      ('total8_std2_d10000', [4, 4, 8, 4, 8, 8, 12, 4], 2., [10000
+                                                            ], 0.05, False),
+      ('total8_std0d5_d1000', [0.25, 0.25, 0.5, 0.25, 0.5, 0.5, 0.75, 0.25
+                              ], 0.5, [1000], 0.15, False),
+      ('total4_std1_d10000_eff', [1., 2. / 3., 1. + 2. / 3., 4. / 7.
+                                 ], 1., [10000], 0.05, True),
+  )
+  def test_tree_tree_aggregation_factory(self, expected_variance, noise_std,
+                                         variable_shape, tolerance,
+                                         use_efficient):
+    record = tf.zeros(variable_shape, tf.float32)
+    record_shape = tf.nest.map_structure(lambda t: t.shape, record)
+    record_type = tff.types.to_type((tf.float32, variable_shape))
+    specs = tf.nest.map_structure(tf.TensorSpec, record_shape)
+
+    tree_factory = dp_fedavg._create_tree_aggregation_factory(
+        noise_multiplier=noise_std,
+        l2_norm_clip=1.,
+        record_specs=specs,
+        clients_per_round=1.,
+        noise_seed=1,
+        use_efficient=use_efficient,
+    )
+
+    process = tree_factory.create(record_type)
+
+    state = process.initialize()
+    client_data = [record]
+    cumsum_result = tf.zeros(variable_shape, tf.float32)
+    for expected_var in expected_variance:
+      output = process.next(state, client_data)
+      state = output.state
+      cumsum_result += output.result
+      self.assertAllClose(
+          np.sqrt(expected_var), np.std(cumsum_result), rtol=tolerance)
+
+  @parameterized.named_parameters(
+      ('r5_nonoise', 5, True, False, 0, 0),
+      ('r5m_reduce', 5, False, False, 0, 0.9),
+      ('r5', 5, True, False, 0.1, 0),
+      ('r5m_nesterov', 5, True, True, 0, 0.9),
+      ('r5m_noise', 5, True, True, 0.1, 0.9),
+  )
+  def test_dpftrl_training(self, total_rounds, simulation_flag, use_nesterov,
+                           noise_multiplier, momentum):
+
+    learning_rate, clip_norm, seed = 0.1, 1, 1
+
+    def server_optimzier_fn(model_weights):
+      model_weight_specs = tf.nest.map_structure(
+          lambda v: tf.TensorSpec(v.shape, v.dtype), model_weights)
+      return optimizer_utils.DPFTRLMServerOptimizer(
+          learning_rate=learning_rate,
+          momentum=momentum,
+          noise_std=clip_norm * noise_multiplier,
+          model_weight_specs=model_weight_specs,
+          efficient_tree=True,
+          use_nesterov=use_nesterov,
+          noise_seed=seed)
+
+    it_process1 = dp_fedavg.build_federated_averaging_process(
+        _create_rnn_model_fn(),
+        server_optimizer_fn=server_optimzier_fn,
+        dp_clip_norm=clip_norm,
+        use_simulation_loop=simulation_flag)
+
+    it_process2 = dp_fedavg.build_dpftrl_fedavg_process(
+        _create_rnn_model_fn(),
+        server_learning_rate=learning_rate,
+        server_momentum=momentum,
+        server_nesterov=use_nesterov,
+        clip_norm=clip_norm,
+        noise_multiplier=noise_multiplier,
+        report_goal=1,
+        noise_seed=seed,
+        use_experimental_simulation_loop=simulation_flag)
+
+    def deterministic_batch():
+      return collections.OrderedDict(
+          x=np.array([[0, 1, 2, 3, 4]], dtype=np.int32),
+          y=np.array([[1, 2, 3, 4, 0]], dtype=np.int32))
+
+    batch = tff.tf_computation(deterministic_batch)()
+    federated_data = [[batch]]
+
+    server_state1 = it_process1.initialize()
+    server_state2 = it_process2.initialize()
+    for _ in range(total_rounds):
+      server_state1, _ = it_process1.next(server_state1, federated_data)
+      server_state2, _ = it_process2.next(server_state2, federated_data)
+      self.assertAllClose(
+          server_state1.model.trainable,
+          server_state2.model.trainable,
+          rtol=1e-6)
 
 
 if __name__ == '__main__':

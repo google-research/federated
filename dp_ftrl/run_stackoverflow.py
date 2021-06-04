@@ -65,6 +65,10 @@ flags.DEFINE_enum('server_optimizer', 'sgd',
 flags.DEFINE_float('client_lr', 0.02, 'Client learning rate.')
 flags.DEFINE_float('server_lr', 1.0, 'Server learning rate.')
 flags.DEFINE_float('server_momentum', 0.9, 'Server momentum for SGDM.')
+flags.DEFINE_boolean(
+    'use_tff_learning', False,
+    'Boolean indicating whether to use `tff.learning` to build iterative'
+    'process for training. If True, server optimizer has to be `dpftrlm`')
 
 # Differential privacy
 flags.DEFINE_float('clip_norm', 1.0, 'Clip L2 norm.')
@@ -235,18 +239,8 @@ def _sample_client_ids(
   return random.sample(client_data.client_ids, num_clients), epoch
 
 
-def train_and_eval():
-  """Train and evaluate StackOver NWP task."""
-  logging.info('Show FLAGS for debugging:')
-  for f in HPARAM_FLAGS:
-    logging.info('%s=%s', f, FLAGS[f].value)
-
-  train_dataset_computation, train_set, validation_set, test_set = _preprocess_stackoverflow(
-      FLAGS.vocab_size, FLAGS.num_oov_buckets, FLAGS.sequence_length,
-      FLAGS.num_validation_examples, FLAGS.client_batch_size,
-      FLAGS.client_epochs_per_round, FLAGS.max_elements_per_user)
-
-  input_spec = train_dataset_computation.type_signature.result.element
+def _build_custom_model_and_process(input_spec, test_metrics):
+  """Build customized iterative process."""
 
   def tff_model_fn():
     keras_model = models.create_recurrent_model(
@@ -257,6 +251,14 @@ def train_and_eval():
         shared_embedding=FLAGS.shared_embedding)
     loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     return dp_fedavg.KerasModelWrapper(keras_model, input_spec, loss)
+
+  model = tff_model_fn()
+
+  def evaluate_fn(model_weights, dataset):
+    model.from_weights(model_weights)
+    metrics = dp_fedavg.keras_evaluate(model.keras_model, dataset, test_metrics)
+    return collections.OrderedDict(
+        (metric.name, metric.result().numpy()) for metric in metrics)
 
   noise_std = FLAGS.clip_norm * FLAGS.noise_multiplier / float(
       FLAGS.clients_per_round)
@@ -274,21 +276,90 @@ def train_and_eval():
       dp_clip_norm=FLAGS.clip_norm,
       server_optimizer_fn=server_optimizer_fn,
       client_optimizer_fn=client_optimizer_fn)
-  iterative_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-      dataset_computation=train_dataset_computation, process=iterative_process)
 
-  keras_metics = _get_stackoverflow_metrics(FLAGS.vocab_size,
-                                            FLAGS.num_oov_buckets)
-  model = tff_model_fn()
+  server_state_update_fn = _build_server_state_epoch_update_fn(
+      FLAGS.server_optimizer, tff_model_fn, server_optimizer_fn)
+  return iterative_process, evaluate_fn, server_state_update_fn
+
+
+def _build_tff_learning_model_and_process(input_spec, test_metrics):
+  """Build `tff.learning` iterative process."""
+
+  if FLAGS.server_optimizer != 'dpftrlm':
+    raise ValueError(
+        'When `use_tff_learning=True`, server optimizer must be `dpftrlm`'
+        f'get {FLAGS.server_optimizer}.')
+
+  def tff_model_fn():
+    keras_model = models.create_recurrent_model(
+        vocab_size=FLAGS.vocab_size,
+        embedding_size=FLAGS.embedding_size,
+        latent_size=FLAGS.latent_size,
+        num_layers=FLAGS.num_layers,
+        shared_embedding=FLAGS.shared_embedding)
+    loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    return tff.learning.from_keras_model(
+        keras_model=keras_model, input_spec=input_spec, loss=loss)
+
   def evaluate_fn(model_weights, dataset):
-    model.from_weights(model_weights)
-    metrics = dp_fedavg.keras_evaluate(model.keras_model, dataset, keras_metics)
+    keras_model = models.create_recurrent_model(
+        vocab_size=FLAGS.vocab_size,
+        embedding_size=FLAGS.embedding_size,
+        latent_size=FLAGS.latent_size,
+        num_layers=FLAGS.num_layers,
+        shared_embedding=FLAGS.shared_embedding)
+    model_weights.assign_weights_to(keras_model)
+    metrics = dp_fedavg.keras_evaluate(keras_model, dataset, test_metrics)
     return collections.OrderedDict(
         (metric.name, metric.result().numpy()) for metric in metrics)
+
+  client_optimizer_fn = functools.partial(
+      _client_optimizer_fn,
+      name=FLAGS.client_optimizer,
+      learning_rate=FLAGS.client_lr)
+
+  iterative_process = dp_fedavg.build_dpftrl_fedavg_process(
+      tff_model_fn,
+      client_optimizer_fn=client_optimizer_fn,
+      server_learning_rate=FLAGS.server_lr,
+      server_momentum=FLAGS.server_momentum,
+      server_nesterov=False,
+      clip_norm=FLAGS.clip_norm,
+      noise_multiplier=FLAGS.noise_multiplier,
+      report_goal=FLAGS.clients_per_round,
+      noise_seed=None,
+      use_experimental_simulation_loop=True)
+
+  server_state_update_fn = None
+  return iterative_process, evaluate_fn, server_state_update_fn
+
+
+def train_and_eval():
+  """Train and evaluate StackOver NWP task."""
+  logging.info('Show FLAGS for debugging:')
+  for f in HPARAM_FLAGS:
+    logging.info('%s=%s', f, FLAGS[f].value)
 
   hparam_dict = collections.OrderedDict([
       (name, FLAGS[name].value) for name in HPARAM_FLAGS
   ])
+
+  train_dataset_computation, train_set, validation_set, test_set = _preprocess_stackoverflow(
+      FLAGS.vocab_size, FLAGS.num_oov_buckets, FLAGS.sequence_length,
+      FLAGS.num_validation_examples, FLAGS.client_batch_size,
+      FLAGS.client_epochs_per_round, FLAGS.max_elements_per_user)
+
+  input_spec = train_dataset_computation.type_signature.result.element
+  stackoverflow_metrics = _get_stackoverflow_metrics(FLAGS.vocab_size,
+                                                     FLAGS.num_oov_buckets)
+  if FLAGS.use_tff_learning:
+    iterative_process, evaluate_fn, server_state_update_fn = _build_tff_learning_model_and_process(
+        input_spec, stackoverflow_metrics)
+  else:
+    iterative_process, evaluate_fn, server_state_update_fn = _build_custom_model_and_process(
+        input_spec, stackoverflow_metrics)
+  iterative_process = tff.simulation.compose_dataset_computation_with_iterative_process(
+      dataset_computation=train_dataset_computation, process=iterative_process)
 
   if FLAGS.total_epochs is None:
 
@@ -306,8 +377,6 @@ def train_and_eval():
                  FLAGS.total_epochs, FLAGS.total_rounds)
     total_epochs = FLAGS.total_epochs
 
-  server_state_update_fn = _build_server_state_epoch_update_fn(
-      FLAGS.server_optimizer, tff_model_fn, server_optimizer_fn)
   training_loop.run(
       iterative_process,
       client_dataset_ids_fn,

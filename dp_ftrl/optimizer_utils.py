@@ -15,7 +15,7 @@
 
 import abc
 import collections
-from typing import Any, Collection, Dict
+from typing import Any, Collection, Dict, Optional
 
 import attr
 import tensorflow as tf
@@ -106,7 +106,8 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
                noise_std: float,
                model_weight_specs: Collection[tf.TensorSpec],
                efficient_tree: bool = True,
-               use_nesterov: bool = False):
+               use_nesterov: bool = False,
+               noise_seed: Optional[int] = None):
     """Initialize the momemtum DPFTRL Optimizer."""
 
     _check_momentum(momentum)
@@ -119,7 +120,7 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
     self.use_nesterov = use_nesterov
 
     random_generator = tree_aggregation.GaussianNoiseGenerator(
-        noise_std, model_weight_specs)
+        noise_std, model_weight_specs, noise_seed)
 
     if efficient_tree:
       self.noise_generator = tree_aggregation.TFEfficientTreeAggregator(
@@ -143,7 +144,7 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
     cumsum_noise, dp_tree_state = self.noise_generator.get_cumsum_and_update(
         dp_tree_state)
 
-    noised_sum_grad = tf.nest.map_structure(tf.add, sum_grad, cumsum_noise)
+    noised_sum_grad = tf.nest.map_structure(tf.subtract, sum_grad, cumsum_noise)
     momentum_buffer = tf.nest.map_structure(lambda v, g: self.momentum * v + g,
                                             momentum_buffer, noised_sum_grad)
     if self.use_nesterov:
