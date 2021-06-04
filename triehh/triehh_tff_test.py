@@ -30,11 +30,10 @@ class TriehhTffTest(hh_test.HeavyHittersTest):
       del client_id
       return tf.data.Dataset.from_tensor_slices(['hello', 'hey', 'hi'])
 
-    client_ids = list(range(size))
+    client_ids = [str(i) for i in range(size)]
 
-    return tff.simulation.datasets.ClientData.from_clients_and_fn(
-        client_ids=client_ids,
-        create_tf_dataset_for_client_fn=create_dataset_fn)
+    return tff.simulation.datasets.ClientData.from_clients_and_tf_fn(
+        client_ids=client_ids, serializable_dataset_fn=create_dataset_fn)
 
   def perform_execution(self, num_sub_rounds=1):
     clients = 3
@@ -73,7 +72,7 @@ class TriehhTffTest(hh_test.HeavyHittersTest):
     client_data = self.create_dataset(100)
 
     for _ in range(max_rounds * num_sub_rounds):
-      sampled_clients = list(range(clients))
+      sampled_clients = [str(i) for i in range(clients)]
       sampled_datasets = [
           client_data.create_tf_dataset_for_client(client_id)
           for client_id in sampled_clients
