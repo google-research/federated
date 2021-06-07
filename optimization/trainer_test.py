@@ -13,8 +13,6 @@
 # limitations under the License.
 """End-to-end tests for federated trainer tasks."""
 
-import os.path
-
 from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -26,7 +24,6 @@ from optimization.tasks import shakespeare
 from optimization.tasks import stackoverflow_nwp
 from optimization.tasks import stackoverflow_tp
 from optimization.tasks import training_specs
-from utils import training_loop
 
 
 def iterative_process_builder(model_fn):
@@ -52,48 +49,15 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
     task_spec = training_specs.TaskSpec(
         iterative_process_builder=iterative_process_builder,
         client_epochs_per_round=1,
-        client_batch_size=10,
+        client_batch_size=32,
         clients_per_round=1,
         client_datasets_random_seed=1)
     runner_spec = config_fn(task_spec)
 
-    total_rounds = 1
-    root_output_dir = self.get_temp_dir()
-    exp_name = 'test_run_federated'
-
-    training_loop.run(
-        iterative_process=runner_spec.iterative_process,
-        client_datasets_fn=runner_spec.client_datasets_fn,
-        validation_fn=runner_spec.validation_fn,
-        # For efficiency, we avoid using the entire test set here
-        test_fn=None,
-        total_rounds=total_rounds,
-        root_output_dir=root_output_dir,
-        experiment_name=exp_name)
-
-    results_dir = os.path.join(root_output_dir, 'results', exp_name)
-    self.assertTrue(tf.io.gfile.exists(results_dir))
-
-    scalar_manager = tff.simulation.CSVMetricsManager(
-        os.path.join(results_dir, 'experiment.metrics.csv'))
-    fieldnames, metrics = scalar_manager.get_metrics()
-
-    self.assertIn(
-        'train/train/loss',
-        fieldnames,
-        msg='The output metrics should have a `train/loss` column if training '
-        'is successful.')
-    self.assertIn(
-        'eval/loss',
-        fieldnames,
-        msg='The output metrics should have a `train/loss` column if validation'
-        ' metrics computation is successful.')
-    self.assertLen(
-        metrics,
-        total_rounds + 1,
-        msg='The number of rows in the metrics CSV should be the number of '
-        'training rounds + 1 (as there is an extra row for validation set'
-        'metrics after training has completed.')
+    tff.simulation.run_simulation(
+        process=runner_spec.iterative_process,
+        client_selection_fn=runner_spec.client_datasets_fn,
+        total_rounds=1)
 
 
 if __name__ == '__main__':

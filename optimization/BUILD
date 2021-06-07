@@ -83,6 +83,5 @@ py_test(
         "//optimization/tasks:stackoverflow_nwp",
         "//optimization/tasks:stackoverflow_tp",
         "//optimization/tasks:training_specs",
-        "//utils:training_loop",
     ],
 )

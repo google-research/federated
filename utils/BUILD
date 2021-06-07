@@ -20,21 +20,6 @@ py_test(
 )
 
 py_library(
-    name = "training_loop",
-    srcs = ["training_loop.py"],
-    srcs_version = "PY3",
-)
-
-py_test(
-    name = "training_loop_test",
-    size = "large",
-    srcs = ["training_loop_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":training_loop"],
-)
-
-py_library(
     name = "utils_impl",
     srcs = ["utils_impl.py"],
     srcs_version = "PY3",
