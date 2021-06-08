@@ -31,8 +31,6 @@ This folder is organized as following,
 *   `optimizer_utils` defined several custimized optimizers including a simple
     reimplementation of SGD, differential private SGD with momentum (DP-SGDM)
     and differential private FTRL with momentum (DP-FTRLM).
-*   `tree_aggregation` defined the noise accumulation by a tree structure for
-    DP-FTRLM.
 
 TODO(b/172867399): add privacy computation method.
 
@@ -52,6 +50,7 @@ absl-py~=0.10
 attrs~=19.3.0
 numpy~=1.19.2
 pandas~=0.24.2
+tensorflow-privacy~=0.6.0
 tensorflow-federated-nightly
 tf-nightly
 ```
@@ -67,7 +66,7 @@ The following command is an example for the DP-FTRLM results in Section 5.3 of
 bazel run run_stackoverflow.py --experiment_name=stackoverflow_ftrlm_smalln --server_optimizer=dpftrlm --total_epochs=1 --total_rounds=1600 --client_lr=0.5 --server_lr=3 --clip_norm=1 --noise_multiplier=0.067
 ```
 
-> NOTE: this code version includes two variants compared to the implementation
+> NOTE: this code version includes some variants compared to the implementation
 > used for StackOverflow results in the first version of "Practical and Private
 > (Deep) Learning without Sampling or Shuffling"
 > [on arxiv](https://arxiv.org/abs/2103.00039v1).
@@ -82,6 +81,9 @@ bazel run run_stackoverflow.py --experiment_name=stackoverflow_ftrlm_smalln --se
 >     `tff.simulation`, while the arxiv paper uses an older version. The changes
 >     should have minimum effects but might cause minor issues to reproduce the
 >     exact results in the paper.
+> 1.  An alternative implementation of DP-FTRLM based on `tff.learning` and
+>     `tfp.DPQuery`, which can be enabled for StackOverflow simulation by
+>     setting `--use_tff_learning=True`.
 
 ## Efficient tree aggregation
 
