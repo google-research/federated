@@ -20,10 +20,10 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_federated as tff
+import tensorflow_privacy as tfp
 
 from dp_ftrl import dp_fedavg
 from dp_ftrl import optimizer_utils
-from dp_ftrl import tree_aggregation
 
 
 def _create_test_cnn_model():
@@ -277,7 +277,7 @@ class DPFedAvgTest(tf.test.TestCase, parameterized.TestCase):
       if server_state.optimizer_state is optimizer_utils.FTRLState:
         self.assertEqual(
             i + 1,
-            tree_aggregation.get_step_idx(
+            tfp.tree_aggregation.get_step_idx(
                 server_state.optimizer_state.dp_tree_state))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
@@ -562,7 +562,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(i + 1, server_state.round_num)
       self.assertEqual(
           i + 1,
-          tree_aggregation.get_step_idx(
+          tfp.tree_aggregation.get_step_idx(
               server_state.optimizer_state.dp_tree_state))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
@@ -611,7 +611,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(i + 1, server_state.round_num)
       self.assertEqual(
           0,
-          tree_aggregation.get_step_idx(
+          tfp.tree_aggregation.get_step_idx(
               server_state.optimizer_state.dp_tree_state))
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
@@ -670,9 +670,8 @@ class TFFLearningDPFTRLTest(tf.test.TestCase, parameterized.TestCase):
       ('total4_std1_d10000_eff', [1., 2. / 3., 1. + 2. / 3., 4. / 7.
                                  ], 1., [10000], 0.05, True),
   )
-  def test_tree_tree_aggregation_factory(self, expected_variance, noise_std,
-                                         variable_shape, tolerance,
-                                         use_efficient):
+  def test_tree_aggregation_factory(self, expected_variance, noise_std,
+                                    variable_shape, tolerance, use_efficient):
     record = tf.zeros(variable_shape, tf.float32)
     record_shape = tf.nest.map_structure(lambda t: t.shape, record)
     record_type = tff.types.to_type((tf.float32, variable_shape))

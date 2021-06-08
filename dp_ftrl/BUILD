@@ -15,16 +15,9 @@ py_library(
 )
 
 py_library(
-    name = "tree_aggregation",
-    srcs = ["tree_aggregation.py"],
-    srcs_version = "PY3",
-)
-
-py_library(
     name = "optimizer_utils",
     srcs = ["optimizer_utils.py"],
     srcs_version = "PY3",
-    deps = [":tree_aggregation"],
 )
 
 py_library(
@@ -38,16 +31,6 @@ py_library(
 )
 
 py_test(
-    name = "tree_aggregation_test",
-    size = "large",
-    srcs = ["tree_aggregation_test.py"],
-    python_version = "PY3",
-    shard_count = 10,
-    srcs_version = "PY3",
-    deps = [":tree_aggregation"],
-)
-
-py_test(
     name = "dp_fedavg_test",
     size = "large",
     srcs = ["dp_fedavg_test.py"],
@@ -57,7 +40,6 @@ py_test(
     deps = [
         ":dp_fedavg",
         ":optimizer_utils",
-        ":tree_aggregation",
     ],
 )
 

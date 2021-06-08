@@ -19,8 +19,7 @@ from typing import Any, Collection, Dict, Optional
 
 import attr
 import tensorflow as tf
-
-from dp_ftrl import tree_aggregation
+import tensorflow_privacy as tfp
 
 
 def _check_momentum(m: float):
@@ -79,8 +78,8 @@ class FTRLState(object):
   Attributes:
     init_weight: A Collection[tf.Tensor] defining the initial weight.
     sum_grad: A Collection[tf.Tensor] tracing the summation of gradient.
-    dp_tree_state: A `tree_aggregation.TreeState` tracking the state of the tree
-      aggregatin noise for the additive in DP-FTRL algorithm.
+    dp_tree_state: A `tfp.tree_aggregation.TreeState` tracking the state of the
+      tree aggregatin noise for the additive in DP-FTRL algorithm.
     momentum_buffer:  A Collection[tf.Tensor] tracing the velocity in the
       momentum variant. Momentum is applied to the (noised) summation of
       gradients.
@@ -95,8 +94,8 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
   """Momentum FTRL Optimizer with Tree aggregation for DP noise.
 
   There are two options of the tree aggregation algorithm:
-  the baseline method `tree_aggregation.TFTreeAggregator`, and the efficient
-  method `tree_aggregation.TFEfficientTreeAggregator` , which is controlled by
+  the baseline method `tfp.tree_aggregation.TreeAggregator`, and the efficient
+  method `tfp.tree_aggregation.EfficientTreeAggregator` , which is controlled by
   flag `efficient_tree` in the constructor.
   """
 
@@ -119,14 +118,14 @@ class DPFTRLMServerOptimizer(ServerOptimizerBase):
     self.model_weight_specs = model_weight_specs
     self.use_nesterov = use_nesterov
 
-    random_generator = tree_aggregation.GaussianNoiseGenerator(
+    random_generator = tfp.tree_aggregation.GaussianNoiseGenerator(
         noise_std, model_weight_specs, noise_seed)
 
     if efficient_tree:
-      self.noise_generator = tree_aggregation.TFEfficientTreeAggregator(
+      self.noise_generator = tfp.tree_aggregation.EfficientTreeAggregator(
           value_generator=random_generator)
     else:
-      self.noise_generator = tree_aggregation.TFTreeAggregator(
+      self.noise_generator = tfp.tree_aggregation.TreeAggregator(
           value_generator=random_generator)
 
   @tf.function
