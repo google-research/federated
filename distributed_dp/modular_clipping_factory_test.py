@@ -19,7 +19,7 @@ from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from distributed_discrete_gaussian import modular_clipping_factory
+from distributed_dp import modular_clipping_factory
 
 
 DEFAULT_CLIP_LOWER = -2

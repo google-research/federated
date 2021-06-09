@@ -17,7 +17,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 
-from distributed_discrete_gaussian import compression_utils
+from distributed_dp import compression_utils
 
 SEED_PAIR = (12345678, 87654321)
 

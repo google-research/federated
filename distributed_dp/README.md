@@ -1,5 +1,8 @@
 # Distributed Discrete Gaussian
 
+Note: This repo will be updated soon with some refactoring, extensions, and new
+results.
+
 ## Overview
 
 This directory contains the code for the paper "The Distributed Discrete

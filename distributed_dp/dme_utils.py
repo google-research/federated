@@ -17,10 +17,10 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_privacy as tfp
 
-from distributed_discrete_gaussian import compression_query
-from distributed_discrete_gaussian import distributed_discrete_gaussian_query
-from distributed_discrete_gaussian.accounting_utils import compute_l2_sensitivy_squared
-from distributed_discrete_gaussian.modular_clipping_factory import modular_clip_by_value
+from distributed_dp import compression_query
+from distributed_dp import distributed_discrete_gaussian_query
+from distributed_dp.accounting_utils import compute_l2_sensitivy_squared
+from distributed_dp.modular_clipping_factory import modular_clip_by_value
 
 
 def get_dp_query(mechanism, l2_norm_bound, noise_scale):

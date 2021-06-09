@@ -19,10 +19,10 @@ from absl import logging
 import numpy as np
 import tensorflow_federated as tff
 
-from distributed_discrete_gaussian import accounting_utils
-from distributed_discrete_gaussian import compression_query
-from distributed_discrete_gaussian import distributed_discrete_gaussian_query
-from distributed_discrete_gaussian import modular_clipping_factory
+from distributed_dp import accounting_utils
+from distributed_dp import compression_query
+from distributed_dp import distributed_discrete_gaussian_query
+from distributed_dp import modular_clipping_factory
 
 
 def get_total_dim(client_template):

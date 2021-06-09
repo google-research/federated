@@ -23,13 +23,13 @@ import numpy as np
 import scipy.stats
 import tensorflow as tf
 
-from distributed_discrete_gaussian.accounting_utils import get_ddgauss_gamma
-from distributed_discrete_gaussian.accounting_utils import get_ddgauss_noise_stddev
-from distributed_discrete_gaussian.accounting_utils import guass_noise_stddev_direct
-from distributed_discrete_gaussian.dme_utils import build_quantized_dp_query
-from distributed_discrete_gaussian.dme_utils import compute_dp_average
-from distributed_discrete_gaussian.dme_utils import generate_client_data
-from distributed_discrete_gaussian.dme_utils import get_dp_query
+from distributed_dp.accounting_utils import get_ddgauss_gamma
+from distributed_dp.accounting_utils import get_ddgauss_noise_stddev
+from distributed_dp.accounting_utils import guass_noise_stddev_direct
+from distributed_dp.dme_utils import build_quantized_dp_query
+from distributed_dp.dme_utils import compute_dp_average
+from distributed_dp.dme_utils import generate_client_data
+from distributed_dp.dme_utils import get_dp_query
 
 flags.DEFINE_boolean('show_plot', False, 'Whether to plot the results.')
 flags.DEFINE_boolean('print_output', False, 'Whether to print the outputs.')

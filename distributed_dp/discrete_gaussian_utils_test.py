@@ -21,7 +21,7 @@ import random
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
-from distributed_discrete_gaussian import discrete_gaussian_utils
+from distributed_dp import discrete_gaussian_utils
 
 GT_SAMPLER_SEED = 4242
 

@@ -28,7 +28,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_privacy as tfp
 
-from distributed_discrete_gaussian import compression_utils
+from distributed_dp import compression_utils
 
 
 def _attr_bool_check(instance, attribute, value):

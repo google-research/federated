@@ -18,7 +18,7 @@ import collections
 import tensorflow as tf
 import tensorflow_privacy as tfp
 
-from distributed_discrete_gaussian import discrete_gaussian_utils
+from distributed_dp import discrete_gaussian_utils
 
 
 class DistributedDiscreteGaussianSumQuery(tfp.SumAggregationDPQuery):

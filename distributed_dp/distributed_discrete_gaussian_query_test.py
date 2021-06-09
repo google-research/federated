@@ -18,8 +18,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_privacy.privacy.dp_query import test_utils
 
-from distributed_discrete_gaussian import discrete_gaussian_utils
-from distributed_discrete_gaussian import distributed_discrete_gaussian_query
+from distributed_dp import discrete_gaussian_utils
+from distributed_dp import distributed_discrete_gaussian_query
 
 ddg_sum_query = distributed_discrete_gaussian_query.DistributedDiscreteGaussianSumQuery
 

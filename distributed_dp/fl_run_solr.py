@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Trains and evaluates an EMNIST classification model."""
+"""Runs federated training with differential privacy on StackOverflow LR."""
 
 import math
 import os.path
@@ -23,40 +23,41 @@ from absl import flags
 from absl import logging
 import tensorflow_federated as tff
 
-from distributed_discrete_gaussian import fl_utils
-from optimization.tasks import emnist
+from distributed_dp import fl_utils
+from optimization.tasks import stackoverflow_tp
 from optimization.tasks import training_specs
 from utils import utils_impl
 from utils.optimizers import optimizer_utils
 
-with utils_impl.record_hparam_flags():
-  # Experiment hyperparameters
-  flags.DEFINE_enum('model', '1m_cnn', ['cnn', '2nn', '1m_cnn'],
-                    'Which model to use.')
-  flags.DEFINE_integer('client_batch_size', 20, 'Batch size on the clients.')
-  flags.DEFINE_integer('clients_per_round', 100, 'Number of clients per round.')
-  flags.DEFINE_integer(
-      'client_epochs_per_round', 1,
-      'Number of client (inner optimizer) epochs per federated round.')
+# We use a separate run_file for EMNIST for now as we might update the model.
+_SUPPORTED_TASKS = ['stackoverflow_lr']
+
+with utils_impl.record_hparam_flags() as optimizer_flags:
+  # Defining optimizer flags
+  optimizer_utils.define_optimizer_flags('client')
+  optimizer_utils.define_optimizer_flags('server')
+
+with utils_impl.record_hparam_flags() as shared_flags:
+  # Federated training hyperparameters
+  flags.DEFINE_string('model', None, '(Placeholder flag)')
+  flags.DEFINE_integer('client_epochs_per_round', 1,
+                       'Number of epochs in the client to take per round.')
+  flags.DEFINE_integer('client_batch_size', 100, 'Batch size on the clients.')
+  flags.DEFINE_integer('clients_per_round', 60,
+                       'How many clients to sample per round.')
+  flags.DEFINE_integer('client_datasets_random_seed', 1,
+                       'Random seed for client sampling.')
   flags.DEFINE_boolean(
       'uniform_weighting', True,
       'Whether to weigh clients uniformly. If false, clients '
       'are weighted by the number of samples.')
-  flags.DEFINE_boolean('only_digits', False,
-                       'Whether to use only digits for the EMNIST dataset.')
-  flags.DEFINE_integer('client_datasets_random_seed', 42,
-                       'Random seed for client sampling.')
 
-  # Optimizer configuration (this defines one or more flags per optimizer).
-  optimizer_utils.define_optimizer_flags('server')
-  optimizer_utils.define_optimizer_flags('client')
-
-with utils_impl.record_new_flags() as training_loop_flags:
+  # Training loop configuration
   flags.DEFINE_integer('total_rounds', 1500, 'Number of total training rounds.')
   flags.DEFINE_string(
       'experiment_name', None, 'The name of this experiment. Will be append to '
       '--root_output_dir to separate experiment results.')
-  flags.DEFINE_string('root_output_dir', '/tmp/ddg_emnist/',
+  flags.DEFINE_string('root_output_dir', '/tmp/ddg_so_lr/',
                       'Root directory for writing experiment output.')
   flags.DEFINE_integer(
       'rounds_per_eval', 1,
@@ -72,14 +73,18 @@ with utils_impl.record_hparam_flags() as compression_flags:
 
 with utils_impl.record_hparam_flags() as dp_flags:
   flags.DEFINE_float(
-      'epsilon', 10.0, 'Epsilon for the DP mechanism. '
+      'epsilon', 5.0, 'Epsilon for the DP mechanism. '
       'No DP used if this is None.')
   flags.DEFINE_float('delta', None, 'Delta for the DP mechanism. ')
-  flags.DEFINE_float('l2_norm_clip', 0.03, 'Initial L2 norm clip.')
+  flags.DEFINE_float('l2_norm_clip', 2.0, 'Initial L2 norm clip.')
 
   dp_mechanisms = ['gaussian', 'ddgauss']
   flags.DEFINE_enum('dp_mechanism', 'ddgauss', dp_mechanisms,
                     'Which DP mechanism to use.')
+
+# Task specification
+flags.DEFINE_enum('task', 'stackoverflow_lr', _SUPPORTED_TASKS,
+                  'Which task to perform federated training on.')
 
 FLAGS = flags.FLAGS
 
@@ -112,6 +117,14 @@ def _configure_managers() -> Tuple[tff.simulation.FileCheckpointManager,
   return checkpoint_manager, [csv_manager, tensorboard_manager]
 
 
+def get_total_num_clients(task):
+  """Hardcode the total number of clients for the dataset."""
+  if task == 'stackoverflow_lr':
+    return 342477
+  else:
+    raise ValueError(f'Unsupported task: {task}')
+
+
 def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Expected no command-line arguments, '
@@ -134,7 +147,7 @@ def main(argv):
     aggregation_factory = fl_utils.build_aggregator(
         compression_flags=compression_dict,
         dp_flags=dp_dict,
-        num_clients=3400,
+        num_clients=get_total_num_clients(FLAGS.task),
         num_clients_per_round=FLAGS.clients_per_round,
         num_rounds=FLAGS.total_rounds,
         client_template=model_trainable_variables)
@@ -153,7 +166,12 @@ def main(argv):
       clients_per_round=FLAGS.clients_per_round,
       client_datasets_random_seed=FLAGS.client_datasets_random_seed)
 
-  runner_spec = emnist.configure_training(task_spec, FLAGS.model)
+  if FLAGS.task == 'stackoverflow_lr':
+    runner_spec = stackoverflow_tp.configure_training(task_spec)
+  else:
+    raise ValueError(
+        '--task flag {} is not supported, must be one of {}.'.format(
+            FLAGS.task, _SUPPORTED_TASKS))
 
   def round_end_evaluation_fn(state, round_num):
     if round_num % FLAGS.rounds_per_eval == 0:
