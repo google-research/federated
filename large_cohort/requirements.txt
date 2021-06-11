@@ -1,0 +1,13 @@
+# Requirements for the Large Cohort Training code.
+absl-py
+attrs
+dm-tree
+numpy
+pandas
+tensorflow-federated-nightly
+tensorflow-model-optimization
+tensorflow-privacy
+tensorflow-probability
+tensorflow-text-nightly
+tf-nightly
+tfa-nightly
