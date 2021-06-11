@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Configures federated EMNIST classification tasks."""
+"""Configures a lightweight federated EMNIST classification task."""
 
 import functools
 
@@ -22,14 +22,14 @@ from large_cohort import simulation_specs
 from utils.datasets import emnist_dataset
 from utils.models import emnist_models
 
-ONLY_DIGITS = False
-EMNIST_TASK = 'digit_recognition'
+ONLY_DIGITS = True
+EMNIST_LITE_TASK = 'digit_recognition'
 
 
 def get_model_spec(seed: int = 0) -> simulation_specs.ModelSpec:
   """Configures a model for EMNIST classification."""
   keras_model_builder = functools.partial(
-      emnist_models.create_conv_dropout_model,
+      emnist_models.create_original_fedavg_cnn_model,
       only_digits=ONLY_DIGITS,
       seed=seed)
   loss_builder = tf.keras.losses.SparseCategoricalCrossentropy
@@ -70,13 +70,13 @@ def get_data_spec(
   train_preprocess_fn = emnist_dataset.create_preprocess_fn(
       num_epochs=train_client_spec.num_epochs,
       batch_size=train_client_spec.batch_size,
-      emnist_task=EMNIST_TASK)
+      emnist_task=EMNIST_LITE_TASK)
 
   eval_preprocess_fn = emnist_dataset.create_preprocess_fn(
       num_epochs=eval_client_spec.num_epochs,
       batch_size=eval_client_spec.batch_size,
       shuffle_buffer_size=1,
-      emnist_task=EMNIST_TASK)
+      emnist_task=EMNIST_LITE_TASK)
 
   return simulation_specs.DataSpec(
       train_data=train_data,

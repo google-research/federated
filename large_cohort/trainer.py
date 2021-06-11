@@ -35,6 +35,7 @@ from large_cohort import warmup
 from large_cohort.tasks import cifar100
 from large_cohort.tasks import emnist
 from large_cohort.tasks import emnist_autoencoder
+from large_cohort.tasks import emnist_lite
 from large_cohort.tasks import shakespeare
 from large_cohort.tasks import stackoverflow_tag_prediction
 from large_cohort.tasks import stackoverflow_word_prediction
@@ -44,6 +45,7 @@ SUPPORTED_TASKS = {
     'cifar100': cifar100,
     'emnist': emnist,
     'emnist_ae': emnist_autoencoder,
+    'emnist_lite': emnist_lite,
     'shakespeare': shakespeare,
     'stackoverflow_tag': stackoverflow_tag_prediction,
     'stackoverflow_word': stackoverflow_word_prediction,

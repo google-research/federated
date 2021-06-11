@@ -38,6 +38,17 @@ py_library(
 )
 
 py_library(
+    name = "emnist_lite",
+    srcs = ["emnist_lite.py"],
+    srcs_version = "PY3",
+    deps = [
+        "//large_cohort:simulation_specs",
+        "//utils/datasets:emnist_dataset",
+        "//utils/models:emnist_models",
+    ],
+)
+
+py_library(
     name = "shakespeare",
     srcs = ["shakespeare.py"],
     srcs_version = "PY3",

@@ -42,6 +42,7 @@ py_library(
         "//large_cohort/tasks:cifar100",
         "//large_cohort/tasks:emnist",
         "//large_cohort/tasks:emnist_autoencoder",
+        "//large_cohort/tasks:emnist_lite",
         "//large_cohort/tasks:shakespeare",
         "//large_cohort/tasks:stackoverflow_tag_prediction",
         "//large_cohort/tasks:stackoverflow_word_prediction",
