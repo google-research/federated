@@ -40,17 +40,17 @@ bazel run :trainer --
 
 We have the following tasks that can be set via the `--task` flag:
 
+<!-- mdformat off(This table is sensitive to automatic formatting changes) -->
+
 | Task Name      | Flag          | Model               | Task Summary          |
 | -------------- | ------------- | ------------------- | --------------------- |
-| CIFAR-100      | cifar100      | ResNet-18 (with     | Image classification  |
-:                :               : GroupNorm)          :                       :
-| EMNIST         | emnist        | CNN (dropout)       | Alpha-numeric         |
-:                :               :                     : character recognition :
-| EMNIST-Lite    | emnist-lite   | CNN (no dropout)    | Numeric character     |
-:                :               :                     : recognition           :
-| Shakespeare    | shakespeare   | RNN (2 LSTM layers) | Next-character        |
-:                :               :                     : prediction            :
+| CIFAR-100      | cifar100      | ResNet-18 (with GroupNorm) | Image classification  |
+| EMNIST         | emnist        | CNN (dropout)       | Alpha-numeric character recognition |
+| EMNIST-Lite    | emnist-lite   | CNN (no dropout)    | Numeric character recognition |
+| Shakespeare    | shakespeare   | RNN (2 LSTM layers) | Next-character prediction  |
 | Stack Overflow | stackoverflow | RNN (1 LSTM layer)  | Next-word prediction  |
+
+<!-- mdformat on -->
 
 Here, `EMNIST-Lite` is intended to be a more lightweight simulation. It only
 uses the first 10 classes of EMNIST (the digits 0-9), and a smaller model. For
