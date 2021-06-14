@@ -14,11 +14,9 @@ Please see the guide
 [here](https://docs.bazel.build/versions/master/install.html) for installation
 instructions.
 
-## Directory structure
-
 This directory contains binaries for running federated learning simulations,
-with supporting utilities. The `tasks` directory contains libraries for building
-datasets and models for supported training tasks.
+along with supporting utilities. The `tasks` directory contains libraries for
+building datasets and models for supported training tasks.
 
 ## Example usage
 
@@ -42,20 +40,24 @@ We have the following tasks that can be set via the `--task` flag:
 
 <!-- mdformat off(This table is sensitive to automatic formatting changes) -->
 
-| Task Name      | Flag          | Model               | Task Summary          |
-| -------------- | ------------- | ------------------- | --------------------- |
-| CIFAR-100      | cifar100      | ResNet-18 (with GroupNorm) | Image classification  |
-| EMNIST         | emnist        | CNN (dropout)       | Alpha-numeric character recognition |
-| EMNIST-Lite    | emnist-lite   | CNN (no dropout)    | Numeric character recognition |
-| Shakespeare    | shakespeare   | RNN (2 LSTM layers) | Next-character prediction  |
-| Stack Overflow | stackoverflow | RNN (1 LSTM layer)  | Next-word prediction  |
+| Task Name | Flag | Dataset | Model | Task Summary |
+| --------- | ---- | ------- | ----  | ------------ |
+| CIFAR-100 | cifar100 | [CIFAR-100](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/cifar100/load_data) | ResNet-18 (with GroupNorm) | Image classification  |
+| EMNIST | emnist | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data) | CNN (dropout) | Alpha-numeric character recognition |
+| EMNIST-Lite | emnist-lite | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data) |CNN (no dropout) | Numeric character recognition |
+| EMNIST Autoencoder | emnist_ae | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data) | Bottleneck network | Image autoencoder |
+| Shakespeare | shakespeare | [Shakespeare](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/shakespeare/load_data) | RNN (2 LSTM layers) | Next-character prediction  |
+| Stack Overflow Word Prediction | stackoverflow_word | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | RNN (1 LSTM layer) | Next-word prediction  |
+| Stack Overflow Tag Prediction | stackoverflow_tag | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | Logistic regression classifier | Tag prediction |
 
 <!-- mdformat on -->
 
-Here, `EMNIST-Lite` is intended to be a more lightweight simulation. It only
-uses the first 10 classes of EMNIST (the digits 0-9), and a smaller model. For
-more in-depth experimentation, we recommend using `EMNIST`, which uses all 62
-alpha-numeric labels of EMNIST and a slightly larger model.
+Here, `EMNIST-Lite` is a lightweight simulation that can be used for basic
+experimentation. It only uses the first 10 classes of EMNIST (the digits 0-9),
+and a smaller model. For more moderate experimentation, we recommend the full
+`EMNIST` task, which uses all 62 alpha-numeric labels of EMNIST and a slightly
+larger model. For more realistic cross-device simulations, we recommend the
+Stack Overflow word prediction and tag prediction tasks.
 
 ### Basic flag usage
 
@@ -66,16 +68,22 @@ Below we describe some of the flags above in more detail.
     encompasses all other methods.
 *   `--total_rounds`: The number of training rounds to perform.
 *   `--client_batch_size`: The client batch size.
-*   `-server_optimizer`: What optimizer should be applied to the server (see
+*   `--server_optimizer`: What optimizer should be applied to the server (see
     discussion below).
-*   `clients_per_train_round`: The cohort size used for training. For small
+*   `--clients_per_train_round`: The cohort size used for training. For small
     simulations, a value between 10 and 50 should generally suffice.
-*   `base_random_seed`: A random seed used to govern the randomness of the
+*   `--base_random_seed`: A random seed used to govern the randomness of the
     simulation. Specifically, it determines the model initialization and which
     clients are sampled at each round.
+*   `--root_output_dir`: The root directory for saving checkpoints and metrics
+    summaries.
+*   `--experiment_name`: The name of the experiment.
 
-Extra settings can be configured via additional flags (see `trainer.py` for more
-details).
+A CSV of recorded metrics will be written to
+`{root_output_dir}/results/{experiment_name}/experiment.metrics.csv`.
+[TensorBoard](https://www.tensorflow.org/tensorboard) metrics are written to
+`{root_output_dir}/logdir/{experiment_name}`. Extra settings can be configured
+via additional flags (see `trainer.py` for more details).
 
 ### Using different optimizers
 
@@ -113,7 +121,8 @@ Below we list other flags that can be set to reproduce other aspects of our
 experiments.
 
 *   `--rounds_to_double_cohort`: Set to a positive number `x` to use dynamic
-    cohort sizes. The cohort size will value every `x` rounds.
+    cohort sizes. The cohort size will double every `x` rounds (up to a maximum
+    value of the number of clients in the training dataset).
 *   `--clipping`: Set to `False` to turn adaptive clipping off.
 *   `--scaling`: Can be one of `constant`, `sqrt`, and `linear`. Set to
     `constant` by default. Use `sqrt` or `linear` to perform server learning
