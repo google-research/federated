@@ -252,14 +252,6 @@ def _build_custom_model_and_process(input_spec, test_metrics):
     loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     return dp_fedavg.KerasModelWrapper(keras_model, input_spec, loss)
 
-  model = tff_model_fn()
-
-  def evaluate_fn(model_weights, dataset):
-    model.from_weights(model_weights)
-    metrics = dp_fedavg.keras_evaluate(model.keras_model, dataset, test_metrics)
-    return collections.OrderedDict(
-        (metric.name, metric.result().numpy()) for metric in metrics)
-
   noise_std = FLAGS.clip_norm * FLAGS.noise_multiplier / float(
       FLAGS.clients_per_round)
   server_optimizer_fn = functools.partial(
@@ -276,6 +268,14 @@ def _build_custom_model_and_process(input_spec, test_metrics):
       dp_clip_norm=FLAGS.clip_norm,
       server_optimizer_fn=server_optimizer_fn,
       client_optimizer_fn=client_optimizer_fn)
+
+  model = tff_model_fn()
+
+  def evaluate_fn(model_weights, dataset):
+    model.from_weights(model_weights)
+    metrics = dp_fedavg.keras_evaluate(model.keras_model, dataset, test_metrics)
+    return collections.OrderedDict(
+        (metric.name, metric.result().numpy()) for metric in metrics)
 
   server_state_update_fn = _build_server_state_epoch_update_fn(
       FLAGS.server_optimizer, tff_model_fn, server_optimizer_fn)
