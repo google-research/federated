@@ -91,6 +91,28 @@ class EmnistTest(tf.test.TestCase):
       processed_label = next(processed_dataset_iterator)[1]
       self.assertEqual(raw_label, processed_label)
 
+  def test_create_real_images_tff_client_data_with_one_pseudoclient(self):
+    client_data = emnist_data_utils.create_real_images_tff_client_data(
+        split='synthetic', num_pseudo_clients=1)
+    synthetic_emnist_data = tff.simulation.datasets.emnist.get_synthetic()
+    self.assertEqual(client_data.client_ids, synthetic_emnist_data.client_ids)
+    for client_id in client_data.client_ids:
+      actual_ds = client_data.create_tf_dataset_for_client(client_id)
+      expected_ds = synthetic_emnist_data.create_tf_dataset_for_client(
+          client_id)
+      self.assertAllClose(list(actual_ds), list(expected_ds))
+
+  def test_create_real_images_tff_client_data_with_pseudoclients(self):
+    if tf.config.list_logical_devices('GPU'):
+      self.skipTest('skip GPU test')
+    num_pseudo_clients = 5
+    client_data = emnist_data_utils.create_real_images_tff_client_data(
+        split='synthetic', num_pseudo_clients=num_pseudo_clients)
+    synthetic_emnist_data = tff.simulation.datasets.emnist.get_synthetic()
+    expected_num_clients_ids = num_pseudo_clients * len(
+        synthetic_emnist_data.client_ids)
+    self.assertLen(client_data.client_ids, expected_num_clients_ids)
+
 
 if __name__ == '__main__':
   tf.test.main()

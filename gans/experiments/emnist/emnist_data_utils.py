@@ -24,28 +24,35 @@ BATCH_SIZE = 32
 SHUFFLE_BUFFER = 10000
 
 
+def _get_transformed_client_data(
+    client_data: tff.simulation.datasets.ClientData, num_pseudo_clients: int):
+  """Returns a (potentially) transformed version of EMNIST client data."""
+  if num_pseudo_clients == 1:
+    return client_data
+  else:
+    return infinite_emnist.get_infinite(
+        client_data, client_expansion_factor=num_pseudo_clients)
+
+
 @functools.lru_cache(maxsize=1)
 def create_real_images_tff_client_data(split='train', num_pseudo_clients=1):
   """Returns `tff.simulation.datasets.ClientData` of real images of numbers/letters."""
 
   if split == 'synthetic':
-    return infinite_emnist.get_infinite(
-        tff.simulation.datasets.emnist.get_synthetic(),
-        client_expansion_factor=num_pseudo_clients)
+    client_data = tff.simulation.datasets.emnist.get_synthetic()
+  else:
+    train_tff_data, eval_tff_data = tff.simulation.datasets.emnist.load_data(
+        only_digits=False)
+    if split == 'train':
+      client_data = train_tff_data
+    elif split == 'test':
+      client_data = eval_tff_data
 
-  train_tff_data, eval_tff_data = tff.simulation.datasets.emnist.load_data(
-      only_digits=False)
-  if split == 'train':
-    return infinite_emnist.get_infinite(
-        train_tff_data, client_expansion_factor=num_pseudo_clients)
-  elif split == 'test':
-    return infinite_emnist.get_infinite(
-        eval_tff_data, client_expansion_factor=num_pseudo_clients)
+  if split in ['synthetic', 'train', 'test']:
+    return _get_transformed_client_data(client_data, num_pseudo_clients)
   elif split == 'both':
-    return (infinite_emnist.get_infinite(
-        train_tff_data, client_expansion_factor=num_pseudo_clients),
-            infinite_emnist.get_infinite(
-                eval_tff_data, client_expansion_factor=num_pseudo_clients))
+    return (_get_transformed_client_data(train_tff_data, num_pseudo_clients),
+            _get_transformed_client_data(eval_tff_data, num_pseudo_clients))
   else:
     raise ValueError('Unknown dataset split ' + split)
 

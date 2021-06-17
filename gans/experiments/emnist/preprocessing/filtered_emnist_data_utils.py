@@ -199,7 +199,7 @@ def get_filtered_client_data_for_training(path_to_read_inversions_csv,
 
   def _get_dataset(client_id):
     """Retrieve/preprocess a tf.data.Dataset for a given client_id."""
-    raw_ds = raw_client_data.create_tf_dataset_for_client(client_id)
+    raw_ds = raw_client_data.serializable_dataset_fn(client_id)
 
     invert_imagery = False
     if selected_client_ids_inversion_map:
@@ -218,7 +218,7 @@ def get_filtered_client_data_for_training(path_to_read_inversions_csv,
         shuffle=True,
         repeat=False)
 
-  return tff.simulation.datasets.ClientData.from_clients_and_fn(
+  return tff.simulation.datasets.ClientData.from_clients_and_tf_fn(
       client_ids, _get_dataset)
 
 

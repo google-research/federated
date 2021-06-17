@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 package(default_visibility = ["//gans/experiments/emnist:__subpackages__"])
 
@@ -33,4 +33,17 @@ py_library(
     srcs = ["filtered_emnist_data_utils.py"],
     srcs_version = "PY3",
     deps = ["//gans/experiments/emnist:emnist_data_utils"],
+)
+
+py_test(
+    name = "filtered_emnist_data_utils_test",
+    srcs = ["filtered_emnist_data_utils_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    tags = [
+        "manual",
+        "nokokoro",
+        "notap",
+    ],
+    deps = [":filtered_emnist_data_utils"],
 )
