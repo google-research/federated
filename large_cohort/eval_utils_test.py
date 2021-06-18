@@ -127,6 +127,8 @@ class CentralizedEvalFnTest(tf.test.TestCase):
     federated_eval_fn = tff.learning.build_federated_evaluation(
         tff_model_builder)
     federated_eval_metrics = federated_eval_fn(model_weights, [dataset])
+    if 'eval' in federated_eval_metrics:
+      federated_eval_metrics = federated_eval_metrics['eval']
 
     self.assertEqual(federated_eval_metrics['mean_squared_error'],
                      centralized_eval_metrics['mean_squared_error'])
