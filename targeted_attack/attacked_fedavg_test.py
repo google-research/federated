@@ -61,9 +61,14 @@ def create_mnist_variables():
       accuracy_sum=tf.Variable(0.0, name='accuracy_sum', trainable=False))
 
 
-def mnist_forward_pass(variables, batch):
+def mnist_predict_on_batch(variables, batch):
   y = tf.nn.softmax(tf.matmul(batch['x'], variables.weights) + variables.bias)
   predictions = tf.cast(tf.argmax(y, 1), tf.int64)
+  return y, predictions
+
+
+def mnist_forward_pass(variables, batch):
+  y, predictions = mnist_predict_on_batch(variables, batch)
   flat_labels = tf.reshape(batch['y'], [-1])
   loss = -tf.reduce_mean(
       tf.reduce_sum(tf.one_hot(flat_labels, 10) * tf.math.log(y), axis=[1]))
@@ -75,7 +80,6 @@ def mnist_forward_pass(variables, batch):
   variables.num_examples.assign_add(num_examples)
   variables.loss_sum.assign_add(loss * num_examples)
   variables.accuracy_sum.assign_add(accuracy * num_examples)
-
   return loss, predictions
 
 
@@ -121,6 +125,12 @@ class MnistModel(tff.learning.Model):
     return collections.OrderedDict(
         x=tf.TensorSpec([None, 784], tf.float32),
         y=tf.TensorSpec([None, 1], tf.int64))
+
+  @tf.function
+  def predict_on_batch(self, batch, training=True):
+    del training
+    logits, predictions = mnist_forward_pass(self._variables, batch)
+    return logits, predictions
 
   @tf.function
   def forward_pass(self, batch, training=True):

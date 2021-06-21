@@ -99,6 +99,12 @@ def _create_mnist_variables():
       accuracy_sum=tf.Variable(0.0, name='accuracy_sum', trainable=False))
 
 
+def _mnist_predict_on_batch(variables, batch):
+  y = tf.nn.softmax(tf.matmul(batch, variables.weights) + variables.bias)
+  predictions = tf.cast(tf.argmax(y, 1), tf.int32)
+  return y, predictions
+
+
 def _mnist_forward_pass(variables, batch):
   y = tf.nn.softmax(tf.matmul(batch['x'], variables.weights) + variables.bias)
   predictions = tf.cast(tf.argmax(y, 1), tf.int32)
@@ -165,6 +171,11 @@ class MnistModel(tff.learning.Model):
     return collections.OrderedDict(
         x=tf.TensorSpec([None, 784], tf.float32),
         y=tf.TensorSpec([None, 1], tf.int32))
+
+  @tf.function
+  def predict_on_batch(self, batch, training=True):
+    del training
+    return _mnist_predict_on_batch(self._variables, batch)
 
   @tf.function
   def forward_pass(self, batch, training=True):
