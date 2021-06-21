@@ -1,4 +1,4 @@
-# Copyright 2020, Google LLC.
+# Copyright 2021, Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 import abc
 
 import numpy as np
-from scipy import optimize
 import tensorflow as tf
+from scipy import optimize
 
 
 class NoiseAddition(abc.ABC):
@@ -65,7 +65,6 @@ class GeometricNoise(NoiseAddition):
 
   def __init__(self, num_clients, differential_privacy_sensitivity,
                differential_privacy_epsilon):
-
     self.num_clients = num_clients
     self.differential_privacy_sensitivity = differential_privacy_sensitivity
     self.differential_privacy_epsilon = differential_privacy_epsilon
@@ -80,21 +79,19 @@ class GeometricNoise(NoiseAddition):
     one_sided_percentile = abs(percentile - 50.0) * 2
 
     return sign * np.round(
-        np.log(1.0 - one_sided_percentile / 100.0) / np.log(self.r))
+      np.log(1.0 - one_sided_percentile / 100.0) / np.log(self.r))
 
   def get_noise_tensor(self, input_shape):
-
     alpha = 1.0 / self.num_clients
     beta = (1 - self.r) / self.r
 
     gamma1 = tf.random.gamma(
-        shape=input_shape, alpha=alpha, beta=beta, dtype=tf.dtypes.float16)
+      shape=input_shape, alpha=alpha, beta=beta, dtype=tf.dtypes.float16)
     gamma2 = tf.random.gamma(
-        shape=input_shape, alpha=alpha, beta=beta, dtype=tf.dtypes.float16)
+      shape=input_shape, alpha=alpha, beta=beta, dtype=tf.dtypes.float16)
     polya1 = tf.random.poisson(shape=[1], lam=gamma1, dtype=tf.dtypes.int32)
     polya2 = tf.random.poisson(shape=[1], lam=gamma2, dtype=tf.dtypes.int32)
     client_noise = tf.reshape(tf.subtract(polya1, polya2), input_shape)
-
     return client_noise.numpy()
 
 
@@ -110,7 +107,6 @@ class RapporNoise(NoiseAddition):
                sensitivity,
                epsilon,
                delta=1e-5):
-
     self.num_clients = num_clients
     self.sensitivity = sensitivity
     self.epsilon = epsilon
@@ -126,6 +122,9 @@ class RapporNoise(NoiseAddition):
 
   def eps_local(self):
     return np.log(2 * self.num_clients / self.lam - 1)
+
+  def get_noise_tensor(self, input_shape):
+    return
 
   def apply_noise(self, input_tensor):
     """Sample bool vector for zeros using RAPPOR.
@@ -144,10 +143,10 @@ class RapporNoise(NoiseAddition):
     zeros_perturbed = np.random.choice([False, True],
                                        input_tensor.shape,
                                        p=[sample_prob, inverse_prob])
-    signal_perturbed = input_tensor *\
-     np.random.choice([True, False],
-                      input_tensor.shape,
-                      p=[sample_prob, inverse_prob])
+    signal_perturbed = input_tensor * \
+                       np.random.choice([True, False],
+                                        input_tensor.shape,
+                                        p=[sample_prob, inverse_prob])
 
     return np.logical_or(zeros_perturbed, signal_perturbed) * 1
 
@@ -177,12 +176,12 @@ class RapporNoise(NoiseAddition):
 
   def rappor_central_to_local(self, eps, n, delta):
     sol = optimize.root(
-        lambda lam: RapporNoise.rappor_central_eps(lam, n, delta) - eps,
-        0.1 * n)
+      lambda lam: RapporNoise.rappor_central_eps(lam, n, delta) - eps,
+      0.1 * n)
     return sol.x[0]
 
 
-def get_eps_var(two_sigma, sens=1):
+def get_eps_from_two_std(two_sigma, sens=1):
   """Utility function to retrieve geometric noise eps from provided error.
 
   Args:
@@ -193,12 +192,12 @@ def get_eps_var(two_sigma, sens=1):
     epsilon that achieves desired error.
   """
 
-  var = (two_sigma / 2)**2
+  var = (two_sigma / 2) ** 2
   maybe_r = ((var + 1) - np.sqrt(2 * var + 1)) / var
   return -sens * np.log(maybe_r)
 
 
-def std_geom(eps, sens):
+def get_std_from_eps(eps, sens=1):
   """Utility function to determine standard deviation from geometric noise.
 
   Args:
@@ -209,5 +208,5 @@ def std_geom(eps, sens):
     Std of the noise that achieves `eps`-DP with sensitivity `sens`.
   """
   r = np.exp(-eps / sens)
-  variance = 2 * r / ((1 - r)**2)
+  variance = 2 * r / ((1 - r) ** 2)
   return np.sqrt(variance)

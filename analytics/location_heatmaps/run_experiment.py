@@ -1,4 +1,4 @@
-# Copyright 2020, Google LLC.
+# Copyright 2021, Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,24 +21,26 @@ plotted and the algorithm computes the metrics comparing to the original density
 image.
 """
 
-import random
+import os
 from typing import List
 
-from matplotlib import pyplot as plt
 import numpy as np
 from PIL import Image
-import tqdm
+from matplotlib import pyplot as plt
 
-from analytics.location_heatmaps import geo_utils
-from analytics.location_heatmaps import mechanisms
-from analytics.location_heatmaps import metrics
-from analytics.location_heatmaps import plotting
+import geo_utils
+import mechanisms
+import metrics
+import plotting
+from sketches import get_count_min_sketch
+from config import Config
 
 TOPK = 1000
 TOTAL_SIZE = 1024
 
 
-def get_data(path, crop_tuple=(512, 100, 1536, 1124), total_size=1024):
+def get_data(path, crop_tuple=(512, 100, 1536, 1124),
+             total_size=1024, save=True):
   """Download the map image.
 
   Downloads the image from a given path, crops it and transforms into a list
@@ -55,19 +57,22 @@ def get_data(path, crop_tuple=(512, 100, 1536, 1124), total_size=1024):
     np.array of the image and a shuffled list of coordinates.
   """
 
-  with open(path) as f:
+  with open(path, 'rb') as f:
     image = Image.open(f).convert('L')
   image = image.crop(crop_tuple)
   true_image = np.asarray(image)
-  dataset = list()
+  if os.path.isfile('dataset.npy'):
+    dataset = np.load('dataset.npy')
+  else:
+    dataset = geo_utils.convert_to_dataset(true_image, total_size)
+    if save:
+      np.save('dataset', dataset)
 
-  for i in tqdm.tqdm(range(total_size), total=total_size):
-    for j in range(total_size):
-      for _ in range(int(true_image[i, j])):
-        dataset.append([i, j])
-
-  random.shuffle(dataset)
   return true_image, dataset
+
+
+def get_split_data(path):
+  dataset = np.load(path)
 
 
 def print_output(text, flag):
@@ -83,7 +88,7 @@ def run_experiment(true_image,
                    secagg_round_size=10000,
                    threshold=0,
                    collapse_threshold=None,
-                   eps_func=lambda x: 1,
+                   eps_func=lambda x, y: 1,
                    total_epsilon_budget=None,
                    top_k=TOPK,
                    partial=100,
@@ -96,7 +101,12 @@ def run_experiment(true_image,
                    output_flag=True,
                    quantize=None,
                    noise_class=mechanisms.GeometricNoise,
-                   save_gif=False) -> List[geo_utils.AlgResult]:
+                   save_gif=False,
+                   positivity=False,
+                   start_with_level=0,
+                   ignore_start_eps=False,
+                   last_result_ci=None,
+                   count_min=False) -> List[geo_utils.AlgResult]:
   """The main method to run an experiment using TrieHH.
 
   Args:
@@ -122,35 +132,70 @@ def run_experiment(true_image,
       quantize: apply quantization to the vectors.
       noise_class: use specific noise, defaults to GeometricNoise.
       save_gif: saves all images as a gif.
+      count_min: use count-min sketch.
 
   Returns:
       A list of per level geo_utls.AlgResult objects.
   """
+  config = Config(dataset=dataset,
+                  image=true_image,
+                  level_sample_size=level_sample_size,
+                  secagg_round_size=secagg_round_size,
+                  threshold=threshold,
+                  collapse_threshold=collapse_threshold,
+                  eps_func=eps_func,
+                  total_epsilon_budget=total_epsilon_budget,
+                  top_k=top_k,
+                  partial=partial,
+                  max_levels=max_levels,
+                  threshold_func=threshold_func,
+                  collapse_func=collapse_func,
+                  total_size=total_size,
+                  min_dp_size=min_dp_size,
+                  dropout_rate=dropout_rate,
+                  output_flag=output_flag,
+                  quantize=quantize,
+                  noise_class=noise_class,
+                  save_gif=save_gif,
+                  positivity=positivity,
+                  start_with_level=start_with_level)
 
-  tree, tree_prefix_list = geo_utils.init_tree()
+  tree, tree_prefix_list = geo_utils.init_tree(positivity)
   per_level_results = list()
+  per_level_grid = list()
   finished = False
   sum_vector = None
+  print_output(f'positivity: {positivity}', output_flag)
 
   spent_budget = 0
+  remaining_budget = total_epsilon_budget
   if level_sample_size % secagg_round_size != 0:
     raise ValueError('Sample size cannot be split into SecAgg')
   else:
-    print_output(f'Total of {level_sample_size/ secagg_round_size} ' +\
-            'SecAgg rounds per level', output_flag)
+    print_output(f'Total of {level_sample_size / secagg_round_size} ' + \
+                 'SecAgg rounds per level', output_flag)
   # define DP round size
   dp_round_size = min_dp_size if min_dp_size else secagg_round_size
   if threshold and threshold_func:
     raise ValueError('Specify either `threshold` or `threshold_func`.')
   if collapse_threshold and collapse_func:
-    raise ValueError('Specify either `collapse_threshold` or `collapse_func`.')
+    raise ValueError(
+      'Specify either `collapse_threshold` or `collapse_func`.')
+  samples = np.random.choice(dataset, level_sample_size, replace=False)
+  if count_min:
+    count_min_sketch = get_count_min_sketch(depth=20, width=2000)
+    sensitivity = 20
+  else:
+    count_min_sketch = None
+    sensitivity = 1
 
   for i in range(max_levels):
-    samples = random.sample(dataset, level_sample_size)
+
     samples_len = len(samples)
     prefix_len = len(tree_prefix_list)
     # create an image from the sampled data.
-    image_sampled = geo_utils.build_from_sample(samples, total_size=total_size)
+    image_sampled = geo_utils.build_from_sample(samples,
+                                                total_size=total_size)
 
     if total_epsilon_budget:
       remaining_budget = total_epsilon_budget - spent_budget
@@ -169,103 +214,107 @@ def run_experiment(true_image,
       # prevent spilling over the budget
       if remaining_budget:
         # last round, no progress in tree, or cannot run at least two rounds.
-        if i == max_levels or finished \
+        if i == max_levels - 1 or finished \
             or remaining_budget < 2 * eps * samples_len:
-          print_output('Last round. Spending remaining epsilon budget: ' +\
-                  f'{remaining_budget}', output_flag)
+          print_output(
+            'Last round. Spending remaining epsilon budget: ' + \
+            f'{remaining_budget}', output_flag)
           eps = remaining_budget / samples_len
 
-      noiser = noise_class(dp_round_size, 1, eps)
-    spent_budget += eps * samples_len
+      noiser = noise_class(dp_round_size, sensitivity, eps)
+      if ignore_start_eps and start_with_level <= i:
+        print_output('Ignoring eps spent', flag=output_flag)
+      else:
+        spent_budget += eps * samples_len
 
     if threshold_func:
       threshold = threshold_func(
-          i, prefix_len, eps,
-          eps + (total_epsilon_budget - spent_budget) / samples_len)
+        i, prefix_len, eps,
+        (total_epsilon_budget - spent_budget) / samples_len)
     if collapse_func:
       collapse_threshold = collapse_func(threshold)
     print_output(
-        f'Level: {i}. Threshold: {threshold:.2f}. ' +
-        f'Collapse threshold: {collapse_threshold:.2f}', output_flag)
+      f'Level: {i}. Eps: {eps}. Threshold: {threshold:.2f}. Remaining: {remaining_budget / samples_len if remaining_budget is not None else 0:.2f}',
+      output_flag)
 
     # to prevent OOM errors we use vectors of size partial.
-    round_vector = np.zeros([partial, prefix_len])
-    sum_vector = np.zeros(prefix_len)
-    for j, sample in enumerate(tqdm.tqdm(samples)):
-      if dropout_rate and random.random() <= dropout_rate:
-        continue
-      round_vector[j % partial] = geo_utils.report_coordinate_to_vector(
-          sample, tree, tree_prefix_list)
-      if j % partial == 0 or j == samples_len - 1:
-        round_vector = noiser.apply_noise(round_vector)
-        if quantize is not None:
-
-          round_vector = geo_utils.quantize_vector(round_vector,
-                                                   -2**(quantize - 1),
-                                                   2**(quantize - 1))
-          sum_vector += geo_utils.quantize_vector(
-              round_vector.sum(axis=0), -2**(quantize - 1), 2**(quantize - 1))
-        else:
-          sum_vector += round_vector.sum(axis=0)
-
-        round_vector = np.zeros([partial, prefix_len])
-    del round_vector
-    rebuilder = np.copy(sum_vector)
-    test_image = geo_utils.rebuild_from_vector(
-        rebuilder, tree, image_size=total_size, threshold=threshold)
-    grid_contour = geo_utils.rebuild_from_vector(
-        sum_vector,
-        tree,
-        image_size=total_size,
-        contour=True,
-        threshold=threshold)
-    result = geo_utils.AlgResult(
-        image=test_image,
-        sum_vector=sum_vector,
-        tree=tree,
+    if start_with_level > i:
+      tree, tree_prefix_list, finished = geo_utils.split_regions(
         tree_prefix_list=tree_prefix_list,
-        threshold=threshold,
-        grid_contour=grid_contour,
-        eps=eps)
+        vector_counts=None,
+        threshold=threshold, image_bit_level=10,
+        collapse_threshold=collapse_threshold, positivity=positivity,
+        expand_all=True, count_min=count_min)
+      print_output(f"Expanding all at the level: {i}.", output_flag)
+      continue
+
+    result, grid_contour = geo_utils.make_step(samples, eps, threshold,
+                                               partial,
+                                               prefix_len, dropout_rate,
+                                               tree, tree_prefix_list,
+                                               noiser, quantize, total_size,
+                                               positivity, count_min=count_min_sketch)
 
     per_level_results.append(result)
+    per_level_grid.append(grid_contour)
 
     # compare to true image without sampling error
-    if output_flag:
-      metric = metrics.get_metrics(
-          result.image,
-          true_image=image_sampled,
-          top_k=top_k,
-          total_size=total_size)
-      print(f'Level: {i}. MSE without sampling error: {metric.mse:.2e}')
+    if positivity:
+      im = result.pos_image
+    else:
+      im = result.image
 
+    metric = metrics.get_metrics(
+      im,
+      true_image=image_sampled,
+      top_k=top_k,
+      total_size=total_size)
+    result.sampled_metric = metric
+    metric = metrics.get_metrics(
+      im,
+      true_image=true_image,
+      top_k=top_k,
+      total_size=total_size)
+    result.metric = metric
+    print_output(
+      f'Level: {i}. MSE: {result.sampled_metric.mse:.2e}, without sampling error: {metric.mse:.2e}.',
+      output_flag)
+    if i == 0 or not last_result_ci:
+      last_result = None
+    else:
+      last_result = per_level_results[i - 1]
     tree, tree_prefix_list, finished = geo_utils.split_regions(
-        tree_prefix_list, sum_vector, threshold, collapse_threshold)
+      tree_prefix_list=result.tree_prefix_list, vector_counts=result.sum_vector,
+      threshold=threshold, image_bit_level=10,
+      collapse_threshold=collapse_threshold, positivity=positivity,
+      last_result=last_result)
+    if finished:
+      break
   if output_flag:
-    print(f'Total epsilon-users: {spent_budget:.2f} with ' +\
-          f'{spent_budget/level_sample_size:.2f} eps per person. ')
-    _, ax = plt.subplots(
-        1, len(per_level_results), figsize=(len(per_level_results) * 10, 10))
+    print(f'Total epsilon-users: {spent_budget:.2f} with ' + \
+          f'{spent_budget / level_sample_size:.2f} eps per person. ')
+    fig, ax = plt.subplots(
+      1, len(per_level_results),
+      figsize=(len(per_level_results) * 10, 10))
     _, ax_contour = plt.subplots(
-        1, len(per_level_results), figsize=(len(per_level_results) * 10, 10))
+      1, len(per_level_results),
+      figsize=(len(per_level_results) * 10, 10))
 
     for i in range(len(per_level_results)):
       axis = ax[i] if len(per_level_results) > 1 else ax
+      axis_contour = ax_contour[i] if len(per_level_results) > 1 else ax_contour
       result = per_level_results[i]
-      metric = metrics.get_metrics(
-          test_image=result.image,
-          true_image=true_image,
-          top_k=top_k,
-          total_size=total_size)
       plotting.plot_it(
-          ax=axis,
-          test_image=result.image,
-          eps=result.eps,
-          total_regions=len(result.tree_prefix_list),
-          metric=metric)
-      ax_contour[i].axes.xaxis.set_visible(False)
-      ax_contour[i].axes.yaxis.set_visible(False)
-      ax_contour[i].imshow(grid_contour)
+        ax=axis,
+        test_image=result.pos_image if positivity else result.image,
+        eps=result.eps,
+        total_regions=len(result.tree_prefix_list),
+        metric=result.metric)
+
+      axis_contour.axes.xaxis.set_visible(False)
+      axis_contour.axes.yaxis.set_visible(False)
+      axis_contour.imshow(per_level_grid[i])
+    fig.savefig('results.pdf')
     if save_gif:
       images = [result.image for result in per_level_results]
       plotting.save_gif(images, path='/gif_image/')

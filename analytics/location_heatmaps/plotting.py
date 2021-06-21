@@ -1,4 +1,4 @@
-# Copyright 2020, Google LLC.
+# Copyright 2021, Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ images or gifs to a path and visualize 3d versions of the result.
 from typing import List
 
 import imageio
+import numpy as np
 from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib import ticker
-import numpy as np
 from sklearn import metrics as mt
 
-from analytics.location_heatmaps import geo_utils
-from analytics.location_heatmaps import metrics
+import geo_utils
+import metrics
 
 
 def copy_tmp_file_to_path(filename, path):
@@ -65,16 +65,19 @@ def plot_it(ax, test_image, eps, total_regions, metric: metrics.Metrics):
                f'L1: {metric.l1_distance:.2e}. L2: {metric.l2_distance:.2e}.' +
                '\n' + f'HS: {metric.hotspots_count}. f1: {metric.f1:.3f}' +
                '\n' + f'WS: {metric.wasserstein:.2e}. ' +
+               '\n' + f'MAPE: {metric.mape:.3f}. SMAPE: {metric.smape:.3f}' +
+               '\n' + f'MAAPE: {metric.maape:.3f}. ' +
                f'Mutual: {metric.mutual_info:.3f}.' + '\n' +
-               f'MSE: {metric.mse:.2e}')
-  ax.imshow(test_image)
+               f'MSE: {metric.mse:.2e}', fontsize=30)
+  ax.imshow(test_image, interpolation='gaussian')
   return
 
 
 def plot_f1_line(test_image, true_image, total_size, k=2):
   """Plots f1 line for every k percentiles from 0 to 100."""
 
-  test_image = metrics.normalize(metrics.rescale_image(test_image, total_size))
+  test_image = metrics.normalize(
+    metrics.rescale_image(test_image, total_size))
   x_list = list()
   y_list = list()
 
@@ -93,6 +96,56 @@ def plot_f1_line(test_image, true_image, total_size, k=2):
   return
 
 
+def disable_ticks(ax):
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def animate_gif(res):
+  from matplotlib import rc
+  rc('animation', html='jshtml')
+  import matplotlib.pyplot as plt
+  import matplotlib
+  import matplotlib.animation as animation
+
+  sub_runs = max([len(x.level_animation_list) for x in res])
+  levels = len(res)
+
+  fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+
+  def init_func():
+    for j in range(2):
+      disable_ticks(ax[j])
+      ax[j].imshow([[0]])
+      ax[j].set_title('_',fontdict = {'fontsize':22},loc='center')
+    plt.tight_layout()
+
+  def frame(w):
+    level = w // sub_runs
+    sub_run = w % sub_runs
+    if len(res[level].level_animation_list) <= sub_run:
+      print(f'due to dropout less reported data for level: {level}.')
+      return
+
+    if sub_run == 0:
+      ax[1].clear()
+      disable_ticks(ax[1])
+      ax[1].imshow(res[level].grid_contour, interpolation='gaussian')
+
+    axis = ax[0]
+    axis.set_title(f'Reports from {10000 * sub_run}/{10000 * sub_runs} users', fontdict = {'fontsize':12},loc='center')
+    axis.clear()
+    disable_ticks(axis)
+    norm = matplotlib.colors.Normalize(0,
+                                       res[level].level_animation_list[-1].max())
+    axis.imshow(res[level].level_animation_list[sub_run], norm=norm,  interpolation='gaussian')
+
+  anim = animation.FuncAnimation(fig, frame, frames=levels * sub_runs, init_func=init_func,
+                                 blit=False, repeat=True)
+  plt.close()
+
+  return anim
+
 def save_gif(images: List[np.ndarray], path, gif_name='gif_map'):
   """Saves gif to path.
 
@@ -108,8 +161,8 @@ def save_gif(images: List[np.ndarray], path, gif_name='gif_map'):
 
   with open(f'/tmp/{gif_name}', 'w') as f:
     imageio.mimsave(
-        f, [image_prepare(image) for image in images],
-        format='gif', duration=1.0)
+      f, [image_prepare(image) for image in images],
+      format='gif', duration=1.0)
   copy_tmp_file_to_path(gif_name, path=path)
 
 
@@ -136,19 +189,21 @@ def plot_3d_single(fig, pos, test_image):
   vmax = np.max(test_image)
   ax = fig.add_subplot(pos, projection='3d')
   # Make data.
-  x_arr = np.arange(0, 1024, 1)
-  y_arr = np.arange(0, 1024, 1)
+  x_arr = 1024 - np.arange(0, 1024, 1)
+  y_arr = 1024 - np.arange(0, 1024, 1)
   x_arr, y_arr = np.meshgrid(x_arr, y_arr)
 
   z_arr = np.copy(test_image)
 
+  ax.set_axis_off()
+
   surf = ax.plot_surface(
-      x_arr,
-      y_arr,
-      z_arr,
-      cmap=cm.get_cmap('Spectral'),
-      linewidth=0,
-      antialiased=False)
+    x_arr,
+    y_arr,
+    z_arr,
+    cmap=cm.get_cmap('Spectral'),
+    linewidth=0,
+    antialiased=False)
 
   # Customize the z axis.
   ax.set_zlim(-0.01, vmax)
@@ -156,7 +211,7 @@ def plot_3d_single(fig, pos, test_image):
   ax.zaxis.set_major_formatter(ticker.FormatStrFormatter('%.02f'))
 
   # Add a color bar which maps values to colors.
-  fig.colorbar(surf, shrink=0.5, aspect=5)
+  # fig.colorbar(surf, shrink=0.5, aspect=5)
   ax.invert_yaxis()
   ax.view_init(70)
 
@@ -173,5 +228,6 @@ def plot_all_3d(per_level_results: List[geo_utils.AlgResult]):
   fig = plt.figure(figsize=(level_count * 5, 5))
   for i in range(level_count):
     image = per_level_results[i].image
-    plot_3d_single(fig, f'1{level_count}{i+1}', image)
+    plot_3d_single(fig, f'1{level_count}{i + 1}', image)
+  plt.savefig('3d.png', dpi=120)
   plt.show()
