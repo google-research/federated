@@ -14,10 +14,9 @@
 """Pre-processing utils for StackOverflow data for reconstruction experiments."""
 
 import collections
-from typing import List
+from typing import Callable, List
 
 import tensorflow as tf
-import tensorflow_federated as tff
 
 from utils.datasets import stackoverflow_word_prediction
 
@@ -83,13 +82,13 @@ def _sort_examples_by_date(
   return new_examples
 
 
-def create_preprocess_fn(vocab: List[str],
-                         num_oov_buckets: int,
-                         client_batch_size: int,
-                         max_sequence_length: int,
-                         max_elements_per_client: int,
-                         feature_dtypes: collections.OrderedDict,
-                         sort_by_date: bool = True) -> tff.Computation:
+def create_preprocess_fn(
+    vocab: List[str],
+    num_oov_buckets: int,
+    client_batch_size: int,
+    max_sequence_length: int,
+    max_elements_per_client: int,
+    sort_by_date: bool = True) -> Callable[[tf.data.Dataset], tf.data.Dataset]:
   """Creates a preprocessing functions for Stack Overflow next-word-prediction.
 
   This function returns a `tff.Computation` which takes a dataset and returns a
@@ -106,14 +105,12 @@ def create_preprocess_fn(vocab: List[str],
     max_elements_per_client: Integer controlling the maximum number of elements
       to take per client. This is intended primarily to contend with the small
       set of clients with tens of thousands of examples.
-    feature_dtypes: An OrderedDict mapping from string key names to dtypes for
-      each feature.
     sort_by_date: If True, sort elements by increasing "creation_date". If
       False, shuffle elements instead. Sorting or shuffling is applied after
       limiting to `max_elements_per_client`.
 
   Returns:
-    A `tff.Computation` taking as input a `tf.data.Dataset`, and returning a
+    A callable taking as input a `tf.data.Dataset`, and returning a
     `tf.data.Dataset` formed by preprocessing according to the input arguments.
   """
   if client_batch_size <= 0:
@@ -130,7 +127,6 @@ def create_preprocess_fn(vocab: List[str],
     raise ValueError('num_oov_buckets must be a positive integer. You have '
                      'passed {}.'.format(num_oov_buckets))
 
-  @tff.tf_computation(tff.SequenceType(feature_dtypes))
   def preprocess_fn(dataset):
     to_ids = stackoverflow_word_prediction.build_to_ids_fn(
         vocab=vocab,

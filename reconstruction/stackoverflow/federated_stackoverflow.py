@@ -149,16 +149,21 @@ def run_federated(
       tff.simulation.datasets.stackoverflow.load_data())
 
   vocab = stackoverflow_word_prediction.create_vocab(vocab_size)
-  dataset_preprocess_comp = stackoverflow_dataset.create_preprocess_fn(
+  dataset_preprocess_fn = stackoverflow_dataset.create_preprocess_fn(
       vocab=vocab,
       num_oov_buckets=num_oov_buckets,
       client_batch_size=client_batch_size,
       max_sequence_length=sequence_length,
       max_elements_per_client=max_elements_per_user,
-      feature_dtypes=train_clientdata.element_type_structure,
       sort_by_date=True)
+  feature_dtypes = train_clientdata.element_type_structure
 
-  input_spec = dataset_preprocess_comp.type_signature.result.element
+  @tff.tf_computation(tff.SequenceType(feature_dtypes))
+  def dataset_preprocess_comp(dataset):
+    return dataset_preprocess_fn(dataset)
+
+  preprocess_train = train_clientdata.preprocess(dataset_preprocess_fn)
+  input_spec = preprocess_train.element_type_structure
 
   model_fn = functools.partial(
       models.create_recurrent_reconstruction_model,

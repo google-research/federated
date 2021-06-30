@@ -95,7 +95,6 @@ class StackoverflowDatasetTest(tf.test.TestCase):
         max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=1,
-        feature_dtypes=FEATURE_DTYPES,
         sort_by_date=False)
     preprocessed_ds = preprocess_fn(ds)
     self.assertEqual(preprocessed_ds.element_spec,
@@ -109,8 +108,7 @@ class StackoverflowDatasetTest(tf.test.TestCase):
           max_sequence_length=10,
           max_elements_per_client=100,
           vocab=['one', 'must'],
-          num_oov_buckets=1,
-          feature_dtypes=FEATURE_DTYPES)
+          num_oov_buckets=1)
 
   def test_preprocess_fn_bad_max_sequence_length_fails(self):
     with self.assertRaisesRegex(ValueError, 'max_sequence_length'):
@@ -119,8 +117,7 @@ class StackoverflowDatasetTest(tf.test.TestCase):
           max_sequence_length=0,
           max_elements_per_client=100,
           vocab=['one', 'must'],
-          num_oov_buckets=1,
-          feature_dtypes=FEATURE_DTYPES)
+          num_oov_buckets=1)
 
   def test_preprocess_fn_bad_max_elements_fails(self):
     with self.assertRaisesRegex(ValueError, 'max_elements_per_client'):
@@ -129,8 +126,7 @@ class StackoverflowDatasetTest(tf.test.TestCase):
           max_sequence_length=20,
           max_elements_per_client=0,
           vocab=['one', 'must'],
-          num_oov_buckets=1,
-          feature_dtypes=FEATURE_DTYPES)
+          num_oov_buckets=1)
 
   def test_preprocess_fn_return_dataset_element_spec_oov_buckets(self):
     ds = tf.data.Dataset.from_tensor_slices(SINGLE_EXAMPLE_TEST_DATA)
@@ -140,7 +136,6 @@ class StackoverflowDatasetTest(tf.test.TestCase):
         max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=10,
-        feature_dtypes=FEATURE_DTYPES,
         sort_by_date=False)
     preprocessed_ds = preprocess_fn(ds)
     self.assertEqual(preprocessed_ds.element_spec,
@@ -155,7 +150,6 @@ class StackoverflowDatasetTest(tf.test.TestCase):
         max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=10,
-        feature_dtypes=FEATURE_DTYPES,
         sort_by_date=True)
     preprocessed_ds = preprocess_fn(ds)
     self.assertEqual(preprocessed_ds.element_spec,
@@ -170,7 +164,6 @@ class StackoverflowDatasetTest(tf.test.TestCase):
         max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=10,
-        feature_dtypes=FEATURE_DTYPES,
         sort_by_date=True)
     preprocessed_ds = preprocess_fn(ds)
     self.assertEqual(preprocessed_ds.element_spec,
@@ -185,7 +178,6 @@ class StackoverflowDatasetTest(tf.test.TestCase):
         max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=1,
-        feature_dtypes=FEATURE_DTYPES,
         sort_by_date=False)
 
     preprocessed_ds = preprocess_fn(ds)
@@ -203,7 +195,6 @@ class StackoverflowDatasetTest(tf.test.TestCase):
         max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=3,
-        feature_dtypes=FEATURE_DTYPES,
         sort_by_date=False)
     preprocessed_ds = preprocess_fn(ds)
     element = next(iter(preprocessed_ds))
@@ -226,7 +217,6 @@ class StackoverflowDatasetTest(tf.test.TestCase):
         max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=1,
-        feature_dtypes=FEATURE_DTYPES,
         sort_by_date=True)
     preprocessed_ds = preprocess_fn(ds)
     element = next(iter(preprocessed_ds))
@@ -245,7 +235,6 @@ class StackoverflowDatasetTest(tf.test.TestCase):
         max_elements_per_client=2,
         vocab=['one', 'must'],
         num_oov_buckets=1,
-        feature_dtypes=FEATURE_DTYPES,
         sort_by_date=True)
     preprocessed_ds = preprocess_fn(ds)
     element = next(iter(preprocessed_ds))
@@ -265,7 +254,6 @@ class StackoverflowDatasetTest(tf.test.TestCase):
         max_elements_per_client=100,
         vocab=['one', 'must'],
         num_oov_buckets=1,
-        feature_dtypes=FEATURE_DTYPES,
         sort_by_date=True)
     preprocessed_ds = preprocess_fn(ds)
     element = next(iter(preprocessed_ds))

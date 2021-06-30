@@ -13,10 +13,9 @@
 # limitations under the License.
 """Prepare Google Landmark datasets for federated and centralized training."""
 
-import collections
 import enum
 import functools
-from typing import Tuple
+from typing import Callable, Tuple
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -58,9 +57,9 @@ def _check_positive(name: str, value: int) -> bool:
     raise ValueError(f'Expected a positive value for {name}, found {value}.')
 
 
-def get_preprocessing_fn(image_size: int, batch_size: int, num_epochs: int,
-                         max_elements: int,
-                         shuffle_buffer_size: int) -> tff.Computation:
+def get_preprocessing_fn(
+    image_size: int, batch_size: int, num_epochs: int, max_elements: int,
+    shuffle_buffer_size: int) -> Callable[[tf.data.Dataset], tf.data.Dataset]:
   """Creates a preprocessing function for federated training.
 
   Args:
@@ -72,7 +71,7 @@ def get_preprocessing_fn(image_size: int, batch_size: int, num_epochs: int,
     shuffle_buffer_size: Buffer size used in shuffling.
 
   Returns:
-    A `tff.Computation` that transforms the raw `tf.data.Dataset` of a client
+    A callable that transforms the raw `tf.data.Dataset` of a client
     into a `tf.data.Dataset` that is ready for training.
   """
   _check_positive('image_size', image_size)
@@ -83,12 +82,6 @@ def get_preprocessing_fn(image_size: int, batch_size: int, num_epochs: int,
     raise ValueError('Expected a positive value or -1 for `max_elements`, '
                      f'found {max_elements}.')
 
-  feature_dtypes = collections.OrderedDict()
-  feature_dtypes['image/decoded'] = tff.TensorType(
-      dtype=tf.uint8, shape=[None, None, None])
-  feature_dtypes['class'] = tff.TensorType(dtype=tf.int64, shape=[1])
-
-  @tff.tf_computation(tff.SequenceType(feature_dtypes))
   def preprocessing_fn(dataset: tf.data.Dataset) -> tf.data.Dataset:
     dataset = dataset.map(
         functools.partial(_map_fn, is_training=True, image_size=image_size),
