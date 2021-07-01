@@ -13,7 +13,6 @@
 # limitations under the License.
 """Data loader for Stackoverflow tag prediction tasks."""
 
-import collections
 from typing import Callable, List, Tuple
 
 import numpy as np
@@ -74,7 +73,8 @@ def create_preprocess_fn(
     client_batch_size: int,
     client_epochs_per_round: int,
     max_elements_per_client: int,
-    max_shuffle_buffer_size: int = 10000) -> tff.Computation:
+    max_shuffle_buffer_size: int = 10000
+) -> Callable[[tf.data.Dataset], tf.data.Dataset]:
   """Creates a preprocessing function for Stack Overflow tag prediction data.
 
   This function creates a `tff.Computation` which takes a dataset, and returns
@@ -98,7 +98,7 @@ def create_preprocess_fn(
     max_shuffle_buffer_size: Maximum shuffle buffer size.
 
   Returns:
-    A `tff.Computation` taking as input a `tf.data.Dataset`, and returning a
+    A callable taking as input a `tf.data.Dataset`, and returning a
     `tf.data.Dataset` formed by preprocessing according to the input arguments.
   """
   if client_batch_size <= 0:
@@ -118,18 +118,6 @@ def create_preprocess_fn(
   else:
     shuffle_buffer_size = max_elements_per_client
 
-  # Features are intentionally sorted lexicographically by key for consistency
-  # across datasets.
-  feature_dtypes = collections.OrderedDict(
-      creation_date=tf.string,
-      score=tf.int64,
-      tags=tf.string,
-      title=tf.string,
-      tokens=tf.string,
-      type=tf.string,
-  )
-
-  @tff.tf_computation(tff.SequenceType(feature_dtypes))
   def preprocess_fn(dataset):
     to_ids = build_to_ids_fn(word_vocab, tag_vocab)
     return (dataset.take(max_elements_per_client).shuffle(shuffle_buffer_size)

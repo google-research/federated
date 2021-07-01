@@ -105,15 +105,15 @@ def configure_training(
       num_validation_examples=num_validation_examples,
       num_oov_buckets=num_oov_buckets)
 
-  train_dataset_preprocess_comp = stackoverflow_word_prediction.create_preprocess_fn(
+  train_preprocess_fn = stackoverflow_word_prediction.create_preprocess_fn(
       vocab=stackoverflow_word_prediction.create_vocab(vocab_size),
       num_oov_buckets=num_oov_buckets,
       client_batch_size=task_spec.client_batch_size,
       client_epochs_per_round=task_spec.client_epochs_per_round,
       max_sequence_length=sequence_length,
       max_elements_per_client=max_elements_per_user)
-
-  input_spec = train_dataset_preprocess_comp.type_signature.result.element
+  train_clientdata = train_clientdata.preprocess(train_preprocess_fn)
+  input_spec = train_clientdata.element_type_structure
 
   def tff_model_fn() -> tff.learning.Model:
     return tff.learning.from_keras_model(
@@ -123,14 +123,8 @@ def configure_training(
         metrics=metrics_builder())
 
   iterative_process = task_spec.iterative_process_builder(tff_model_fn)
-
-  @tff.tf_computation(tf.string)
-  def train_dataset_computation(client_id):
-    client_train_data = train_clientdata.dataset_computation(client_id)
-    return train_dataset_preprocess_comp(client_train_data)
-
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-      train_dataset_computation, iterative_process)
+      train_clientdata.dataset_computation, iterative_process)
   client_ids_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
           train_clientdata.client_ids,

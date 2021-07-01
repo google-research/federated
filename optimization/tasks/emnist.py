@@ -53,8 +53,8 @@ def configure_training(task_spec: training_specs.TaskSpec,
       num_epochs=task_spec.client_epochs_per_round,
       batch_size=task_spec.client_batch_size,
       emnist_task=emnist_task)
-
-  input_spec = train_preprocess_fn.type_signature.result.element
+  emnist_train = emnist_train.preprocess(train_preprocess_fn)
+  input_spec = emnist_train.element_type_structure
 
   if model == 'cnn':
     model_builder = functools.partial(
@@ -81,14 +81,8 @@ def configure_training(task_spec: training_specs.TaskSpec,
         metrics=metrics_builder())
 
   iterative_process = task_spec.iterative_process_builder(tff_model_fn)
-
-  @tff.tf_computation(tf.string)
-  def build_train_dataset_from_client_id(client_id):
-    client_dataset = emnist_train.dataset_computation(client_id)
-    return train_preprocess_fn(client_dataset)
-
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-      build_train_dataset_from_client_id, iterative_process)
+      emnist_train.dataset_computation, iterative_process)
   client_ids_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
           emnist_train.client_ids,

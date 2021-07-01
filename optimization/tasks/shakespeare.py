@@ -81,7 +81,8 @@ def configure_training(task_spec: training_specs.TaskSpec,
       num_epochs=task_spec.client_epochs_per_round,
       batch_size=task_spec.client_batch_size,
       sequence_length=sequence_length)
-  input_spec = train_preprocess_fn.type_signature.result.element
+  shakespeare_train = shakespeare_train.preprocess(train_preprocess_fn)
+  input_spec = shakespeare_train.element_type_structure
 
   model_builder = functools.partial(
       create_shakespeare_model, sequence_length=sequence_length)
@@ -96,14 +97,8 @@ def configure_training(task_spec: training_specs.TaskSpec,
         metrics=metrics_builder())
 
   iterative_process = task_spec.iterative_process_builder(tff_model_fn)
-
-  @tff.tf_computation(tf.string)
-  def build_train_dataset_from_client_id(client_id):
-    client_dataset = shakespeare_train.dataset_computation(client_id)
-    return train_preprocess_fn(client_dataset)
-
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-      build_train_dataset_from_client_id, iterative_process)
+      shakespeare_train.dataset_computation, iterative_process)
   client_ids_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
           shakespeare_train.client_ids,

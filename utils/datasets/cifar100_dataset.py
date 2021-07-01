@@ -76,7 +76,8 @@ def create_preprocess_fn(
     shuffle_buffer_size: int = NUM_EXAMPLES_PER_CLIENT,
     crop_shape: Tuple[int, int, int] = CIFAR_SHAPE,
     distort_image=False,
-    num_parallel_calls: int = tf.data.experimental.AUTOTUNE) -> tff.Computation:
+    num_parallel_calls: int = tf.data.experimental.AUTOTUNE
+) -> Callable[[tf.data.Dataset], tf.data.Dataset]:
   """Creates a preprocessing function for CIFAR-100 client datasets.
 
   Args:
@@ -95,23 +96,14 @@ def create_preprocess_fn(
       used when performing `tf.data.Dataset.map`.
 
   Returns:
-    A `tff.Computation` performing the preprocessing described above.
+    A callable performing the preprocessing described above.
   """
   if num_epochs < 1:
     raise ValueError('num_epochs must be a positive integer.')
   if shuffle_buffer_size <= 1:
     shuffle_buffer_size = 1
 
-  # Features are intentionally sorted lexicographically by key for consistency
-  # across datasets.
-  feature_dtypes = collections.OrderedDict(
-      coarse_label=tff.TensorType(tf.int64),
-      image=tff.TensorType(tf.uint8, shape=(32, 32, 3)),
-      label=tff.TensorType(tf.int64))
-
   image_map_fn = build_image_map(crop_shape, distort_image)
-
-  @tff.tf_computation(tff.SequenceType(feature_dtypes))
   def preprocess_fn(dataset):
     return (
         dataset.shuffle(shuffle_buffer_size).repeat(num_epochs)

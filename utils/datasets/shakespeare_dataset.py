@@ -13,8 +13,7 @@
 # limitations under the License.
 """Libraries to prepare Shakespeare datasets for CharRNN experiments."""
 
-import collections
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -88,7 +87,8 @@ def create_preprocess_fn(
     batch_size: int,
     shuffle_buffer_size: int = 50,
     sequence_length: int = SEQUENCE_LENGTH,
-    num_parallel_calls: int = tf.data.experimental.AUTOTUNE) -> tff.Computation:
+    num_parallel_calls: int = tf.data.experimental.AUTOTUNE
+) -> Callable[[tf.data.Dataset], tf.data.Dataset]:
   """Creates a preprocessing function for Shakespeare client datasets.
 
   This function maps a dataset of string snippets to a dataset of input/output
@@ -108,7 +108,7 @@ def create_preprocess_fn(
       used when performing `tf.data.Dataset.map`.
 
   Returns:
-    A `tff.Computation` performing the preprocessing described above.
+    A callable performing the preprocessing described above.
   """
   if num_epochs < 1:
     raise ValueError('num_epochs must be a positive integer.')
@@ -117,9 +117,6 @@ def create_preprocess_fn(
   if shuffle_buffer_size <= 1:
     shuffle_buffer_size = 1
 
-  feature_dtypes = collections.OrderedDict(snippets=tf.string,)
-
-  @tff.tf_computation(tff.SequenceType(feature_dtypes))
   def preprocess_fn(dataset):
     to_tokens = _build_tokenize_fn(split_length=sequence_length + 1)
     return (

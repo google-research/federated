@@ -13,7 +13,6 @@
 # limitations under the License.
 """Library for loading and preprocessing EMNIST training and testing data."""
 
-import collections
 from typing import Tuple
 
 import tensorflow as tf
@@ -58,7 +57,7 @@ def create_preprocess_fn(
       used when performing `tf.data.Dataset.map`.
 
   Returns:
-    A `tff.Computation` performing the preprocessing discussed above.
+    A callable performing the preprocessing discussed above.
   """
   if num_epochs < 1:
     raise ValueError('num_epochs must be a positive integer.')
@@ -73,13 +72,6 @@ def create_preprocess_fn(
     raise ValueError('emnist_task must be one of "digit_recognition" or '
                      '"autoencoder".')
 
-  # Features are intentionally sorted lexicographically by key for consistency
-  # across datasets.
-  feature_dtypes = collections.OrderedDict(
-      label=tff.TensorType(tf.int32),
-      pixels=tff.TensorType(tf.float32, shape=(28, 28)))
-
-  @tff.tf_computation(tff.SequenceType(feature_dtypes))
   def preprocess_fn(dataset):
     return dataset.shuffle(shuffle_buffer_size).repeat(num_epochs).batch(
         batch_size, drop_remainder=False).map(

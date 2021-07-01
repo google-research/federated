@@ -76,7 +76,8 @@ def configure_training(
       client_batch_size=task_spec.client_batch_size,
       client_epochs_per_round=task_spec.client_epochs_per_round,
       max_elements_per_client=max_elements_per_user)
-  input_spec = train_preprocess_fn.type_signature.result.element
+  stackoverflow_train = stackoverflow_train.preprocess(train_preprocess_fn)
+  input_spec = stackoverflow_train.element_type_structure
 
   model_builder = functools.partial(
       stackoverflow_lr_models.create_logistic_model,
@@ -96,14 +97,8 @@ def configure_training(
         metrics=metrics_builder())
 
   iterative_process = task_spec.iterative_process_builder(tff_model_fn)
-
-  @tff.tf_computation(tf.string)
-  def build_train_dataset_from_client_id(client_id):
-    client_dataset = stackoverflow_train.dataset_computation(client_id)
-    return train_preprocess_fn(client_dataset)
-
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-      build_train_dataset_from_client_id, iterative_process)
+      stackoverflow_train.dataset_computation, iterative_process)
   client_ids_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
           stackoverflow_train.client_ids,

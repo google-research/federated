@@ -59,8 +59,9 @@ def configure_training(
       batch_size=task_spec.client_batch_size,
       crop_shape=crop_shape,
       distort_image=distort_train_images)
-  input_spec = train_preprocess_fn.type_signature.result.element
 
+  cifar_train = cifar_train.preprocess(train_preprocess_fn)
+  input_spec = cifar_train.element_type_structure
   model_builder = functools.partial(
       resnet_models.create_resnet18,
       input_shape=crop_shape,
@@ -78,13 +79,8 @@ def configure_training(
 
   iterative_process = task_spec.iterative_process_builder(tff_model_fn)
 
-  @tff.tf_computation(tf.string)
-  def build_train_dataset_from_client_id(client_id):
-    client_dataset = cifar_train.dataset_computation(client_id)
-    return train_preprocess_fn(client_dataset)
-
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-      build_train_dataset_from_client_id, iterative_process)
+      cifar_train.dataset_computation, iterative_process)
   client_ids_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
           cifar_train.client_ids,

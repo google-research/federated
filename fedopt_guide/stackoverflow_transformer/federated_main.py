@@ -160,15 +160,15 @@ def run_federated(iterative_process_builder: Callable[
         keras_metrics.NumTokensCounter(masked_tokens=[pad_token])
     ]
 
-  train_dataset_preprocess_comp = stackoverflow_word_prediction.create_preprocess_fn(
+  preprocess_fn = stackoverflow_word_prediction.create_preprocess_fn(
       vocab=stackoverflow_word_prediction.create_vocab(vocab_size),
       num_oov_buckets=num_oov_buckets,
       client_batch_size=client_batch_size,
       client_epochs_per_round=client_epochs_per_round,
       max_sequence_length=sequence_length,
       max_elements_per_client=max_elements_per_user)
-
-  input_spec = train_dataset_preprocess_comp.type_signature.result.element
+  train_clientdata = train_clientdata.preprocess(preprocess_fn)
+  input_spec = train_clientdata.element_type_structure
 
   def tff_model_fn() -> tff.learning.Model:
     return tff.learning.from_keras_model(
@@ -185,32 +185,17 @@ def run_federated(iterative_process_builder: Callable[
   iterative_process = iterative_process_builder(
       tff_model_fn, client_weight_fn=client_weight_fn)
 
-  if hasattr(train_clientdata, 'dataset_computation'):
-
-    @tff.tf_computation(tf.string)
-    def train_dataset_computation(client_id):
-      client_train_data = train_clientdata.dataset_computation(client_id)
-      return train_dataset_preprocess_comp(client_train_data)
-
-    training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-        train_dataset_computation, iterative_process)
-    client_ids_fn = functools.partial(
-        tff.simulation.build_uniform_sampling_fn(
-            train_clientdata.client_ids,
-            replace=False,
-            random_seed=client_datasets_random_seed),
-        size=clients_per_round)
-    # We convert the output to a list (instead of an np.ndarray) so that it can
-    # be used as input to the iterative process.
-    client_sampling_fn = lambda x: list(client_ids_fn(x))
-  else:
-    training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-        train_dataset_preprocess_comp, iterative_process)
-    client_sampling_fn = functools.partial(
-        tff.simulation.build_uniform_sampling_fn(
-            dataset=train_clientdata.client_ids,
-            random_seed=client_datasets_random_seed),
-        size=clients_per_round)
+  training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
+      train_clientdata.dataset_computation, iterative_process)
+  client_ids_fn = functools.partial(
+      tff.simulation.build_uniform_sampling_fn(
+          train_clientdata.client_ids,
+          replace=False,
+          random_seed=client_datasets_random_seed),
+      size=clients_per_round)
+  # We convert the output to a list (instead of an np.ndarray) so that it can
+  # be used as input to the iterative process.
+  client_sampling_fn = lambda x: list(client_ids_fn(x))
 
   training_process.get_model_weights = iterative_process.get_model_weights
 

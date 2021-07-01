@@ -273,6 +273,8 @@ class CentralizedDatasetTest(tf.test.TestCase):
         return_value=sample_ds)
 
     mock_validation = mock.create_autospec(tff.simulation.datasets.ClientData)
+    mock_validation.create_tf_dataset_from_all_clients = mock.Mock(
+        return_value=sample_ds)
 
     mock_test = mock.create_autospec(tff.simulation.datasets.ClientData)
     mock_test.create_tf_dataset_from_all_clients = mock.Mock(
@@ -292,13 +294,11 @@ class CentralizedDatasetTest(tf.test.TestCase):
         num_oov_buckets=1)
 
     # Assert the datasets are created via create_tf_dataset_from_all_clients.
-    # For the validation dataset, assert .take(10000) was called as well.
     mock_load_data.assert_called_once()
     self.assertEqual(mock_train.mock_calls,
                      mock.call.create_tf_dataset_from_all_clients().call_list())
-    self.assertEqual(
-        mock_validation.mock_calls,
-        mock.call.create_tf_dataset_from_all_clients().take(10000).call_list())
+    self.assertEqual(mock_validation.mock_calls,
+                     mock.call.create_tf_dataset_from_all_clients().call_list())
     self.assertEqual(mock_test.mock_calls,
                      mock.call.create_tf_dataset_from_all_clients().call_list())
 
