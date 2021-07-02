@@ -13,7 +13,7 @@
 # limitations under the License.
 """Data loader for Stack Overflow next-word-prediction tasks."""
 
-from typing import Callable, List, Tuple
+from typing import Callable, Mapping, List, Tuple
 
 import attr
 import numpy as np
@@ -64,7 +64,7 @@ def split_input_target(chunk: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
 def build_to_ids_fn(
     vocab: List[str],
     max_sequence_length: int,
-    num_oov_buckets: int = 1) -> Callable[[tf.Tensor], tf.Tensor]:
+    num_oov_buckets: int = 1) -> Callable[[Mapping[str, tf.Tensor]], tf.Tensor]:
   """Constructs function mapping examples to sequences of token indices."""
   special_tokens = get_special_tokens(len(vocab), num_oov_buckets)
   bos = special_tokens.bos
@@ -75,8 +75,7 @@ def build_to_ids_fn(
       tf.lookup.KeyValueTensorInitializer(vocab, table_values),
       num_oov_buckets=num_oov_buckets)
 
-  def to_ids(example):
-
+  def to_ids(example: Mapping[str, tf.Tensor]) -> tf.Tensor:
     sentence = tf.reshape(example['tokens'], shape=[1])
     words = tf.strings.split(sentence, sep=' ').values
     truncated_words = words[:max_sequence_length]
