@@ -1,8 +1,22 @@
-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
+
+py_binary(
+    name = "federated_trainer",
+    srcs = ["federated_trainer.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":fed_pa_schedule",
+        "//utils:task_utils",
+        "//utils:training_utils",
+        "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
+    ],
+)
 
 py_library(
     name = "fed_pa_schedule",

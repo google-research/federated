@@ -18,13 +18,13 @@ prerequisites please follow
 ## Running experiments
 
 Suppose we wish to train a convolutional network on EMNIST for purposes of
-character recognition (`emnist_cr`), using FedPA algorithm. Various aspects of
-the federated training procedure can be customized via `absl` flags. For
-example, from this directory one could run:
+handwriting recognition using the FedPA algorithm. Various aspects of the
+federated training procedure can be customized via `absl` flags. For example,
+from this directory one could run:
 
 ```bash
 bazel run main:federated_trainer -- \
-  --task=emnist_cr \
+  --task=emnist_digit \
   --total_rounds=1500 \
   --client_optimizer=sgd \
   --client_learning_rate=0.02 \

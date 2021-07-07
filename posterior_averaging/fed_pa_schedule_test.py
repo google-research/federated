@@ -22,7 +22,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from posterior_averaging.shared import fed_pa_schedule
+from posterior_averaging import fed_pa_schedule
 
 _Batch = collections.namedtuple('Batch', ['x', 'y'])
 
