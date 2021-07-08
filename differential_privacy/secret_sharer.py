@@ -16,6 +16,7 @@
 from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
+import scipy as sp
 import tensorflow as tf
 import tensorflow_federated as tff
 
@@ -127,3 +128,52 @@ def stackoverflow_with_secrets(
 
   return tff.simulation.datasets.TransformingClientData(
       stackoverflow_client_data, make_transform_fn)
+
+
+def generate_secrets(word_counts: Dict[str, int], secret_len: int,
+                     num_secrets: int) -> List[str]:
+  """Generates a list of secrets.
+
+  Each secret consists of `secret_len` tokens chosen independently from
+  the marginal distribution over tokens.
+
+  Args:
+    word_counts: A dict mapping string tokens to integer counts.
+    secret_len: The number of tokens in each secret.
+    num_secrets: The number of secrets to generate.
+
+  Returns:
+    A list of string secrets.
+  """
+  weights = np.array([float(c) for c in word_counts.values()])
+  weights /= sum(weights)
+  token_ids = np.random.choice(
+      len(word_counts), size=(num_secrets, secret_len), p=weights)
+  vocab = list(word_counts.keys())
+  return [
+      ' '.join([vocab[t] for t in token_ids[i, :]]) for i in range(num_secrets)
+  ]
+
+
+def compute_exposure(secrets: List[str], reference_secrets: List[str],
+                     get_perplexity: Callable[[str], float]) -> List[float]:
+  """Computes exposure of list of secrets using extrapolation method.
+
+  See Carlini et al., 2019 https://arxiv.org/pdf/1802.08232.pdf for details.
+
+  Args:
+    secrets: List of secrets to compute exposure of.
+    reference_secrets: List of reference secrets to estimate perplexity
+      distribution.
+    get_perplexity: A callable that returns the model's perplexity on a secret.
+
+  Returns:
+    A list of exposures of the same length as `secrets`.
+  """
+  perplexities_reference = [get_perplexity(s) for s in reference_secrets]
+  snormal_param = sp.stats.skewnorm.fit(perplexities_reference)
+
+  return [
+      -np.log2(sp.stats.skewnorm.cdf(get_perplexity(s), *snormal_param))
+      for s in secrets
+  ]
