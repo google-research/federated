@@ -48,8 +48,8 @@ py_binary(
     deps = [
         ":flars_fedavg",
         ":flars_optimizer",
+        "//utils:training_utils",
         "//utils:utils_impl",
-        "//utils/models:emnist_models",
         "//utils/optimizers:optimizer_utils",
     ],
 )
