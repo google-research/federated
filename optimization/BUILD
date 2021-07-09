@@ -52,36 +52,9 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":fed_avg_schedule",
-        "//optimization/tasks:cifar100",
-        "//optimization/tasks:emnist",
-        "//optimization/tasks:emnist_ae",
-        "//optimization/tasks:shakespeare",
-        "//optimization/tasks:stackoverflow_nwp",
-        "//optimization/tasks:stackoverflow_tp",
-        "//optimization/tasks:training_specs",
+        "//utils:task_utils",
+        "//utils:training_utils",
         "//utils:utils_impl",
         "//utils/optimizers:optimizer_utils",
-    ],
-)
-
-py_test(
-    name = "trainer_test",
-    size = "large",
-    srcs = ["trainer_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    tags = [
-        "manual",
-        "nokokoro",
-        "nopresubmit",
-    ],
-    deps = [
-        "//optimization/tasks:cifar100",
-        "//optimization/tasks:emnist",
-        "//optimization/tasks:emnist_ae",
-        "//optimization/tasks:shakespeare",
-        "//optimization/tasks:stackoverflow_nwp",
-        "//optimization/tasks:stackoverflow_tp",
-        "//optimization/tasks:training_specs",
     ],
 )

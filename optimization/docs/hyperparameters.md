@@ -31,59 +31,55 @@ Batch size                  | `client_batch_size`    | See table below
 
 **Default values**
 
-Task               | Clients per round | Batch size | Total rounds
------------------- | ----------------- | ---------- | ------------
-CIFAR-100          | 10                | 20         | 4000
-EMNIST AE          | 10                | 20         | 3000
-EMNIST CR          | 10                | 20         | 1500
-Shakespeare        | 10                | 4          | 1200
-Stack Overflow NWP | 50                | 16         | 1500
-Stack Overflow TP  | 10                | 100        | 1500
+Task                  | Clients per round | Batch size | Total rounds
+--------------------- | ----------------- | ---------- | ------------
+cifar100_image        | 10                | 20         | 4000
+emnist_autoencoder    | 10                | 20         | 3000
+emnist_character      | 10                | 20         | 1500
+shakespeare_character | 10                | 4          | 1200
+stackoverflow_word    | 50                | 16         | 1500
+stackoverflor_tag     | 10                | 100        | 1500
 
 ### Task-specific hyperparameters
 
 Next, we list task-specific hyperparameters, and the suggested starting values
 (which are set by default when running experiments).
 
-**CIFAR-100**
+**CIFAR-100 Image Classification**
 
-Hyperparameter  | Flag                 | Value
---------------- | -------------------- | -----
-Image crop size | `cifar100_crop_size` | 24
+Hyperparameter  | Flag                       | Value
+--------------- | -------------------------- | -----
+Image crop size | `cifar100_image_crop_size` | 24
 
-**EMNIST CR**
+**EMNIST Character Recognition**
 
-Hyperparameter | Flag              | Value
--------------- | ----------------- | -----
-Model type     | `emnist_cr_model` | cnn
+Hyperparameter | Flag                     | Value
+-------------- | ------------------------ | -----
+Model type     | `emnist_character_model` | cnn
 
-**Shakespeare**
+**Shakespeare Character Prediction**
 
-Hyperparameter            | Flag                          | Value
-------------------------- | ----------------------------- | -----
-Character sequence length | `shakespeare_sequence_length` | 80
+Hyperparameter            | Flag                                    | Value
+------------------------- | --------------------------------------- | -----
+Character sequence length | `shakespeare_character_sequence_length` | 80
 
 **Stack Overflow NWP**
 
-Hyperparameter                     | Flag                             | Value
----------------------------------- | -------------------------------- | -----
-Vocabulary size                    | `so_nwp_vocab_size`              | 10000
-Number of out-of-vocabulary tokens | `so_nwp_num_oov_buckets`         | 1
-Sequence length                    | `so_nwp_sequence_length`         | 20
-Validation set size                | `so_nwp_num_validation_examples` | 10000
-Max examples per client            | `so_nwp_max_elements_per_user`   | 1000
-Embedding layer size               | `so_nwp_embedding_size`          | 96
-LSTM layer size                    | `so_nwp_latent_size`             | 670
-Number of LSTM layers              | `so_nwp_num_layers`              | 1
+Hyperparameter          | Flag                                 | Value
+----------------------- | ------------------------------------ | -----
+Vocabulary size         | `stackoverflow_word_vocab_size`      | 10000
+Sequence length         | `stackoverflow_word_sequence_length` | 20
+Validation set size     | `num_validation_examples`            | 10000
+Max examples per client | `max_elements_per_user`              | 1000
 
 **Stack Overflow TP**
 
-Hyperparameter          | Flag                            | Value
------------------------ | ------------------------------- | -----
-Vocabulary size         | `so_tp_vocab_tokens_size`       | 10000
-Number of labels        | `so_tp_vocab_tags_size`         | 500
-Validation set size     | `so_tp_num_validation_examples` | 10000
-Max examples per client | `so_tp_max_elements_per_user`   | 1000
+Hyperparameter          | Flag                                | Value
+----------------------- | ----------------------------------- | -----
+Vocabulary size         | `stackoverflow_tag_word_vocab_size` | 10000
+Number of labels        | `stackoverflow_tag_tag_vocab_size`  | 500
+Validation set size     | `num_validation_examples`           | 10000
+Max examples per client | `max_elements_per_user`             | 1000
 
 ## Configuring optimizers
 
@@ -147,14 +143,14 @@ the best hyperparameters for each optimizer/task pair.
 
 ### Best optimizers for each task
 
-Task               | Best method(s)
------------------- | ----------------------------
-CIFAR-100          | FedYogi
-EMNIST AE          | FedYogi
-EMNIST CR          | FedAdam, FedYogi, FedAvgM
-Shakespeare        | FedAdagrad, FedYogi, FedAvgM
-Stack Overflow NWP | FedAdam, FedYogi
-Stack Overflow TP  | FedAdagrad
+Task                  | Best method(s)
+--------------------- | ----------------------------
+cifar100_image        | FedYogi
+emnist_autoencoder    | FedYogi
+emnist_character      | FedAdam, FedYogi, FedAvgM
+shakespeare_character | FedAdagrad, FedYogi, FedAvgM
+stackoverflow_word    | FedAdam, FedYogi
+stackoverflow_tag     | FedAdagrad
 
 In general, we found FedYogi to be the most consistently good optimizer.
 
@@ -166,36 +162,36 @@ base-10 log format (eg. instead of 0.001, we write -3).
 
 **Client learning rates**
 
-Fed...             | Adagrad | Adam | Yogi | AvgM | Avg
------------------- | ------- | ---- | ---- | ---- | ----
-CIFAR-100          | -1      | -1.5 | -1.5 | -1.5 | -1
-EMNIST AE          | 1.5     | 1    | 1    | 0.5  | 1
-EMNIST CR          | -1.5    | -1.5 | -1.5 | -1.5 | -1
-Shakespeare        | 0       | 0    | 0    | 0    | 0
-Stack Overflow NWP | -0.5    | -0.5 | -0.5 | -0.5 | -0.5
-Stack Overflow TP  | 2       | 2    | 2    | 2    | 2
+Fed...                | Adagrad | Adam | Yogi | AvgM | Avg
+--------------------- | ------- | ---- | ---- | ---- | ----
+cifar100_image        | -1      | -1.5 | -1.5 | -1.5 | -1
+emnist_autoencoder    | 1.5     | 1    | 1    | 0.5  | 1
+emnist_character      | -1.5    | -1.5 | -1.5 | -1.5 | -1
+shakespeare_character | 0       | 0    | 0    | 0    | 0
+stackoverflow_word    | -0.5    | -0.5 | -0.5 | -0.5 | -0.5
+stackoverflow_tag     | 2       | 2    | 2    | 2    | 2
 
 We see that in most cases, the client learning rate can be fixed at a
 task-level.
 
 **Server learning rates**
 
-Fed...             | Adagrad | Adam | Yogi | AvgM | Avg
------------------- | ------- | ---- | ---- | ---- | ---
-CIFAR-100          | -1      | 0    | 0    | 0    | 0.5
-EMNIST AE          | -1.5    | -1.5 | -1.5 | 0    | 0
-EMNIST CR          | -1      | -2.5 | -2.5 | -0.5 | 0
-Shakespeare        | -0.5    | -2   | -2   | -0.5 | 0
-Stack Overflow NWP | -1.5    | -2   | -2   | 0    | 0
-Stack Overflow TP  | 1       | -0.5 | -0.5 | 0    | 0
+Fed...                | Adagrad | Adam | Yogi | AvgM | Avg
+--------------------- | ------- | ---- | ---- | ---- | ---
+cifar100_image        | -1      | 0    | 0    | 0    | 0.5
+emnist_autoencoder    | -1.5    | -1.5 | -1.5 | 0    | 0
+shakespeare_character | -1      | -2.5 | -2.5 | -0.5 | 0
+shakespeare_character | -0.5    | -2   | -2   | -0.5 | 0
+stackoverflow_word    | -1.5    | -2   | -2   | 0    | 0
+stackoverflow_tag     | 1       | -0.5 | -0.5 | 0    | 0
 
 **Epsilon values**
 
-Fed...             | Adagrad | Adam | Yogi
------------------- | ------- | ---- | ----
-CIFAR-100          | -2      | -1   | -1
-EMNIST AE          | -3      | -3   | -3
-EMNIST CR          | -2      | -4   | -4
-Shakespeare        | -1      | -3   | -3
-Stack Overflow NWP | -4      | -5   | -5
-Stack Overflow TP  | -2      | -5   | -5
+Fed...                | Adagrad | Adam | Yogi
+--------------------- | ------- | ---- | ----
+cifar100_image        | -2      | -1   | -1
+emnist_autoencoder    | -3      | -3   | -3
+shakespeare_character | -2      | -4   | -4
+shakespeare_character | -1      | -3   | -3
+stackoverflow_word    | -4      | -5   | -5
+stackoverflow_tag     | -2      | -5   | -5
