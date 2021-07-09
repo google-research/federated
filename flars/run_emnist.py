@@ -84,7 +84,7 @@ def _run_experiment():
       num_epochs=FLAGS.client_epochs_per_round, batch_size=FLAGS.batch_size)
   emnist_task = tff.simulation.baselines.emnist.create_character_recognition_task(
       train_client_spec,
-      model_id=tff.simulation.baselines.emnist.DigitRecognitionModel.CNN,
+      model_id=tff.simulation.baselines.emnist.CharacterRecognitionModel.CNN,
       only_digits=FLAGS.digit_only_emnist)
 
   client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')

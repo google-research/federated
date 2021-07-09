@@ -151,7 +151,7 @@ def run_experiment():
 
   emnist_task = tff.simulation.baselines.emnist.create_character_recognition_task(
       train_client_spec,
-      model_id=tff.simulation.baselines.emnist.DigitRecognitionModel.CNN,
+      model_id=tff.simulation.baselines.emnist.CharacterRecognitionModel.CNN,
       only_digits=FLAGS.only_digits)
 
   # Build optimizer functions from flags
