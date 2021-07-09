@@ -94,7 +94,7 @@ class TaskUtilsTest(tf.test.TestCase, parameterized.TestCase):
   @flagsaver.flagsaver
   def test_raises_on_nondefault_flags_for_multiple_tasks(self):
     FLAGS.task = 'emnist_autoencoder'
-    FLAGS.emnist_digit_only_digits = True
+    FLAGS.emnist_character_only_digits = True
     train_client_spec = tff.simulation.baselines.ClientSpec(
         num_epochs=1, batch_size=10)
     with self.assertRaises(ValueError):

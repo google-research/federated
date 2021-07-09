@@ -24,7 +24,7 @@ from this directory one could run:
 
 ```bash
 bazel run main:federated_trainer -- \
-  --task=emnist_digit \
+  --task=emnist_character \
   --total_rounds=1500 \
   --client_optimizer=sgd \
   --client_learning_rate=0.02 \

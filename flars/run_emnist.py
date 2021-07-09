@@ -82,7 +82,7 @@ def _run_experiment():
   """Data preprocessing and experiment execution."""
   train_client_spec = tff.simulation.baselines.ClientSpec(
       num_epochs=FLAGS.client_epochs_per_round, batch_size=FLAGS.batch_size)
-  emnist_task = tff.simulation.baselines.emnist.create_digit_recognition_task(
+  emnist_task = tff.simulation.baselines.emnist.create_character_recognition_task(
       train_client_spec,
       model_id=tff.simulation.baselines.emnist.DigitRecognitionModel.CNN,
       only_digits=FLAGS.digit_only_emnist)

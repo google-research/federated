@@ -25,8 +25,8 @@ TASK_CONSTRUCTORS = {
         tff.simulation.baselines.cifar100.create_image_classification_task,
     'emnist_autoencoder':
         tff.simulation.baselines.emnist.create_autoencoder_task,
-    'emnist_digit':
-        tff.simulation.baselines.emnist.create_digit_recognition_task,
+    'emnist_character':
+        tff.simulation.baselines.emnist.create_character_recognition_task,
     'shakespeare_character':
         tff.simulation.baselines.shakespeare.create_character_prediction_task,
     'stackoverflow_tag':

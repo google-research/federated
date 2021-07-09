@@ -33,7 +33,7 @@ def create_scalar_metrics():
 def create_task():
   train_client_spec = tff.simulation.baselines.ClientSpec(
       num_epochs=1, batch_size=10, shuffle_buffer_size=1)
-  return tff.simulation.baselines.emnist.create_digit_recognition_task(
+  return tff.simulation.baselines.emnist.create_autoencoder_task(
       train_client_spec, use_synthetic_data=True)
 
 
