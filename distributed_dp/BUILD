@@ -122,8 +122,7 @@ py_binary(
     srcs_version = "PY3",
     deps = [
         ":fl_utils",
-        "//optimization/tasks:stackoverflow_tp",
-        "//optimization/tasks:training_specs",
+        "//utils:training_utils",
         "//utils:utils_impl",
         "//utils/optimizers:optimizer_utils",
     ],
