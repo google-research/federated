@@ -13,19 +13,23 @@
 # limitations under the License.
 """Runs federated training with differential privacy on various tasks."""
 
+import collections
+import functools
 import pprint
-from typing import Callable
 
 from absl import app
 from absl import flags
 from absl import logging
+import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from differential_privacy import stackoverflow_nwp_with_secrets
-from optimization.tasks import training_specs
+from differential_privacy import secret_sharer
+from utils import task_utils
 from utils import training_utils
 from utils import utils_impl
+from utils.datasets import stackoverflow_word_prediction
+from utils.models import stackoverflow_models
 from utils.optimizers import optimizer_utils
 
 with utils_impl.record_hparam_flags() as optimizer_flags:
@@ -42,6 +46,10 @@ with utils_impl.record_hparam_flags() as shared_flags:
                        'How many clients to sample per round.')
   flags.DEFINE_integer('client_datasets_random_seed', 1,
                        'Random seed for client sampling.')
+  flags.DEFINE_integer(
+      'max_elements_per_client', None, 'Maximum number of '
+      'elements for each training client. If set to None, all '
+      'available examples are used.')
 
   # Training loop configuration
   flags.DEFINE_integer('total_rounds', 1500, 'Number of total training rounds.')
@@ -55,6 +63,10 @@ with utils_impl.record_hparam_flags() as shared_flags:
       'How often to evaluate the global model on the validation dataset.')
   flags.DEFINE_integer('rounds_per_checkpoint', 50,
                        'How often to checkpoint the global model.')
+  flags.DEFINE_integer(
+      'num_validation_examples', -1, 'The number of validation'
+      'examples to use. If set to -1, all available examples '
+      'are used.')
 
 with utils_impl.record_hparam_flags() as dp_flags:
   # Differential privacy flags
@@ -92,6 +104,12 @@ with utils_impl.record_hparam_flags() as secrets_flags:
   flags.DEFINE_integer(
       'num_reference_secrets', 65536, 'Number of reference secrets for '
       'computing exposure by extrapolation.')
+  flags.DEFINE_integer('secret_seed', 0,
+                       'Random seed for generating and inserting secrets.')
+
+# Task specification
+with utils_impl.record_hparam_flags() as task_flags:
+  task_utils.define_task_flags()
 
 FLAGS = flags.FLAGS
 
@@ -133,6 +151,63 @@ def parse_secret_group_info():
   return secret_group_info
 
 
+def _write_hparam_flags():
+  """Returns an ordered dictionary of pertinent hyperparameter flags."""
+  hparam_dict = utils_impl.lookup_flag_values(shared_flags)
+
+  # Update with optimizer flags corresponding to the chosen optimizers.
+  opt_flag_dict = utils_impl.lookup_flag_values(optimizer_flags)
+  opt_flag_dict = optimizer_utils.remove_unused_flags('client', opt_flag_dict)
+  opt_flag_dict = optimizer_utils.remove_unused_flags('server', opt_flag_dict)
+  hparam_dict.update(opt_flag_dict)
+
+
+def make_aggregation_factory():
+  """Constructs aggregation factory from flags."""
+  if FLAGS.noise_multiplier is None:
+    if FLAGS.uniform_weighting:
+      aggregation_factory = tff.aggregators.UnweightedMeanFactory()
+    else:
+      aggregation_factory = tff.aggregators.MeanFactory()
+    if FLAGS.clip is not None:
+      if FLAGS.clip <= 0:
+        raise ValueError('clip must be positive if clipping is enabled.')
+      if FLAGS.adaptive_clip_learning_rate is None:
+        clip = FLAGS.clip
+      else:
+        if FLAGS.adaptive_clip_learning_rate <= 0:
+          raise ValueError('adaptive_clip_learning_rate must be positive if '
+                           'adaptive clipping is enabled.')
+        clip = tff.aggregators.PrivateQuantileEstimationProcess.no_noise(
+            initial_estimate=FLAGS.clip,
+            target_quantile=FLAGS.target_unclipped_quantile,
+            learning_rate=FLAGS.adaptive_clip_learning_rate)
+      return tff.aggregators.clipping_factory(clip, aggregation_factory)
+  else:
+    if not FLAGS.uniform_weighting:
+      raise ValueError(
+          'Differential privacy is only implemented for uniform weighting.')
+    if FLAGS.noise_multiplier <= 0:
+      raise ValueError('noise_multiplier must be positive if DP is enabled.')
+    if FLAGS.clip is None or FLAGS.clip <= 0:
+      raise ValueError('clip must be positive if DP is enabled.')
+    if FLAGS.adaptive_clip_learning_rate is None:
+      return tff.aggregators.DifferentiallyPrivateFactory.gaussian_fixed(
+          noise_multiplier=FLAGS.noise_multiplier,
+          clients_per_round=FLAGS.clients_per_round,
+          clip=FLAGS.clip)
+    else:
+      if FLAGS.adaptive_clip_learning_rate <= 0:
+        raise ValueError('adaptive_clip_learning_rate must be positive if '
+                         'adaptive clipping is enabled.')
+      return tff.aggregators.DifferentiallyPrivateFactory.gaussian_adaptive(
+          noise_multiplier=FLAGS.noise_multiplier,
+          clients_per_round=FLAGS.clients_per_round,
+          initial_l2_norm_clip=FLAGS.clip,
+          target_unclipped_quantile=FLAGS.target_unclipped_quantile,
+          learning_rate=FLAGS.adaptive_clip_learning_rate)
+
+
 def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Expected no command-line arguments, '
@@ -141,116 +216,126 @@ def main(argv):
   client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
   server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
 
-  def iterative_process_builder(
-      model_fn: Callable[[], tff.learning.Model],
-  ) -> tff.templates.IterativeProcess:
-    """Creates an iterative process using a given TFF `model_fn`.
+  model_builder = functools.partial(
+      stackoverflow_models.create_recurrent_model,
+      vocab_size=FLAGS.stackoverflow_word_vocab_size,
+      num_oov_buckets=FLAGS.stackoverflow_word_num_out_of_vocab_buckets)
 
-    Args:
-      model_fn: A no-arg function returning a `tff.learning.Model`.
+  train_client_spec = tff.simulation.baselines.ClientSpec(
+      num_epochs=FLAGS.client_epochs_per_round,
+      batch_size=FLAGS.client_batch_size,
+      max_elements=FLAGS.max_elements_per_client)
+  task = tff.simulation.baselines.stackoverflow.create_word_prediction_task(
+      train_client_spec, vocab_size=FLAGS.stackoverflow_word_vocab_size)
 
-    Returns:
-      A `tff.templates.IterativeProcess`.
-    """
+  logging.info('Trainable weights:')
+  for weight in task.model_fn().weights.trainable:
+    logging.info('name: %s  shape: %s', weight.name, weight.shape)
 
-    logging.info('Trainable weights:')
-    for weight in model_fn().weights.trainable:
-      logging.info('name: %s  shape: %s', weight.name, weight.shape)
+  if FLAGS.uniform_weighting:
+    client_weighting = tff.learning.ClientWeighting.UNIFORM
+  else:
 
-    if FLAGS.uniform_weighting:
-      client_weighting = tff.learning.ClientWeighting.UNIFORM
-    else:
+    def client_weighting(local_outputs):
+      return tf.cast(tf.squeeze(local_outputs['num_tokens']), tf.float32)
 
-      def client_weighting(local_outputs):
-        return tf.cast(tf.squeeze(local_outputs['num_tokens']), tf.float32)
+    aggregation_factory = make_aggregation_factory()
 
-    if FLAGS.noise_multiplier is None:
-      if FLAGS.uniform_weighting:
-        aggregation_factory = tff.aggregators.UnweightedMeanFactory()
-      else:
-        aggregation_factory = tff.aggregators.MeanFactory()
-      if FLAGS.clip is not None:
-        if FLAGS.clip <= 0:
-          raise ValueError('clip must be positive if clipping is enabled.')
-        if FLAGS.adaptive_clip_learning_rate is None:
-          clip = FLAGS.clip
-        else:
-          if FLAGS.adaptive_clip_learning_rate <= 0:
-            raise ValueError('adaptive_clip_learning_rate must be positive if '
-                             'adaptive clipping is enabled.')
-          clip = tff.aggregators.PrivateQuantileEstimationProcess.no_noise(
-              initial_estimate=FLAGS.clip,
-              target_quantile=FLAGS.target_unclipped_quantile,
-              learning_rate=FLAGS.adaptive_clip_learning_rate)
-        aggregation_factory = tff.aggregators.clipping_factory(
-            clip, aggregation_factory)
-    else:
-      if not FLAGS.uniform_weighting:
-        raise ValueError(
-            'Differential privacy is only implemented for uniform weighting.')
-      if FLAGS.noise_multiplier <= 0:
-        raise ValueError('noise_multiplier must be positive if DP is enabled.')
-      if FLAGS.clip is None or FLAGS.clip <= 0:
-        raise ValueError('clip must be positive if DP is enabled.')
-      if FLAGS.adaptive_clip_learning_rate is None:
-        aggregation_factory = tff.aggregators.DifferentiallyPrivateFactory.gaussian_fixed(
-            noise_multiplier=FLAGS.noise_multiplier,
-            clients_per_round=FLAGS.clients_per_round,
-            clip=FLAGS.clip)
-      else:
-        if FLAGS.adaptive_clip_learning_rate <= 0:
-          raise ValueError('adaptive_clip_learning_rate must be positive if '
-                           'adaptive clipping is enabled.')
-        aggregation_factory = tff.aggregators.DifferentiallyPrivateFactory.gaussian_adaptive(
-            noise_multiplier=FLAGS.noise_multiplier,
-            clients_per_round=FLAGS.clients_per_round,
-            initial_l2_norm_clip=FLAGS.clip,
-            target_unclipped_quantile=FLAGS.target_unclipped_quantile,
-            learning_rate=FLAGS.adaptive_clip_learning_rate)
-
-    return tff.learning.build_federated_averaging_process(
-        model_fn=model_fn,
-        server_optimizer_fn=server_optimizer_fn,
-        client_weighting=client_weighting,
-        client_optimizer_fn=client_optimizer_fn,
-        model_update_aggregation_factory=aggregation_factory)
-
-  task_spec = training_specs.TaskSpec(
-      iterative_process_builder=iterative_process_builder,
-      client_epochs_per_round=FLAGS.client_epochs_per_round,
-      client_batch_size=FLAGS.client_batch_size,
-      clients_per_round=FLAGS.clients_per_round,
-      client_datasets_random_seed=FLAGS.client_datasets_random_seed)
+  training_process = tff.learning.build_federated_averaging_process(
+      model_fn=task.model_fn,
+      server_optimizer_fn=server_optimizer_fn,
+      client_weighting=client_weighting,
+      client_optimizer_fn=client_optimizer_fn,
+      model_update_aggregation_factory=aggregation_factory)
 
   secret_group_info = parse_secret_group_info()
-  logging.info('Parsed secret config: %s', secret_group_info)
 
-  runner_spec = stackoverflow_nwp_with_secrets.configure_training(
-      task_spec,
-      secret_len=FLAGS.secret_len,
-      secret_group_info=secret_group_info,
-      num_secrets_per_group=FLAGS.num_secrets_per_group,
-      num_reference_secrets=FLAGS.num_reference_secrets)
+  num_train_secrets = len(secret_group_info) * FLAGS.num_secrets_per_group
+  word_counts = tff.simulation.datasets.stackoverflow.load_word_counts(
+      FLAGS.stackoverflow_word_vocab_size)
+  secrets = secret_sharer.generate_secrets(
+      word_counts, FLAGS.secret_len,
+      num_train_secrets + FLAGS.num_reference_secrets)
+  expanded_secret_group_info = []
+  for config in secret_group_info:
+    expanded_secret_group_info.extend([config] * FLAGS.num_secrets_per_group)
+  train_secrets = collections.OrderedDict(
+      zip(secrets[:num_train_secrets], expanded_secret_group_info))
 
-  def round_end_evaluation_fn(state, round_num):
-    if round_num % FLAGS.rounds_per_eval == 0:
-      validation_metrics = runner_spec.validation_fn(state, round_num)
-    else:
-      validation_metrics = {}
-    return validation_metrics
+  train_data = secret_sharer.stackoverflow_with_secrets(
+      task.datasets.train_data, train_secrets, FLAGS.secret_seed)
+  vocab = stackoverflow_word_prediction.create_vocab(
+      FLAGS.stackoverflow_word_vocab_size)
+  to_ids_fn = stackoverflow_word_prediction.build_to_ids_fn(
+      vocab=vocab,
+      max_sequence_length=FLAGS.secret_len,
+      num_oov_buckets=FLAGS.stackoverflow_word_num_out_of_vocab_buckets)
+  train_preprocess_fn = stackoverflow_word_prediction.create_preprocess_fn(
+      vocab=vocab,
+      num_oov_buckets=FLAGS.stackoverflow_word_num_out_of_vocab_buckets,
+      client_batch_size=FLAGS.client_batch_size,
+      client_epochs_per_round=FLAGS.client_epochs_per_round,
+      max_sequence_length=FLAGS.stackoverflow_word_sequence_length,
+      max_elements_per_client=FLAGS.max_elements_per_client)
+  train_data = train_data.preprocess(train_preprocess_fn)
+  training_process = (
+      tff.simulation.compose_dataset_computation_with_iterative_process(
+          train_data.dataset_computation, training_process))
+
+  client_selection_fn = functools.partial(
+      tff.simulation.build_uniform_sampling_fn(
+          train_data.client_ids, random_seed=FLAGS.client_datasets_random_seed),
+      size=FLAGS.clients_per_round)
+  validation_fn = training_utils.create_validation_fn(
+      task,
+      validation_frequency=FLAGS.rounds_per_eval,
+      num_validation_examples=FLAGS.num_validation_examples)
+
+  def validation_fn_from_state(state, round_num):
+    return validation_fn(state.model, round_num)
 
   checkpoint_manager, metrics_managers = training_utils.configure_managers(
       FLAGS.root_output_dir, FLAGS.experiment_name, FLAGS.rounds_per_checkpoint)
 
+  _write_hparam_flags()
+
   state = tff.simulation.run_simulation(
-      process=runner_spec.iterative_process,
-      client_selection_fn=runner_spec.client_datasets_fn,
+      process=training_process,
+      client_selection_fn=client_selection_fn,
       total_rounds=FLAGS.total_rounds,
-      validation_fn=round_end_evaluation_fn,
+      validation_fn=validation_fn_from_state,
       file_checkpoint_manager=checkpoint_manager,
       metrics_managers=metrics_managers)
 
-  test_metrics = runner_spec.test_fn(state)
+  orig_test_fn = training_utils.create_test_fn(task)
+
+  def test_fn(model_weights):
+    """Computes standard eval metrics and adds exposure of all secrets."""
+    test_metric_dict = orig_test_fn(model_weights)
+    prediction_model = model_builder()
+    model_weights.assign_weights_to(prediction_model)
+    prediction_model.compile(loss=tf.keras.losses.CategoricalCrossentropy())
+    cce = tf.keras.losses.SparseCategoricalCrossentropy(
+        reduction=tf.keras.losses.Reduction.NONE)
+
+    def get_perplexity(secret):
+      ids = to_ids_fn({'tokens': tf.convert_to_tensor(secret)})
+      prediction = prediction_model.predict(ids[:-1])
+      return np.mean(cce(ids[1:], prediction))
+
+    exposures = secret_sharer.compute_exposure(
+        secrets=secrets[:num_train_secrets],
+        reference_secrets=secrets[num_train_secrets:],
+        get_perplexity=get_perplexity)
+    for i, exposure in enumerate(exposures):
+      group_info = secret_group_info[i // FLAGS.num_secrets_per_group]
+      j = i % FLAGS.num_secrets_per_group
+      metric_name = f'exposure_{group_info[0]}_{group_info[1]}_{j}'
+      test_metric_dict[metric_name] = exposure
+
+    return test_metric_dict
+
+  test_metrics = test_fn(state.model)
 
   logging.info('Test metrics:\n %s', pprint.pformat(test_metrics))
 

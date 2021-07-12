@@ -10,10 +10,12 @@ py_binary(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
-        ":stackoverflow_nwp_with_secrets",
-        "//optimization/tasks:training_specs",
+        ":secret_sharer",
+        "//utils:task_utils",
         "//utils:training_utils",
         "//utils:utils_impl",
+        "//utils/datasets:stackoverflow_word_prediction",
+        "//utils/models:stackoverflow_models",
         "//utils/optimizers:optimizer_utils",
     ],
 )
@@ -43,17 +45,4 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [":secret_sharer"],
-)
-
-py_library(
-    name = "stackoverflow_nwp_with_secrets",
-    srcs = ["stackoverflow_nwp_with_secrets.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":secret_sharer",
-        "//optimization/tasks:training_specs",
-        "//utils:keras_metrics",
-        "//utils/datasets:stackoverflow_word_prediction",
-        "//utils/models:stackoverflow_models",
-    ],
 )
