@@ -24,6 +24,7 @@ from reconstruction.shared import federated_trainer_utils
 from reconstruction.stackoverflow import models
 from reconstruction.stackoverflow import stackoverflow_dataset
 from utils import keras_metrics
+from utils import training_utils
 from utils.datasets import stackoverflow_word_prediction
 
 
@@ -272,7 +273,7 @@ def run_federated(
       validation_metrics = {}
     return validation_metrics
 
-  checkpoint_manager, metrics_managers = federated_trainer_utils.configure_managers(
+  checkpoint_manager, metrics_managers = training_utils.configure_managers(
       root_output_dir, experiment_name, rounds_per_checkpoint)
 
   logging.info('Starting training loop.')

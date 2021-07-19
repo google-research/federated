@@ -21,6 +21,7 @@ from typing import Callable, List, Tuple
 from absl import app
 from absl import flags
 from absl import logging
+import tensorflow as tf
 import tensorflow_federated as tff
 
 from distributed_dp import fl_utils
@@ -89,15 +90,15 @@ def _configure_managers() -> Tuple[tff.simulation.FileCheckpointManager,
   """Configures checkpoint and metrics managers from flags."""
   root_output_dir = FLAGS.root_output_dir
   experiment_name = FLAGS.experiment_name
-  utils_impl.create_directory_if_not_exists(root_output_dir)
+  tf.io.gfile.makedirs(root_output_dir)
 
   checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
-  utils_impl.create_directory_if_not_exists(checkpoint_dir)
+  tf.io.gfile.makedirs(checkpoint_dir)
   checkpoint_manager = tff.simulation.FileCheckpointManager(
       checkpoint_dir, step=FLAGS.rounds_per_checkpoint)
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
-  utils_impl.create_directory_if_not_exists(results_dir)
+  tf.io.gfile.makedirs(results_dir)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
   csv_manager = tff.simulation.CSVMetricsManager(csv_file)
 

@@ -25,18 +25,9 @@ import tempfile
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Union
 
 from absl import flags
-from absl import logging
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-
-
-def create_directory_if_not_exists(path: str):
-  """Creates a directory if it does not already exist."""
-  try:
-    tf.io.gfile.makedirs(path)
-  except tf.errors.OpError:
-    logging.info('Skipping creation of directory [%s], already exists', path)
 
 
 def iter_grid(

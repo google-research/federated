@@ -75,7 +75,7 @@ def write_hparams_to_csv(hparam_dict: Dict[str, Any], root_output_dir: str,
     experiment_name: A unique identifier for the current training simulation.
   """
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
-  utils_impl.create_directory_if_not_exists(results_dir)
+  tf.io.gfile.makedirs(results_dir)
   hparam_file = os.path.join(results_dir, 'hparams.csv')
   utils_impl.atomic_write_series_to_csv(hparam_dict, hparam_file)
 

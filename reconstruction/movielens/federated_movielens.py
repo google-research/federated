@@ -23,6 +23,7 @@ import tensorflow_federated as tff
 from reconstruction.movielens import models
 from reconstruction.movielens import movielens_dataset
 from reconstruction.shared import federated_trainer_utils
+from utils import training_utils
 
 
 def run_federated(
@@ -257,7 +258,7 @@ def run_federated(
       validation_metrics = {}
     return validation_metrics
 
-  checkpoint_manager, metrics_managers = federated_trainer_utils.configure_managers(
+  checkpoint_manager, metrics_managers = training_utils.configure_managers(
       root_output_dir, experiment_name, rounds_per_checkpoint)
 
   logging.info('Starting training loop.')

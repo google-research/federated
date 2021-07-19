@@ -297,7 +297,7 @@ def _write_hparam_flags():
 
   results_dir = os.path.join(FLAGS.root_output_dir, 'results',
                              FLAGS.experiment_name)
-  utils_impl.create_directory_if_not_exists(results_dir)
+  tf.io.gfile.makedirs(results_dir)
   hparam_file = os.path.join(results_dir, 'hparams.csv')
   utils_impl.atomic_write_series_to_csv(hparam_dict, hparam_file)
 

@@ -51,5 +51,6 @@ py_library(
         ":models",
         ":movielens_dataset",
         "//reconstruction/shared:federated_trainer_utils",
+        "//utils:training_utils",
     ],
 )
