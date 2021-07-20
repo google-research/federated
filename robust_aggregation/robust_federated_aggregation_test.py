@@ -68,9 +68,9 @@ class DummyClientComputation(tff.learning.framework.ClientDeltaFn):
       client_weight_fn: Optional argument is ignored
     """
     del client_weight_fn
-    self._model = tff.learning.framework.enhance(model)
-    if not isinstance(self._model, tff.learning.framework.EnhancedModel):
-      raise TypeError('Expected `int`, found {}.'.format(type(self._model)))
+    if not isinstance(model, tff.learning.Model):
+      raise TypeError('Expected `int`, found {}.'.format(type(model)))
+    self._model = model
     self._client_weight_fn = None
 
   @property

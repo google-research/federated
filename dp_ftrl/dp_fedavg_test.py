@@ -346,7 +346,7 @@ def _server_init(model: tff.learning.Model,
                  optimizer: optimizer_utils.ServerOptimizerBase):
   """Returns initial `ServerState`."""
   return dp_fedavg.ServerState(
-      model=model.weights,
+      model=tff.learning.ModelWeights.from_model(model),
       round_num=0,
       optimizer_state=optimizer.init_state(),
       dp_clip_norm=1000)
@@ -379,7 +379,7 @@ class ServerTest(tf.test.TestCase):
 
 def _initialize_optimizer_vars(model, optimizer):
   """Creates optimizer variables to assign the optimizer's state."""
-  model_weights = model.weights
+  model_weights = tff.learning.ModelWeights.from_model(model)
   model_delta = tf.nest.map_structure(tf.zeros_like, model_weights.trainable)
   # Create zero gradients to force an update that doesn't modify.
   # Force eagerly constructing the optimizer variables. Normally Keras lazily
@@ -416,7 +416,8 @@ class ClientTest(tf.test.TestCase, parameterized.TestCase):
       optimizer = optimizer_fn()
       _initialize_optimizer_vars(model, optimizer)
       server_message = dp_fedavg.BroadcastMessage(
-          model_weights=model.weights, dp_clip_norm=clip_norm)
+          model_weights=tff.learning.ModelWeights.from_model(model),
+          dp_clip_norm=clip_norm)
       outputs = dp_fedavg.client_update(model, client_data(), server_message,
                                         optimizer, simulation_flag)
       losses.append(outputs.model_output.numpy())
@@ -438,7 +439,8 @@ class ClientTest(tf.test.TestCase, parameterized.TestCase):
       optimizer = optimizer_fn()
       _initialize_optimizer_vars(model, optimizer)
       server_message = dp_fedavg.BroadcastMessage(
-          model_weights=model.weights, dp_clip_norm=clip_norm)
+          model_weights=tff.learning.ModelWeights.from_model(model),
+          dp_clip_norm=clip_norm)
       outputs = dp_fedavg.client_update(
           model,
           client_data(),
@@ -597,7 +599,8 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
     server_state = it_process.initialize()
 
     model = _create_rnn_model_fn()()
-    optimizer = server_optimizer_fn(model.weights.trainable)
+    model_weights = tff.learning.ModelWeights.from_model(model)
+    optimizer = server_optimizer_fn(model_weights.trainable)
 
     def server_state_update(state):
       return tff.structure.update_struct(
