@@ -6,7 +6,7 @@ results.
 ## Overview
 
 This directory contains the code for the paper "The Distributed Discrete
-Gaussian Mechanism for Federated Learning with Secure Aggregation".
+Gaussian Mechanism for Federated Learning with Secure Aggregation". ICML 2021.
 [[PDF](https://arxiv.org/pdf/2102.06387)][[arXiv](https://arxiv.org/abs/2102.06387)]
 
 ## Dependencies
@@ -22,10 +22,9 @@ Gaussian Mechanism for Federated Learning with Secure Aggregation".
 Run scripts:
 
 -   `dme_run.py`: Runs the distributed mean estimation experiment.
--   `fl_run_emnist.py`: Runs the FL experiment on
-    [Federated EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data).
--   `fl_run_solr.py`: Runs the FL experiment on
-    [StackOverflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data).
+-   `fl_run.py`: Runs the FL experiments on different tasks
+    -   [Federated EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data)
+    -   [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data)
 
 Shared modules:
 
@@ -49,7 +48,7 @@ Shared modules:
 There are two main components:
 
 -   Distributed Mean Estimation (`dme_run.py`)
--   Federated Learning (`fl_run_emnist.py`, `fl_run_solr.py`)
+-   Federated Learning (`fl_run.py`)
 
 ### Distributed Mean Estimation
 
@@ -87,13 +86,21 @@ python3 dme_merge_repeats.py /tmp/ddg_dme_outputs/my_test_run/
 
 ### Federated Learning
 
-1.  Update the parameter flags in `fl_run_emnist.py` and `fl_run_solr.py`
-    (Federated EMNIST and Stack Overflow Tag Prediction, respectively).
-2.  Execute the script to start training (using EMNIST as an example):
+Run the `fl_run.py` script to start training:
 
 ```
-bazel run :fl_run_emnist -- <flags>
+bazel run :fl_run -- <flags>
 ```
+
+The task flags are defined in the format of:
+
+```
+--task=<task_name> --<task_name>_<task_args1>=... --<task_name>_<task_args2>=...
+```
+
+where `task_name` is one of the options from `utils/task_utils.py`, and
+`task_args` are defined according to the task constructors at
+`tff.simulation.baselines.*`.
 
 The optimizer flags can be set as:
 
@@ -105,18 +112,26 @@ The optimizer flags can be set as:
 Example command to train on Federated EMNIST:
 
 ```
-bazel run :fl_run_emnist -- \
+bazel run :fl_run -- \
+    --task=emnist_character \
     --server_optimizer=sgd \
     --server_learning_rate=1 \
     --server_sgd_momentum=0.9 \
     --client_optimizer=sgd \
     --client_learning_rate=0.03 \
-    --experiment_name=my_test \
+    --client_batch_size=20 \
+    --experiment_name=my_emnist_test \
     --epsilon=10 \
     --l2_norm_clip=0.03 \
     --dp_mechanism=ddgauss \
     --logtostderr
 ```
+
+For Stack Overflow tasks, the following flags should also be set:
+
+-   `--num_validation_examples=10000`
+-   `--max_elements_per_client=256` (next word prediction)
+-   `--max_elements_per_client=1000` (tag prediction)
 
 Please refer to the paper for hyperparameter settings and set the flags
 accordingly. Note that the training scripts by default do not configure hardware

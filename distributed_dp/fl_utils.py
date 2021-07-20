@@ -87,36 +87,40 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
 
   clip, epsilon = dp_flags['l2_norm_clip'], dp_flags['epsilon']
   # No DP (but still do the clipping if necessary).
-  if epsilon is None:
+  if epsilon is None or epsilon == -1:
     agg_factory = tff.aggregators.UnweightedMeanFactory()
     if clip is not None:
       assert clip > 0, 'Norm clip must be positive.'
       agg_factory = tff.aggregators.clipping_factory(clip, agg_factory)
     logging.info('Using vanilla sum aggregation with clipping %s', clip)
-    return agg_factory
+    params_dict = {'clip': clip}
+    return agg_factory, params_dict
 
   # Parameters for DP
   assert epsilon > 0, f'Epsilon should be positive, found {epsilon}.'
   assert clip is not None and clip > 0, f'Clip must be positive, found {clip}.'
   sampling_rate = float(num_clients_per_round) / num_clients
-  delta = dp_flags['delta'] or 1.0 / num_clients  # Default to delta = 1 / n.
+  delta = dp_flags['delta'] or 1.0 / num_clients  # Default to delta = 1 / N.
+  mechanism = dp_flags['dp_mechanism'].lower()
   dim = get_total_dim(client_template)
 
-  logging.info('Shared DP Parameters:')
-  logging.info(
-      pprint.pformat({
-          'epsilon': epsilon,
-          'delta': delta,
-          'clip': clip,
-          'dim': dim,
-          'sampling_rate': sampling_rate,
-          'num_clients': num_clients,
-          'num_clients_per_round': num_clients_per_round,
-          'num_rounds': num_rounds
-      }))
+  params_dict = {
+      'epsilon': epsilon,
+      'delta': delta,
+      'clip': clip,
+      'dim': dim,
+      'sampling_rate': sampling_rate,
+      'mechanism': mechanism,
+      'num_clients': num_clients,
+      'num_clients_per_round': num_clients_per_round,
+      'num_rounds': num_rounds
+  }
 
-  # Baseline: continuous Gaussian
-  if dp_flags['dp_mechanism'] == 'gaussian':
+  logging.info('Shared DP Parameters:')
+  logging.info(pprint.pformat(params_dict))
+
+  # Baseline: continuous Gaussian.
+  if mechanism == 'gaussian':
     noise_mult = accounting_utils.get_gauss_noise_multiplier(
         target_eps=epsilon,
         target_delta=delta,
@@ -128,14 +132,15 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
         noise_multiplier=noise_mult,
         clients_per_round=num_clients_per_round,
         clip=clip)
+    gauss_params_dict = {'noise_mult': noise_mult}
     logging.info('Gaussian Parameters:')
-    logging.info({'noise_mult': noise_mult})
+    logging.info(gauss_params_dict)
+    params_dict.update(gauss_params_dict)
 
   # Distributed Discrete Gaussian
-  elif dp_flags['dp_mechanism'] == 'ddgauss':
+  elif mechanism == 'ddgauss':
     padded_dim = pad_dim(dim)
-
-    k_stddevs = compression_flags['k_stddevs'] or 2
+    k_stddevs = compression_flags['k_stddevs'] or 4
     beta = compression_flags['beta']
     bits = compression_flags['num_bits']
 
@@ -166,17 +171,24 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
         dimension=padded_dim,
         delta=delta)
 
+    central_stddev = local_stddev * np.sqrt(num_clients_per_round)
+    noise_mult_clip = central_stddev / clip
+
+    discrete_params_dict = {
+        'bits': bits,
+        'beta': beta,
+        'dim': dim,
+        'padded_dim': padded_dim,
+        'gamma': gamma,
+        'k_stddevs': k_stddevs,
+        'local_stddev': local_stddev,
+        'mechanism': mechanism,
+        'noise_mult_clip': noise_mult_clip,
+    }
+
     logging.info('DDGauss Parameters:')
-    logging.info(
-        pprint.pformat({
-            'bits': bits,
-            'beta': beta,
-            'dim': dim,
-            'padded_dim': padded_dim,
-            'gamma': gamma,
-            'k_stddevs': k_stddevs,
-            'local_stddev': local_stddev
-        }))
+    logging.info(pprint.pformat(discrete_params_dict))
+    params_dict.update(discrete_params_dict)
 
     # Build nested aggregators.
     agg_factory = tff.aggregators.SumFactory()
@@ -212,4 +224,4 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
   else:
     raise ValueError(f'Unsupported mechanism: {dp_flags["dp_mechanism"]}')
 
-  return agg_factory
+  return agg_factory, params_dict

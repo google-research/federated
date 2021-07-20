@@ -102,26 +102,13 @@ py_library(
 )
 
 py_binary(
-    name = "fl_run_emnist",
-    srcs = ["fl_run_emnist.py"],
+    name = "fl_run",
+    srcs = ["fl_run.py"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
         ":fl_utils",
-        "//optimization/tasks:emnist",
-        "//optimization/tasks:training_specs",
-        "//utils:utils_impl",
-        "//utils/optimizers:optimizer_utils",
-    ],
-)
-
-py_binary(
-    name = "fl_run_solr",
-    srcs = ["fl_run_solr.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        ":fl_utils",
+        "//utils:task_utils",
         "//utils:training_utils",
         "//utils:utils_impl",
         "//utils/optimizers:optimizer_utils",
