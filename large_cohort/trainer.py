@@ -297,7 +297,13 @@ def main(argv):
     validation_data = data_spec.validation_data
 
   # Create training artifacts
-  model_input_spec = data_spec.train_preprocess_fn.type_signature.result.element
+  @tff.tf_computation(tf.string)
+  def build_train_dataset_from_client_id(client_id):
+    raw_client_data = train_data.dataset_computation(client_id)
+    return data_spec.train_preprocess_fn(raw_client_data)
+
+  model_input_spec = (
+      build_train_dataset_from_client_id.type_signature.result.element)
 
   def model_fn() -> tff.learning.Model:
     return tff.learning.from_keras_model(
@@ -307,11 +313,6 @@ def main(argv):
         metrics=model_spec.metrics_builder())
 
   iterative_process = _create_iterative_process(model_fn)
-
-  @tff.tf_computation(tf.string)
-  def build_train_dataset_from_client_id(client_id):
-    raw_client_data = train_data.dataset_computation(client_id)
-    return data_spec.train_preprocess_fn(raw_client_data)
 
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
       build_train_dataset_from_client_id, iterative_process)
