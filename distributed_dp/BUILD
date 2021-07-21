@@ -39,6 +39,17 @@ py_test(
 )
 
 py_library(
+    name = "ddpquery_utils",
+    srcs = ["ddpquery_utils.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":accounting_utils",
+        ":compression_query",
+        ":distributed_discrete_gaussian_query",
+    ],
+)
+
+py_library(
     name = "discrete_gaussian_utils",
     srcs = ["discrete_gaussian_utils.py"],
 )
@@ -70,12 +81,7 @@ py_library(
     name = "dme_utils",
     srcs = ["dme_utils.py"],
     srcs_version = "PY3",
-    deps = [
-        ":accounting_utils",
-        ":compression_query",
-        ":distributed_discrete_gaussian_query",
-        ":modular_clipping_factory",
-    ],
+    deps = [":modular_clipping_factory"],
 )
 
 py_binary(
@@ -85,6 +91,7 @@ py_binary(
     srcs_version = "PY3",
     deps = [
         ":accounting_utils",
+        ":ddpquery_utils",
         ":dme_utils",
     ],
 )
@@ -95,8 +102,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":accounting_utils",
-        ":compression_query",
-        ":distributed_discrete_gaussian_query",
+        ":ddpquery_utils",
         ":modular_clipping_factory",
     ],
 )

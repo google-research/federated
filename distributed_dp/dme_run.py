@@ -22,14 +22,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
 import tensorflow as tf
+import tensorflow_privacy as tfp
 
-from distributed_dp.accounting_utils import get_ddgauss_gamma
-from distributed_dp.accounting_utils import get_ddgauss_noise_stddev
-from distributed_dp.accounting_utils import guass_noise_stddev_direct
-from distributed_dp.dme_utils import build_quantized_dp_query
-from distributed_dp.dme_utils import compute_dp_average
-from distributed_dp.dme_utils import generate_client_data
-from distributed_dp.dme_utils import get_dp_query
+from distributed_dp import accounting_utils
+from distributed_dp import ddpquery_utils
+from distributed_dp import dme_utils
 
 flags.DEFINE_boolean('show_plot', False, 'Whether to plot the results.')
 flags.DEFINE_boolean('print_output', False, 'Whether to print the outputs.')
@@ -37,8 +34,9 @@ flags.DEFINE_integer(
     'run_id', 1, 'ID of the run, useful for identifying '
     'the run when parallelizing this script.')
 flags.DEFINE_integer('repeat', 5, 'Number of times to repeat (sequentially).')
-flags.DEFINE_string('output_dir', '/tmp/ddg_dme_outputs', 'Output directory.')
+flags.DEFINE_string('output_dir', '/tmp/ddp_dme_outputs', 'Output directory.')
 flags.DEFINE_string('tag', '', 'Extra subfolder for the output result files.')
+flags.DEFINE_enum('mechanism', 'ddgauss', ['ddgauss'], 'DDP mechanism to use.')
 flags.DEFINE_float('norm', 10.0, 'Norm of the randomly generated vectors.')
 flags.DEFINE_integer(
     'k_stddevs', 2, 'Number of standard deviations of the '
@@ -51,26 +49,25 @@ FLAGS = flags.FLAGS
 
 
 def experiment(bits,
-               c,
+               clip,
                beta,
                client_data,
                epsilons,
                delta,
-               mechanism='distributed_dgauss',
+               mechanism,
                k_stddevs=2,
                sqrtn_norm_growth=False):
   """Run a distributed mean estimation experiment.
 
   Args:
     bits: A list of compression bits to use.
-    c: L2 norm bound.
+    clip: The initial L2 norm clip.
     beta: A hyperparameter controlling the concentration inequality for the
       probabilistic norm bound after randomized rounding.
     client_data: A Python list of `n` np.array vectors, each with shape (d,).
     epsilons: A list of target epsilon values for comparison (serve as x-axis).
     delta: The delta for approximate DP.
-    mechanism: A string specifying the mechanism to compare against continuous
-      Gaussian. Only supports "distributed_dgauss" for now.
+    mechanism: A string specifying the mechanism to compare against Gaussian.
     k_stddevs: The number of standard deviations to keep for modular clipping.
       Defaults to 2.
     sqrtn_norm_growth: Whether to assume the norm of the sum of the vectors grow
@@ -88,7 +85,7 @@ def experiment(bits,
   # Initial fixed params.
   num_clients = len(client_data)
   d = len(client_data[0])
-  padded_d = np.math.pow(2, np.ceil(np.log2(d)))
+  padded_dim = np.math.pow(2, np.ceil(np.log2(d)))
   client_template = tf.zeros_like(client_data[0])
 
   # `client_data` has shape (n, d).
@@ -97,77 +94,75 @@ def experiment(bits,
   # 1. Baseline: central continuous Gaussian.
   gauss_mse_list = []
   for eps in epsilons:
-    gauss_stddev = guass_noise_stddev_direct(eps, delta, c)
-    gauss_query = get_dp_query(
-        'gauss', l2_norm_bound=c, noise_scale=gauss_stddev)
-    gauss_avg_vector = compute_dp_average(
+    # Analytic Gaussian.
+    gauss_stddev = accounting_utils.analytic_gauss_stddev(eps, delta, clip)
+    gauss_query = tfp.GaussianSumQuery(l2_norm_clip=clip, stddev=gauss_stddev)
+    gauss_avg_vector = dme_utils.compute_dp_average(
         client_data, gauss_query, is_compressed=False, bits=None)
     gauss_mse_list.append(mse(gauss_avg_vector, true_avg_vector))
 
-  # 2. Distributed discrete Gaussian: try each `b` separately.
-  assert mechanism == 'distributed_dgauss', 'Only supports DDGauss for now.'
-  discrete_mse_list_per_bit = []
-  for b in bits:
+  # 2. Distributed DP: try each `b` separately.
+  ddp_mse_list_per_bit = []
+  for bit in bits:
     discrete_mse_list = []
-    for _, eps in enumerate(epsilons):
-      gamma = get_ddgauss_gamma(
-          q=1.0,
-          epsilon=eps,
-          l2_clip_norm=c,
-          bits=b,
-          num_clients=num_clients,
-          dimension=padded_d,
-          delta=delta,
-          beta=beta,
-          steps=1,
-          k=k_stddevs,
-          sqrtn_norm_growth=sqrtn_norm_growth)
+    for eps in epsilons:
+      if mechanism == 'ddgauss':
+        gamma, local_stddev = accounting_utils.ddgauss_params(
+            q=1,
+            epsilon=eps,
+            l2_clip_norm=clip,
+            bits=bit,
+            num_clients=num_clients,
+            dim=padded_dim,
+            delta=delta,
+            beta=beta,
+            steps=1,
+            k=k_stddevs,
+            sqrtn_norm_growth=sqrtn_norm_growth)
+        scale = 1.0 / gamma
+      else:
+        raise ValueError(f'Unsupported mechanism: {mechanism}')
 
-      local_stddev = get_ddgauss_noise_stddev(
-          q=1.0,
-          epsilon=eps,
-          l2_clip_norm=c,
-          gamma=gamma,
+      ddp_query = ddpquery_utils.build_ddp_query(
+          mechanism,
+          local_stddev,
+          l2_norm_bound=clip,
           beta=beta,
-          steps=1,
-          num_clients=num_clients,
-          dimension=padded_d,
-          delta=delta)
+          padded_dim=padded_dim,
+          scale=scale,
+          client_template=client_template)
 
-      distributed_query = build_quantized_dp_query(mechanism, c, padded_d,
-                                                   gamma, local_stddev, beta,
-                                                   client_template)
-      distributed_avg_vector = compute_dp_average(
-          client_data, distributed_query, is_compressed=True, bits=b)
+      distributed_avg_vector = dme_utils.compute_dp_average(
+          client_data, ddp_query, is_compressed=True, bits=bit)
       discrete_mse_list.append(mse(distributed_avg_vector, true_avg_vector))
 
-    discrete_mse_list_per_bit.append(discrete_mse_list)
+    ddp_mse_list_per_bit.append(discrete_mse_list)
 
   # Convert to np arrays and do some checks
   gauss_mse_list = np.array(gauss_mse_list)
-  discrete_mse_list_per_bit = np.array(discrete_mse_list_per_bit)
+  ddp_mse_list_per_bit = np.array(ddp_mse_list_per_bit)
 
   assert gauss_mse_list.shape == (len(epsilons),)
-  assert discrete_mse_list_per_bit.shape == (len(bits), len(epsilons))
+  assert ddp_mse_list_per_bit.shape == (len(bits), len(epsilons))
 
-  return gauss_mse_list, discrete_mse_list_per_bit
+  return gauss_mse_list, ddp_mse_list_per_bit
 
 
 def experiment_repeated(bits,
-                        c,
+                        clip,
                         beta,
                         client_data_list,
                         repeat,
                         epsilons,
                         delta,
-                        mechanism='distributed_dgauss',
+                        mechanism,
                         k_stddevs=2,
                         sqrtn_norm_growth=False):
   """Sequentially repeat the experiment (see `experiment()` for parameters)."""
   assert len(client_data_list) == repeat
   n, d = len(client_data_list[0]), len(client_data_list[0][0])
   print(f'Sequentially repeating the experiment {len(client_data_list)} times '
-        f'for n={n}, d={d}, mechanism={mechanism}, c={c}, bits={bits}, beta='
+        f'for n={n}, d={d}, mechanism={mechanism}, c={clip}, bits={bits}, beta='
         f'{beta:.3f}, eps={epsilons}, k={k_stddevs}, sng={sqrtn_norm_growth}')
 
   repeat_results = []
@@ -175,7 +170,7 @@ def experiment_repeated(bits,
     repeat_results.append(
         experiment(
             bits=bits,
-            c=c,
+            clip=clip,
             beta=beta,
             client_data=client_data,
             epsilons=epsilons,
@@ -184,17 +179,17 @@ def experiment_repeated(bits,
             k_stddevs=k_stddevs,
             sqrtn_norm_growth=sqrtn_norm_growth))
 
-  repeat_gauss_mse_list, repeat_ddgauss_mse_list_per_bit = zip(*repeat_results)
+  repeat_gauss_mse_list, repeat_ddp_mse_list_per_bit = zip(*repeat_results)
 
   repeat_gauss_mse_list = np.array(repeat_gauss_mse_list)
-  repeat_ddgauss_mse_list_per_bit = np.array(repeat_ddgauss_mse_list_per_bit)
+  repeat_ddp_mse_list_per_bit = np.array(repeat_ddp_mse_list_per_bit)
 
   assert len(repeat_results) == repeat
   assert repeat_gauss_mse_list.shape == (repeat, len(epsilons))
-  assert (repeat_ddgauss_mse_list_per_bit.shape == (repeat, len(bits),
-                                                    len(epsilons)))
+  assert (repeat_ddp_mse_list_per_bit.shape == (repeat, len(bits),
+                                                len(epsilons)))
 
-  return repeat_gauss_mse_list, repeat_ddgauss_mse_list_per_bit
+  return repeat_gauss_mse_list, repeat_ddp_mse_list_per_bit
 
 
 def mean_confidence_interval(data, confidence=0.95):
@@ -214,19 +209,20 @@ def plot_curve(subplot, epsilons, data, label):
 
 def main(_):
   """Run distributed mean estimation experiments."""
-  c = FLAGS.norm
+  clip = FLAGS.norm
   delta = 1e-5
-  mechanism = 'distributed_dgauss'
   use_log = True  # Whether to use log-scale for y-axis.
   k_stddevs = FLAGS.k_stddevs
   sqrtn_norm_growth = FLAGS.sqrtn_norm_growth
   repeat = FLAGS.repeat
 
   # Parallel subplots for different n=num_clients and d=dimension.
-  nd_zip = [(25, 100), (250, 250)]
+  nd_zip = [(100, 250), (1000, 250)]
+  # nd_zip = [(10000, 2000)]
 
   # Curves within a subplot.
-  bits = [10, 12, 16]
+  bits = [10, 12, 14, 16]
+  # bits = [14, 16, 18, 20]
 
   # X-axis: epsilons.
   epsilons = [0.75] + list(np.arange(1, 6.5, 0.5))
@@ -236,20 +232,21 @@ def main(_):
   results = []
   for j, (n, d) in enumerate(nd_zip):
     client_data_list = [
-        generate_client_data(d, n, l2_norm=c) for _ in range(repeat)
+        dme_utils.generate_client_data(d, n, l2_norm=clip)
+        for _ in range(repeat)
     ]
     beta = np.exp(-0.5)
 
     # Run experiment with repetition.
-    rep_gauss_mse_list, rep_ddgauss_mse_list_per_bit = experiment_repeated(
+    rep_gauss_mse_list, rep_ddp_mse_list_per_bit = experiment_repeated(
         bits,
-        c,
+        clip,
         beta,
         client_data_list,
         repeat,
         epsilons,
         delta,
-        mechanism=mechanism,
+        mechanism=FLAGS.mechanism,
         k_stddevs=k_stddevs,
         sqrtn_norm_growth=sqrtn_norm_growth)
 
@@ -260,17 +257,16 @@ def main(_):
       # Continuous Gaussian.
       plot_curve(
           subplot, epsilons, rep_gauss_mse_list, label='Continuous Gaussian')
-      # Distributed Discrete Gaussian.
-      for index, b in enumerate(bits):
+      # Distributed DP.
+      for index, bit in enumerate(bits):
         plot_curve(
             subplot,
             epsilons,
-            rep_ddgauss_mse_list_per_bit[:, index],
-            label=f'DDGauss (B = {b})')
-      subplot.set(
-          xlabel='Epsilon',
-          ylabel='MSE',
-          title=f'(n={n}, d={d}, k={k_stddevs})')
+            rep_ddp_mse_list_per_bit[:, index],
+            label=f'{FLAGS.mechanism} (B = {bit})')
+
+      subplot.set(xlabel='Epsilon', ylabel='MSE')
+      subplot.set_title(f'(n={n}, d={d}, k={k_stddevs})')
       subplot.set_yscale('log' if use_log else 'linear')
       subplot.legend()
 
@@ -278,14 +274,14 @@ def main(_):
         'n': n,
         'd': d,
         'rep': repeat,
-        'c': c,
+        'c': clip,
         'bits': bits,
         'k_stddevs': k_stddevs,
         'epsilons': epsilons,
-        'mechanism': mechanism,
+        'mechanism': FLAGS.mechanism,
         'sqrtn_norm_growth': sqrtn_norm_growth,
         'gauss': rep_gauss_mse_list,
-        'distributed_dgauss': rep_ddgauss_mse_list_per_bit,
+        FLAGS.mechanism: rep_ddp_mse_list_per_bit,
     }
     results.append(result_dic)
 

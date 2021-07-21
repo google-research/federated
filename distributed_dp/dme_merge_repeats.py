@@ -39,7 +39,7 @@ def plot_curve(subplot, epsilons, data, label, linewidth=1, color=None):
       epsilons, lower, upper, alpha=0.2, edgecolor='face', color=color)
 
 
-def plot_results(merged_results):
+def plot_results(merged_results, ddp_mechanism):
   """Plot the specified DME result dict."""
   use_log = True
   linewidth = 1
@@ -66,19 +66,19 @@ def plot_results(merged_results):
     n, d = res['n'], res['d']
     epsilons, bits = res['epsilons'], res['bits']
     k_stddevs = res['k_stddevs']
-    gauss, distributed_dgauss = res['gauss'], res['distributed_dgauss']
+    gauss, ddp = res['gauss'], res[ddp_mechanism]
 
     # Gaussian.
     plot_curve(
         subplot, epsilons, gauss, 'Continuous Gaussian', linewidth=linewidth)
 
-    # DDGauss.
+    # Distributed DP.
     for bit_index, b in enumerate(bits):
       plot_curve(
           subplot,
           epsilons,
-          distributed_dgauss[:, bit_index],
-          rf'DDGauss ($B={b}$)',
+          ddp[:, bit_index],
+          rf'{ddp_mechanism} ($B={b}$)',
           linewidth=linewidth,
           color=bit2color[int(b)])
 
@@ -100,6 +100,7 @@ def plot_results(merged_results):
 def main():
   args = sys.argv
   prefix = args[1]
+  ddp_mechanism = args[2] if len(args) >= 3 else 'ddgauss'
   print('Globbing prefix:')
   dirname, fname_prefix = os.path.split(prefix)
   print('Folder:', dirname)
@@ -127,19 +128,19 @@ def main():
     merged_results[nd_result_index]['gauss'] = np.concatenate(
         gauss_results, axis=0)
 
-    ddgauss_results = [
-        result_repeated[i][nd_result_index]['distributed_dgauss']
+    ddp_results = [
+        result_repeated[i][nd_result_index][ddp_mechanism]
         for i in range(len(result_repeated))
     ]
-    merged_results[nd_result_index]['distributed_dgauss'] = np.concatenate(
-        ddgauss_results, axis=0)
+    merged_results[nd_result_index][ddp_mechanism] = np.concatenate(
+        ddp_results, axis=0)
 
   results_str = pprint.pformat(merged_results)
   print('Merged results:\n')
   print(results_str)
 
   print('Plotting results...')
-  plot_results(merged_results)
+  plot_results(merged_results, ddp_mechanism)
 
 
 if __name__ == '__main__':

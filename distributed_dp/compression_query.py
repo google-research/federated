@@ -20,7 +20,6 @@ to provide compression operations (and their inverses) including:
   (3) quantization with stochastic rounding.
 """
 
-import abc
 import collections
 
 import attr
@@ -39,7 +38,7 @@ def _attr_bool_check(instance, attribute, value):
 
 
 @attr.s(eq=False)
-class QuantizationParams(metaclass=abc.ABCMeta):
+class QuantizationParams:
   """Common parameters for quantization.
 
   Attributes:
@@ -55,11 +54,15 @@ class QuantizationParams(metaclass=abc.ABCMeta):
       stochastic rounding rounding.
     beta: A constant in [0, 1) controlling the concentration inequality for the
       probabilistic norm bound after rounding.
+    quantize_scale: A scale factor controlling the quantization granularity; it
+      is applied to the input records before rounding to the nearest integer.
+      This also encompasses the scaling needed for inner DP mechanisms.
   """
   stochastic = attr.ib(validator=_attr_bool_check)
   conditional = attr.ib(validator=_attr_bool_check)
   l2_norm_bound = attr.ib()
   beta = attr.ib()
+  quantize_scale = attr.ib()
 
   @l2_norm_bound.validator
   def check_l2_norm_bound(self, attribute, value):
@@ -72,24 +75,6 @@ class QuantizationParams(metaclass=abc.ABCMeta):
     if not isinstance(value, tf.Tensor):
       if value < 0 or value >= 1:
         raise ValueError(f'`beta` must be in [0, 1). Found {value}.')
-
-  @abc.abstractmethod
-  def to_tf_tensors(self):
-    raise NotImplementedError(
-        'The function `to_tf_tensors` is not implemented in the '
-        'base `QuantizationParams` class. Please, use a subclass.')
-
-
-@attr.s(eq=False)
-class ScaledQuantizationParams(QuantizationParams):
-  """Parameters for scaling-based quantization.
-
-  Attributes:
-    quantize_scale: A scale factor controlling the quantization granularity; it
-      is applied to the input records before rounding to the nearest integer.
-      This also encompasses the scaling needed for inner DP mechanisms.
-  """
-  quantize_scale = attr.ib()
 
   @quantize_scale.validator
   def check_quantize_scale(self, attribute, value):
@@ -160,14 +145,6 @@ class CompressionSumQuery(tfp.SumAggregationDPQuery):
     self._inner_query = inner_query
     self._record_template = record_template
 
-    if isinstance(quantization_params, ScaledQuantizationParams):
-      self._quantization_fn = scaled_quantization
-      self._inverse_quantization_fn = inverse_scaled_quantization
-    else:
-      raise ValueError(
-          f'Unknown type(quantization_params) of {type(quantization_params)} '
-          f'with value {quantization_params}.')
-
   def set_ledger(self, ledger):
     raise NotImplementedError(
         'Ledger has not yet been implemented for this query!')
@@ -199,7 +176,15 @@ class CompressionSumQuery(tfp.SumAggregationDPQuery):
     casted_record = tf.cast(record_as_vector, tf.float32)
     rotated_record = compression_utils.randomized_hadamard_transform(
         casted_record, sample_hadamard_seed)
-    encoded_record = self._quantization_fn(rotated_record, quantization_params)
+    quantized_record = compression_utils.scaled_quantization(
+        rotated_record,
+        quantization_params.quantize_scale,
+        stochastic=quantization_params.stochastic,
+        conditional=quantization_params.conditional,
+        l2_norm_bound=quantization_params.l2_norm_bound,
+        beta=quantization_params.beta)
+    # Inner discrete DPQuery uses integers.
+    encoded_record = tf.cast(quantized_record, tf.int32)
     return encoded_record
 
   def _decode_agg_record(self, agg_record, record_template,
@@ -212,13 +197,17 @@ class CompressionSumQuery(tfp.SumAggregationDPQuery):
         t = tf.round(t)
       return tf.cast(t, t_input.dtype)
 
+    # Revert to float32 for decoding operations.
+    dequantized_record = tf.cast(agg_record, tf.float32)
+    dequantized_record = compression_utils.inverse_scaled_quantization(
+        dequantized_record, quantization_params.quantize_scale)
+
     template_as_vector = compression_utils.flatten_concat(record_template)
-    dequantized_record = self._inverse_quantization_fn(agg_record,
-                                                       quantization_params)
     unrotated_record = compression_utils.inverse_randomized_hadamard_transform(
         dequantized_record,
         original_dim=tf.size(template_as_vector),
         seed_pair=sample_hadamard_seed)
+
     uncasted_record = cast_to_input_dtype(unrotated_record, template_as_vector)
     decoded_record = compression_utils.inverse_flatten_concat(
         uncasted_record, record_template)
@@ -253,32 +242,3 @@ def new_seed_pair() -> tf.Tensor:
   """Create a seed pair with shape=[2] to be used by `tf.random.stateless_*`."""
   return tf.random.uniform(
       shape=[2], minval=tf.int32.min, maxval=tf.int32.max, dtype=tf.int32)
-
-
-def scaled_quantization(record, quantization_params: ScaledQuantizationParams):
-  """Quantization by scaling up the inputs and rounding to integers."""
-
-  def quantization(t):
-    quantized_t = compression_utils.scaled_quantization(
-        t,
-        quantization_params.quantize_scale,
-        stochastic=quantization_params.stochastic,
-        conditional=quantization_params.conditional,
-        l2_norm_bound=quantization_params.l2_norm_bound,
-        beta=quantization_params.beta)
-    return tf.cast(quantized_t, tf.int32)  # Inner discrete query uses int32.
-
-  return tf.nest.map_structure(quantization, record)
-
-
-def inverse_scaled_quantization(agg_record,
-                                quantization_params: ScaledQuantizationParams):
-  """Applies the inverse of `scaled_quantization` after aggregation."""
-
-  def dequantization(t):
-    # Revert to float32 for decoding operations.
-    t = tf.cast(t, tf.float32)
-    return compression_utils.inverse_scaled_quantization(
-        t, quantization_params.quantize_scale)
-
-  return tf.nest.map_structure(dequantization, agg_record)

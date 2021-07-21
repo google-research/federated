@@ -27,9 +27,6 @@ DEFAULT_CLIP_UPPER = 2
 
 _test_struct_type = [(tf.int32, (3,)), tf.int32]
 
-_int_at_server = tff.type_at_server(tf.int32)
-_int_at_clients = tff.type_at_clients(tf.int32)
-
 
 def _make_test_struct_value(x):
   return [tf.constant(x, dtype=tf.int32, shape=(3,)), x]

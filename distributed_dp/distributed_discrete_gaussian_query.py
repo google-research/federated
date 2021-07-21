@@ -48,13 +48,14 @@ class DistributedDiscreteGaussianSumQuery(tfp.SumAggregationDPQuery):
     self._local_scale = local_scale
 
   def set_ledger(self, ledger):
+    del ledger  # Unused.
     raise NotImplementedError('Ledger has not yet been implemented for'
                               'DistributedDiscreteGaussianSumQuery!')
 
   def initial_global_state(self):
     return self._GlobalState(
         tf.cast(self._l2_norm_bound, tf.float32),
-        tf.cast(self._local_scale, tf.int32))  # Only integer scales for now.
+        tf.cast(self._local_scale, tf.float32))
 
   def derive_sample_params(self, global_state):
     return self._SampleParams(global_state.l2_norm_bound,
@@ -73,12 +74,15 @@ class DistributedDiscreteGaussianSumQuery(tfp.SumAggregationDPQuery):
     Returns:
       The record with local noise added.
     """
+    # The TF discrete Gaussian sampler only takes integer noise scales for now.
+    # Round up to preserve privacy.
+    ceil_local_scale = tf.cast(tf.math.ceil(local_scale), tf.int32)
 
     def add_noise(v):
       # Adds an extra dimension for `shares` number of draws.
       shape = tf.concat([[shares], tf.shape(v)], axis=0)
       dgauss_noise = discrete_gaussian_utils.sample_discrete_gaussian(
-          scale=local_scale, shape=shape, dtype=v.dtype)
+          scale=ceil_local_scale, shape=shape, dtype=v.dtype)
       # Sum across the number of noise shares and add it.
       return v + tf.reduce_sum(dgauss_noise, axis=0)
 
@@ -103,7 +107,6 @@ class DistributedDiscreteGaussianSumQuery(tfp.SumAggregationDPQuery):
       return result
 
   def get_noised_result(self, sample_state, global_state):
-    """The noise was added locally, so simply return the aggregate."""
-    # Note that this assumes we won't have clients dropping out (thus missing
-    # local noise shares) for experiments.
+    # Note that by directly returning the aggregate, this assumes that there
+    # will not be missing local noise shares during execution.
     return sample_state, global_state

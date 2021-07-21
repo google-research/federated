@@ -118,69 +118,48 @@ class DistributedDiscreteGaussianQueryTest(tf.test.TestCase,
       expected = [10, 10]
       self.assertAllEqual(result, expected)
 
-  @parameterized.named_parameters([('small_scale', 2, 0.2),
-                                   ('large_scale', 10, 1)])
-  def test_sum_local_noise_single_share(self, local_scale, tolerance):
-    with self.cached_session() as sess:
-      num_records = 1
-      num_trials = 1000
-      record = tf.zeros([num_trials], dtype=tf.int32)
-      sample = [record] * num_records
-      query = ddg_sum_query(l2_norm_bound=10.0, local_scale=local_scale)
-      query_result, _ = test_utils.run_query(query, sample)
-      result = sess.run(query_result)
-
-      result_scale = np.std(result)
-      self.assertNear(result_scale, local_scale, tolerance)
-
-  @parameterized.named_parameters([('1_local_scale_1_record', 1, 1, 0.05, 1),
-                                   ('1_local_scale_4_records', 1, 4, 0.1, 1),
-                                   ('4_local_scale_4_records', 4, 4, 0.5, 1),
-                                   ('4_local_scale_16_records', 4, 16, 2, 2)])
-  def test_sum_local_noise_multiple_shares(self, local_scale, num_records,
-                                           mean_std_atol, percentile_atol):
+  @parameterized.named_parameters([('2_local_scale_1_record', 2, 1),
+                                   ('10_local_scale_4_records', 10, 4),
+                                   ('1000_local_scale_1_record', 1000, 1),
+                                   ('1000_local_scale_25_records', 1000, 25)])
+  def test_sum_local_noise_shares(self, local_scale, num_records):
     """Test the noise level of the sum of discrete Gaussians applied locally.
 
-    The sum of discrete Gaussians is *not* a discrete Gaussian, but it is pretty
-    close. Thus, we will compare the aggregated noise to a central discrete
-    Gaussian noise with appropriately scaled stddev with some reasonable
-    tolerance.
+    The sum of discrete Gaussians is not a discrete Gaussian, but it will be
+    extremely close for sigma >= 2. We will thus compare the aggregated noise
+    to a central discrete Gaussian noise with appropriately scaled stddev with
+    some reasonable tolerance.
 
     Args:
       local_scale: The stddev of the local discrete Gaussian noise.
       num_records: The number of records to be aggregated.
-      mean_std_atol: Absolute error tolerance between the summed local noises
-        and the central discrete Gaussian noises with stddev set to
-        `sqrt(num_records) * local_scale`.
-      percentile_atol: Absolute error tolerance for comparing percentiles. Note
-        that the records are discrete, so the tolerance is an integer.
     """
-    with self.cached_session() as sess:
-      # Aggregated local noises.
-      num_trials = 1000
-      record = tf.zeros([num_trials], dtype=tf.int32)
-      sample = [record] * num_records
-      query = ddg_sum_query(l2_norm_bound=10.0, local_scale=local_scale)
-      query_result, _ = test_utils.run_query(query, sample)
+    # Aggregated local noises.
+    num_trials = 1000
+    record = tf.zeros([num_trials], dtype=tf.int32)
+    sample = [record] * num_records
+    query = ddg_sum_query(l2_norm_bound=10.0, local_scale=local_scale)
+    query_result, _ = test_utils.run_query(query, sample)
 
-      # Central discrete Gaussian noise.
-      sqrt_n = tf.sqrt(tf.cast(num_records, tf.float64))
-      central_stddev = sqrt_n * tf.cast(local_scale, tf.float64)
-      central_noise = discrete_gaussian_utils.sample_discrete_gaussian(
-          scale=tf.cast(tf.round(central_stddev), record.dtype),
-          shape=tf.shape(record),
-          dtype=record.dtype)
+    # Central discrete Gaussian noise.
+    central_scale = np.sqrt(num_records) * local_scale
+    central_noise = discrete_gaussian_utils.sample_discrete_gaussian(
+        scale=tf.cast(tf.round(central_scale), record.dtype),
+        shape=tf.shape(record),
+        dtype=record.dtype)
 
-      agg_noise, central_noise = sess.run([query_result, central_noise])
+    agg_noise, central_noise = self.evaluate([query_result, central_noise])
 
-      self.assertAllClose(
-          np.mean(agg_noise), np.mean(central_noise), atol=mean_std_atol)
-      self.assertAllClose(
-          np.std(agg_noise), np.std(central_noise), atol=mean_std_atol)
-      self.assertAllClose(
-          np.percentile(agg_noise, [25, 50, 75]),
-          np.percentile(central_noise, [25, 50, 75]),
-          atol=percentile_atol)
+    mean_stddev = central_scale * np.sqrt(num_trials) / num_trials
+    atol = 3.5 * mean_stddev
+
+    # Use the atol for mean as a rough default atol for stddev/percentile.
+    self.assertAllClose(np.mean(agg_noise), np.mean(central_noise), atol=atol)
+    self.assertAllClose(np.std(agg_noise), np.std(central_noise), atol=atol)
+    self.assertAllClose(
+        np.percentile(agg_noise, [25, 50, 75]),
+        np.percentile(central_noise, [25, 50, 75]),
+        atol=atol)
 
 
 if __name__ == '__main__':

@@ -28,7 +28,7 @@ ddg_sum_query = distributed_discrete_gaussian_query.DistributedDiscreteGaussianS
 class CompressionQueryTest(tf.test.TestCase, parameterized.TestCase):
 
   DEFAULT_L2_NORM_BOUND = 1000
-  DEFAULT_QUANTIZATION_PARAMS = compression_query.ScaledQuantizationParams(
+  DEFAULT_QUANTIZATION_PARAMS = compression_query.QuantizationParams(
       stochastic=True,
       conditional=False,
       l2_norm_bound=DEFAULT_L2_NORM_BOUND,

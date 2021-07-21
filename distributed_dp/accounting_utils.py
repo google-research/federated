@@ -20,9 +20,13 @@ from scipy import optimize
 from scipy import special
 import tensorflow_privacy as tfp
 
-RDP_ORDERS = tuple(map(float, range(2, 21)))
-RDP_ORDERS += (22., 24., 28., 32., 64., 128., 256.)
+RDP_ORDERS = tuple(range(2, 129)) + (256,)
 DIV_EPSILON = 1e-22
+
+
+####################
+###### Shared ######
+####################
 
 
 def log_comb(n, k):
@@ -73,12 +77,103 @@ def _compute_rdp_subsampled(alpha, gamma, eps, upper_bound=True):
   return special.logsumexp(a=a, b=b) / (alpha - 1)
 
 
+def rounded_l2_norm_bound(l2_norm_bound, beta, dim):
+  """Computes the L2 norm bound after stochastic rounding to integers.
+
+  Note that this function is *agnostic* to the actual vector whose coordinates
+  are to be rounded, and it does *not* consider the effect of scaling (i.e.
+  we assume the input norm is already scaled before rounding).
+
+  See Theorem 1 of https://arxiv.org/pdf/2102.06387.pdf.
+
+  Args:
+    l2_norm_bound: The L2 norm (bound) of the vector whose coordinates are to be
+      stochastically rounded to the integer grid.
+    beta: A float constant in [0, 1). See the initializer docstring of the
+      aggregator.
+    dim: The dimension of the vector to be rounded.
+
+  Returns:
+    The inflated L2 norm bound after stochastic rounding (conditionally
+    according to beta).
+  """
+  assert int(dim) == dim and dim > 0, f'Invalid dimension: {dim}'
+  assert 0 <= beta < 1, 'beta must be in the range [0, 1)'
+  assert l2_norm_bound > 0, 'Input l2_norm_bound should be positive.'
+
+  bound_1 = l2_norm_bound + np.sqrt(dim)
+  if beta == 0:
+    return bound_1
+
+  squared_bound_2 = np.square(l2_norm_bound) + 0.25 * dim
+  squared_bound_2 += (
+      np.sqrt(2.0 * np.log(1.0 / beta)) * (l2_norm_bound + 0.5 * np.sqrt(dim)))
+  bound_2 = np.sqrt(squared_bound_2)
+  return min(bound_1, bound_2)
+
+
+def rounded_l1_norm_bound(l2_norm_bound, dim):
+  # In general we have L1 <= sqrt(d) * L2. In the scaled and rounded domain
+  # where coordinates are integers we also have L1 <= L2^2.
+  return l2_norm_bound * min(np.sqrt(dim), l2_norm_bound)
+
+
+def heuristic_scale_factor(local_stddev,
+                           l2_clip,
+                           bits,
+                           num_clients,
+                           dim,
+                           k_stddevs,
+                           rho=1.0):
+  """Selects a scaling factor by assuming subgaussian aggregates.
+
+  Selects scale_factor = 1 / gamma such that k stddevs of the noisy, quantized,
+  aggregated client values are bounded within the bit-width. The aggregate at
+  the server is assumed to follow a subgaussian distribution. See Section 4.2
+  and 4.4 of https://arxiv.org/pdf/2102.06387.pdf for more details.
+
+  Specifically, the implementation is solving for gamma using the following
+  expression:
+
+    2^b = 2k * sqrt(rho / dim * (cn)^2 + (gamma^2 / 4 + sigma^2) * n) / gamma.
+
+  Args:
+    local_stddev: The local noise standard deviation.
+    l2_clip: The initial L2 clip norm. See the __init__ docstring.
+    bits: The bit-width. See the __init__ docstring.
+    num_clients: The expected number of clients. See the __init__ docstring.
+    dim: The dimension of the client vector that includes any necessary padding.
+    k_stddevs: The number of standard deviations of the noisy and quantized
+      aggregate values to bound within the bit-width.
+    rho: (Optional) The subgaussian flatness parameter of the random orthogonal
+      transform as part of the DDP procedure. See Section 4.2 of the above paper
+      for more details.
+
+  Returns:
+    The selected scaling factor in tf.float64.
+  """
+  c = l2_clip
+  n = num_clients
+  sigma = local_stddev
+
+  if 2.0**(2.0 * bits) < n * k_stddevs**2:
+    raise ValueError(f'The selected bit-width ({bits}) is too small for the '
+                     f'given parameters (num_clients = {n}, k_stddevs = '
+                     f'{k_stddevs}). You may decrease `num_clients`, '
+                     f'increase `bits`, or decrease `k_stddevs`.')
+
+  numer = np.sqrt(2.0**(2.0 * bits) - n * k_stddevs**2)
+  denom = 2.0 * k_stddevs * np.sqrt(rho / dim * c**2 * n**2 + n * sigma**2)
+  scale_factor = numer / denom
+  return scale_factor
+
+
 #####################################
 ######## Gaussian Accounting ########
 #####################################
 
 
-def guass_noise_stddev_direct(epsilon, delta, norm_bound, tol=1.e-12):
+def analytic_gauss_stddev(epsilon, delta, norm_bound, tol=1.e-12):
   """Compute the stddev for the Gaussian mechanism with the given DP params.
 
   Calibrate a Gaussian perturbation for differential privacy using the
@@ -188,40 +283,21 @@ def get_gauss_noise_multiplier(target_eps,
     return -1
 
 
-############################################################
-######## (Distributed) Discrete Gaussian Accounting ########
-############################################################
+##################################################
+######## (Distributed) Discrete Gaussian  ########
+##################################################
 
 
-def compute_rdp_discrete_gaussian_simplified(q, l2_scale, tau, dimension, steps,
-                                             orders):
-  """Compute RDP of the Sampled (Distributed) Discrete Gaussian Mechanism.
-
-  See Proposition 14 / Eq. 17 (Page 16) of the main paper. This function omits
-  the RDP term with L1 sensitivity.
-
-  Args:
-    q: The sampling rate.
-    l2_scale: The l2 scale of the discrete Gaussian mechanism (i.e.,
-      l2_sensitivity/stddev). For distributed version, stddev is the noise
-      variance after summing all the noise shares.
-    tau: The inflation parameter due to adding multiple discrete Gaussians. Set
-      to zero when analyzing the the discrete Gaussian mechanism. For the
-      distributed discrete Gaussian mechanisn, see Theorem 1.
-    dimension: The dimension of the vector query.
-    steps: The number of steps.
-    orders: An array (or a scalar) of RDP orders, must all be greater than 1. If
-      provided orders are not integers, they are rounded down to the nearest
-      integer.
-
-  Returns:
-    The RDPs at all orders, can be np.inf.
-  """
+def compute_rdp_dgaussian_simplified(q, l2_scale, tau, dim, steps, orders):
+  """Compute RDP of the Sampled (Distributed) Discrete Gaussian Mechanism."""
   orders = [int(order) for order in orders]
 
   def eps(order):
-    dim = dimension
-    return _compute_rdp_discrete_gaussian_simplified(l2_scale, tau, dim, order)
+    """See Proposition 14 / Eq. 17 (Page 16) of the main paper."""
+    assert order >= 1, 'alpha must be greater than or equal to 1.'
+    term_1 = order * (l2_scale**2) / 2.0 + tau * dim
+    term_2 = (order / 2.0) * (l2_scale + math.sqrt(dim) * tau)**2
+    return min(term_1, term_2)
 
   if q == 1:
     rdp = np.array([eps(order) for order in orders])
@@ -234,71 +310,108 @@ def compute_rdp_discrete_gaussian_simplified(q, l2_scale, tau, dimension, steps,
   return rdp * steps
 
 
-def _compute_rdp_discrete_gaussian_simplified(l2_scale, tau, dimension, order):
-  """See Proposition 14 / Eq. 17 (Page 16) of the main paper."""
-  assert order >= 1, "alpha must be greater than or equal to 1."
-  term_1 = order * (l2_scale**2) / 2.0 + tau * dimension
-  term_2 = (order / 2.0) * (l2_scale + math.sqrt(dimension) * tau)**2
-  return min(term_1, term_2)
+def compute_rdp_dgaussian(q, l1_scale, l2_scale, tau, dim, steps, orders):
+  """Compute RDP of the Sampled (Distributed) Discrete Gaussian Mechanism.
+
+  See Proposition 14 / Eq. 17 (Page 16) of the main paper.
+
+  Args:
+    q: The sampling rate.
+    l1_scale: The l1 scale of the discrete Gaussian mechanism (i.e.,
+      l1_sensitivity/stddev). For distributed version, stddev is the noise
+      stddev after summing all the noise shares.
+    l2_scale: The l2 scale of the discrete Gaussian mechanism (i.e.,
+      l2_sensitivity/stddev). For distributed version, stddev is the noise
+      stddev after summing all the noise shares.
+    tau: The inflation parameter due to adding multiple discrete Gaussians. Set
+      to zero when analyzing the the discrete Gaussian mechanism. For the
+      distributed discrete Gaussian mechanisn, see Theorem 1.
+    dim: The dimension of the vector query.
+    steps: The number of steps.
+    orders: An array (or a scalar) of RDP orders, must all be greater than 1. If
+      provided orders are not integers, they are rounded down to the nearest
+      integer.
+
+  Returns:
+    The RDPs at all orders, can be np.inf.
+  """
+  orders = [int(order) for order in orders]
+
+  def eps(order):
+    assert order > 1, 'alpha must be greater than 1.'
+    # Proposition 14 of https://arxiv.org/pdf/2102.06387.pdf.
+    term_1 = (order / 2.0) * l2_scale**2 + tau * dim
+    term_2 = (order / 2.0) * (l2_scale**2 + 2 * l1_scale * tau + tau**2 * dim)
+    term_3 = (order / 2.0) * (l2_scale + np.sqrt(dim) * tau)**2
+    return min(term_1, term_2, term_3)
+
+  if q == 1:
+    rdp = np.array([eps(order) for order in orders])
+  else:
+    rdp = np.array([
+        min(_compute_rdp_subsampled(order, q, eps), eps(order))
+        for order in orders
+    ])
+
+  return rdp * steps
 
 
-def compute_l2_sensitivy_squared(l2_clip_norm, gamma, beta, dimension):
-  """See Theorem 1 of the paper."""
-  term_1 = math.pow(l2_clip_norm + gamma * math.sqrt(dimension), 2)
-  if beta is None or beta == 0:
-    return term_1
-
-  term_2 = math.pow(l2_clip_norm, 2)
-  term_2 += 0.25 * math.pow(gamma, 2) * dimension
-  term_2 += math.sqrt(2.0 * math.log(1 / beta)) * gamma * (
-      l2_clip_norm + 0.5 * gamma * math.sqrt(dimension))
-  return min(term_1, term_2)
-
-
-def get_ddgauss_epsilon(q,
-                        noise_stddev,
-                        l2_clip_norm,
-                        gamma,
-                        beta,
-                        steps,
-                        num_clients,
-                        dimension,
-                        delta,
-                        orders=RDP_ORDERS):
-  """Computes the overall epsilon. See Theorem 1 of the paper."""
-  variance = math.pow(noise_stddev, 2)
-  l2_sensitivity_squared = compute_l2_sensitivy_squared(l2_clip_norm, gamma,
-                                                        beta, dimension)
-  sq_l2_scale = l2_sensitivity_squared / (num_clients * variance + DIV_EPSILON)
-  l2_scale = math.sqrt(sq_l2_scale)
+def ddgauss_epsilon(gamma,
+                    local_stddev,
+                    num_clients,
+                    l2_sens,
+                    beta,
+                    dim,
+                    q,
+                    steps,
+                    delta,
+                    l1_sens=None,
+                    rounding=True,
+                    orders=RDP_ORDERS):
+  """Computes epsilon of (distributed) discrete Gaussian via RDP."""
+  scale = 1.0 / (gamma + DIV_EPSILON)
+  l1_sens = l1_sens or (l2_sens * np.sqrt(dim))
+  if rounding:
+    l2_sens = rounded_l2_norm_bound(l2_sens * scale, beta, dim) / scale
+    l1_sens = rounded_l1_norm_bound(l2_sens * scale, dim) / scale
 
   tau = 0
   for k in range(1, num_clients):
-    tau += math.exp(-2 * (variance / (math.pow(gamma, 2) + DIV_EPSILON)) *
-                    math.pi**2 * (k * 1.0 / (k + 1)))
+    tau += math.exp(-2 * (math.pi * local_stddev * scale)**2 * (k / (k + 1)))
   tau *= 10
 
-  rdp = compute_rdp_discrete_gaussian_simplified(q, l2_scale, tau, dimension,
-                                                 steps, orders)
-  eps, _, _ = tfp.get_privacy_spent(orders, rdp, target_delta=delta)
-  return eps
+  l1_scale = l1_sens / (np.sqrt(num_clients) * local_stddev)
+  l2_scale = l2_sens / (np.sqrt(num_clients) * local_stddev)
+  rdp = compute_rdp_dgaussian(q, l1_scale, l2_scale, tau, dim, steps, orders)
+  eps, _, order = tfp.get_privacy_spent(orders, rdp, target_delta=delta)
+  return eps, order
 
 
-def get_ddgauss_noise_stddev(q,
-                             epsilon,
-                             l2_clip_norm,
-                             gamma,
-                             beta,
-                             steps,
-                             num_clients,
-                             dimension,
-                             delta,
-                             orders=RDP_ORDERS):
+def ddgauss_local_stddev(q,
+                         epsilon,
+                         l2_clip_norm,
+                         gamma,
+                         beta,
+                         steps,
+                         num_clients,
+                         dim,
+                         delta,
+                         orders=RDP_ORDERS):
   """Selects the local stddev for the distributed discrete Gaussian."""
 
-  def stddev_opt_fn(z):
-    cur_epsilon = get_ddgauss_epsilon(q, z, l2_clip_norm, gamma, beta, steps,
-                                      num_clients, dimension, delta, orders)
+  def stddev_opt_fn(stddev):
+    stddev += DIV_EPSILON
+    cur_epsilon, _ = ddgauss_epsilon(
+        gamma,
+        stddev,
+        num_clients,
+        l2_clip_norm,
+        beta,
+        dim,
+        q,
+        steps,
+        delta,
+        orders=orders)
     return (epsilon - cur_epsilon)**2
 
   stddev_result = optimize.minimize_scalar(stddev_opt_fn)
@@ -308,20 +421,20 @@ def get_ddgauss_noise_stddev(q,
     return -1
 
 
-def get_ddgauss_gamma(q,
-                      epsilon,
-                      l2_clip_norm,
-                      bits,
-                      num_clients,
-                      dimension,
-                      delta,
-                      beta,
-                      steps,
-                      k=1,
-                      rho=1,
-                      sqrtn_norm_growth=False,
-                      orders=RDP_ORDERS):
-  """Selects gamma from the given parameters.
+def ddgauss_params(q,
+                   epsilon,
+                   l2_clip_norm,
+                   bits,
+                   num_clients,
+                   dim,
+                   delta,
+                   beta,
+                   steps,
+                   k=4,
+                   rho=1,
+                   sqrtn_norm_growth=False,
+                   orders=RDP_ORDERS):
+  """Selects gamma and local noise standard deviation from the given parameters.
 
   Args:
     q: The sampling factor.
@@ -329,7 +442,7 @@ def get_ddgauss_gamma(q,
     l2_clip_norm: The l2 clipping norm for the client vectors.
     bits: The number of bits per coordinate for the aggregated noised vector.
     num_clients: The number of clients per step.
-    dimension: The dimension of the vector query.
+    dim: The dimension of the vector query.
     delta: The target delta.
     beta: The constant in [0, 1) controlling conditional randomized rounding.
       See Proposition 22 of the paper.
@@ -344,26 +457,27 @@ def get_ddgauss_gamma(q,
     orders: The RDP orders.
 
   Returns:
-    The selected gamma.
+    The selected gamma and the local noise standard deviation.
   """
-  if sqrtn_norm_growth:
-    n_factor = num_clients
-  else:
-    n_factor = num_clients**2
+  n_factor = num_clients**(1 if sqrtn_norm_growth else 2)
 
   def stddev(x):
-    return get_ddgauss_noise_stddev(q, epsilon, l2_clip_norm, x, beta, steps,
-                                    num_clients, dimension, delta, orders)
+    return ddgauss_local_stddev(q, epsilon, l2_clip_norm, x, beta, steps,
+                                num_clients, dim, delta, orders)
 
   def mod_min(x):
-    return k * math.sqrt(rho / dimension * l2_clip_norm**2 * n_factor +
+    return k * math.sqrt(rho / dim * l2_clip_norm**2 * n_factor +
                          (x**2 / 4.0 + stddev(x)**2) * num_clients)
 
   def gamma_opt_fn(x):
     return (math.pow(2, bits) - 2 * mod_min(x) / (x + DIV_EPSILON))**2
 
   gamma_result = optimize.minimize_scalar(gamma_opt_fn)
-  if gamma_result.success:
-    return gamma_result.x
-  else:
-    return -1
+  if not gamma_result.success:
+    raise ValueError('Cannot compute gamma.')
+
+  gamma = gamma_result.x
+  # Select the local_stddev that gave the best gamma.
+  local_stddev = ddgauss_local_stddev(q, epsilon, l2_clip_norm, gamma, beta,
+                                      steps, num_clients, dim, delta, orders)
+  return gamma, local_stddev

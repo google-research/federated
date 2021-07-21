@@ -20,8 +20,7 @@ import numpy as np
 import tensorflow_federated as tff
 
 from distributed_dp import accounting_utils
-from distributed_dp import compression_query
-from distributed_dp import distributed_discrete_gaussian_query
+from distributed_dp import ddpquery_utils
 from distributed_dp import modular_clipping_factory
 
 
@@ -32,53 +31,6 @@ def get_total_dim(client_template):
 
 def pad_dim(dim):
   return np.math.pow(2, np.ceil(np.log2(dim)))
-
-
-def dp_query_factory(mechanism, noise_stddev, quantized_l2_norm_bound):
-  """Factory for instantiating discrete DP mechanisms from TF Privacy."""
-  mechanism = mechanism.lower()
-  if mechanism == 'ddgauss':
-    return distributed_discrete_gaussian_query.DistributedDiscreteGaussianSumQuery(
-        l2_norm_bound=quantized_l2_norm_bound, local_scale=noise_stddev)
-  else:
-    raise ValueError(f'Unsupported mechanism: "{mechanism}".')
-
-
-def build_compressed_dp_query(mechanism, clip, padded_dim, gamma, stddev, beta,
-                              client_template):
-  """Construct a DPQuery with quantization operations."""
-  # Scaling up the noise for the quantized query.
-  scaled_stddev = np.ceil(stddev / gamma)
-  # Compute the post-rounding inflated norm bound.
-  sq_l2_norm_bound = accounting_utils.compute_l2_sensitivy_squared(
-      l2_clip_norm=clip, gamma=gamma, beta=beta, dimension=padded_dim)
-  # Add some norm leeway to peacefully allow for numerical/precision errors.
-  scaled_l2_norm_bound = (np.sqrt(sq_l2_norm_bound) + 1e-4) / gamma
-
-  discrete_query = dp_query_factory(
-      mechanism=mechanism,
-      noise_stddev=scaled_stddev,
-      quantized_l2_norm_bound=scaled_l2_norm_bound)
-
-  quantize_scale = 1.0 / gamma
-  beta = beta or 0
-  conditional = beta > 0
-  logging.info('Conditional rounding set to %s (beta = %f)', conditional, beta)
-
-  quantization_params = compression_query.ScaledQuantizationParams(
-      stochastic=True,
-      conditional=conditional,
-      l2_norm_bound=clip,
-      beta=beta,
-      quantize_scale=quantize_scale)
-
-  # Wrap the discrete query with compression operations.
-  compressed_query = compression_query.CompressionSumQuery(
-      quantization_params=quantization_params,
-      inner_query=discrete_query,
-      record_template=client_template)
-
-  return compressed_query
 
 
 def build_aggregator(compression_flags, dp_flags, num_clients,
@@ -92,7 +44,7 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
     if clip is not None:
       assert clip > 0, 'Norm clip must be positive.'
       agg_factory = tff.aggregators.clipping_factory(clip, agg_factory)
-    logging.info('Using vanilla sum aggregation with clipping %s', clip)
+    logging.info('Using vanilla aggregation with clipping %s', clip)
     params_dict = {'clip': clip}
     return agg_factory, params_dict
 
@@ -147,32 +99,24 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
     # Modular clipping has exclusive upper bound.
     mod_clip_lo, mod_clip_hi = -(2**(bits - 1)), 2**(bits - 1)
 
-    gamma = accounting_utils.get_ddgauss_gamma(
+    gamma, local_stddev = accounting_utils.ddgauss_params(
         q=sampling_rate,
         epsilon=epsilon,
         l2_clip_norm=clip,
         bits=bits,
         num_clients=num_clients_per_round,
-        dimension=padded_dim,
+        dim=padded_dim,
         delta=delta,
         beta=beta,
         steps=num_rounds,
-        k=k_stddevs,
-        sqrtn_norm_growth=False)
-
-    local_stddev = accounting_utils.get_ddgauss_noise_stddev(
-        q=sampling_rate,
-        epsilon=epsilon,
-        l2_clip_norm=clip,
-        gamma=gamma,
-        beta=beta,
-        steps=num_rounds,
-        num_clients=num_clients_per_round,
-        dimension=padded_dim,
-        delta=delta)
+        k=k_stddevs)
+    scale = 1.0 / gamma
 
     central_stddev = local_stddev * np.sqrt(num_clients_per_round)
     noise_mult_clip = central_stddev / clip
+    inflated_l2 = accounting_utils.rounded_l2_norm_bound(
+        clip * scale, beta=beta, dim=padded_dim) / scale
+    noise_mult_inflated = central_stddev / inflated_l2
 
     discrete_params_dict = {
         'bits': bits,
@@ -180,10 +124,13 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
         'dim': dim,
         'padded_dim': padded_dim,
         'gamma': gamma,
+        'scale': scale,
         'k_stddevs': k_stddevs,
         'local_stddev': local_stddev,
         'mechanism': mechanism,
+        'inflated_l2': inflated_l2,
         'noise_mult_clip': noise_mult_clip,
+        'noise_mult_inflated': noise_mult_inflated,
     }
 
     logging.info('DDGauss Parameters:')
@@ -198,18 +145,18 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
         clip_range_upper=mod_clip_hi,
         inner_agg_factory=agg_factory)
 
-    # 2. DPFactory that uses the compressed_query.
-    compressed_query = build_compressed_dp_query(
-        mechanism='ddgauss',
-        clip=clip,
-        padded_dim=padded_dim,
-        gamma=gamma,
-        stddev=local_stddev,
+    # 2. Quantization followed by the distributed DP mechanism.
+    ddp_query = ddpquery_utils.build_ddp_query(
+        mechanism=mechanism,
+        local_stddev=local_stddev,
+        l2_norm_bound=clip,
         beta=beta,
+        padded_dim=padded_dim,
+        scale=scale,
         client_template=client_template)
 
     agg_factory = tff.aggregators.DifferentiallyPrivateFactory(
-        query=compressed_query, record_aggregation_factory=agg_factory)
+        query=ddp_query, record_aggregation_factory=agg_factory)
 
     # 3. L2 norm clipping as the first step.
     agg_factory = tff.aggregators.clipping_factory(
