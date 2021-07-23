@@ -15,6 +15,7 @@
 
 import collections
 import functools
+import itertools
 import pprint
 
 from absl import app
@@ -32,6 +33,9 @@ from utils.datasets import stackoverflow_word_prediction
 from utils.models import stackoverflow_models
 from utils.optimizers import optimizer_utils
 
+INITIAL_CLIP = 0.1
+ADAPTIVE_CLIP_LEARNING_RATE = 0.2
+
 with utils_impl.record_hparam_flags() as optimizer_flags:
   # Defining optimizer flags
   optimizer_utils.define_optimizer_flags('client')
@@ -39,6 +43,7 @@ with utils_impl.record_hparam_flags() as optimizer_flags:
 
 with utils_impl.record_hparam_flags() as shared_flags:
   # Federated training hyperparameters
+  flags.DEFINE_integer('clients_per_thread', 1, 'TFF executor configuration.')
   flags.DEFINE_integer('client_epochs_per_round', 1,
                        'Number of epochs in the client to take per round.')
   flags.DEFINE_integer('client_batch_size', 16, 'Batch size on the clients.')
@@ -47,19 +52,19 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_integer('client_datasets_random_seed', 1,
                        'Random seed for client sampling.')
   flags.DEFINE_integer(
-      'max_elements_per_client', None, 'Maximum number of '
+      'max_elements_per_client', 256, 'Maximum number of '
       'elements for each training client. If set to None, all '
       'available examples are used.')
 
   # Training loop configuration
-  flags.DEFINE_integer('total_rounds', 1500, 'Number of total training rounds.')
+  flags.DEFINE_integer('total_rounds', 1600, 'Number of total training rounds.')
   flags.DEFINE_string(
       'experiment_name', None, 'The name of this experiment. Will be append to '
       '--root_output_dir to separate experiment results.')
   flags.DEFINE_string('root_output_dir', '/tmp/fed_opt/',
                       'Root directory for writing experiment output.')
   flags.DEFINE_integer(
-      'rounds_per_eval', 1,
+      'rounds_per_eval', 20,
       'How often to evaluate the global model on the validation dataset.')
   flags.DEFINE_integer('rounds_per_checkpoint', 50,
                        'How often to checkpoint the global model.')
@@ -70,16 +75,11 @@ with utils_impl.record_hparam_flags() as shared_flags:
 
 with utils_impl.record_hparam_flags() as dp_flags:
   # Differential privacy flags
+  flags.DEFINE_float('noise_multiplier', 0.0,
+                     'Noise multiplier. If 0, non-DP aggregator is used.')
   flags.DEFINE_float(
-      'clip', None, 'Clip value for fixed clipping or initial clip for '
-      'adaptive clipping. If None, no clipping is used.')
-  flags.DEFINE_float('noise_multiplier', None,
-                     'Noise multiplier. If None, non-DP aggregator is used.')
-  flags.DEFINE_float(
-      'adaptive_clip_learning_rate', None, 'Adaptive clip learning rate. If '
-      'None, clip adaptation is not used.')
-  flags.DEFINE_float('target_unclipped_quantile', 0.5,
-                     'Target unclipped quantile.')
+      'target_unclipped_quantile', 0.5,
+      'Target unclipped quantile. If 1.0, no clipping will be performed.')
   flags.DEFINE_boolean('uniform_weighting', False,
                        'Whether to weigh clients uniformly.')
 
@@ -88,14 +88,14 @@ with utils_impl.record_hparam_flags() as secrets_flags:
   flags.DEFINE_integer('secret_len', 5, 'Number of tokens per secret.')
   flags.DEFINE_list(
       'secret_groups_num_clients', None, 'Comma separated list of integers '
-      'representing the number of clients who receive that secret. Must be in '
-      'one-to-one correspondence with values in '
-      '`secret_groups_substitution_probs`.')
+      'representing the number of clients who receive that secret. Secret '
+      'groups will be formed as cross-product of this with '
+      'secret_groups_substitution_probs.')
   flags.DEFINE_list(
       'secret_groups_substitution_probs', None, 'Comma separated list of floats'
       ' representing the probability that a sentence will be replaced by the '
-      'secret if the client has a secret. Must be in one-to-one correspondence '
-      'with values in `secret_groups_num_clients`.')
+      'secret if the client has a secret. Secret groups will be formed as '
+      'cross-product of this with secret_groups_num_clients.')
   flags.DEFINE_integer(
       'num_secrets_per_group', 5, 'Number of secrets for each secret group. '
       'So if there is a secret group "(1, 0.2)" and num_secrets_per_group is '
@@ -125,6 +125,14 @@ def parse_secret_group_info():
           f'Error parsing secret_groups_num_clients value "{num_clients_str}" '
           f'as  int.')
 
+  def find_dups(l):
+    return list(set([x for x in l if l.count(x) > 1]))
+
+  num_client_dups = find_dups(secret_groups_num_clients)
+  if num_client_dups:
+    raise ValueError(
+        f'Num clients must be distinct. Found duplicates: {num_client_dups}.')
+
   secret_groups_substitution_probs = []
   for substitution_probs_str in FLAGS.secret_groups_substitution_probs:
     try:
@@ -133,20 +141,14 @@ def parse_secret_group_info():
       raise ValueError(f'Error parsing secret_groups_substitution_probs value '
                        f'"{substitution_probs_str}" as float.')
 
-  if len(secret_groups_num_clients) != len(secret_groups_substitution_probs):
-    raise ValueError(
-        f'`secret_groups_num_clients` and `secret_groups_substitution_probs` '
-        f'must be the same length. Found "{FLAGS.secret_groups_num_clients}" '
-        f'and "{FLAGS.secret_groups_substitution_probs}".')
+  sub_prob_dups = find_dups(secret_groups_substitution_probs)
+  if sub_prob_dups:
+    raise ValueError(f'Substitution probabilities must be distinct. '
+                     f'Found duplicates: {sub_prob_dups}.')
 
-  secret_group_info = [(n, p) for n, p in zip(secret_groups_num_clients,
-                                              secret_groups_substitution_probs)]
-
-  if len(set(secret_group_info)) != len(secret_group_info):
-    dups = list(
-        set([x for x in secret_group_info if secret_group_info.count(x) > 1]))
-    raise ValueError(
-        f'Secret configs must be distinct. Found duplicates: {dups}.')
+  secret_group_info = list(
+      itertools.product(secret_groups_num_clients,
+                        secret_groups_substitution_probs))
 
   return secret_group_info
 
@@ -164,55 +166,35 @@ def _write_hparam_flags():
 
 def make_aggregation_factory():
   """Constructs aggregation factory from flags."""
-  if FLAGS.noise_multiplier is None:
+  if FLAGS.noise_multiplier == 0:
     if FLAGS.uniform_weighting:
       aggregation_factory = tff.aggregators.UnweightedMeanFactory()
     else:
       aggregation_factory = tff.aggregators.MeanFactory()
-    if FLAGS.clip is not None:
-      if FLAGS.clip <= 0:
-        raise ValueError('clip must be positive if clipping is enabled.')
-      if FLAGS.adaptive_clip_learning_rate is None:
-        clip = FLAGS.clip
-      else:
-        if FLAGS.adaptive_clip_learning_rate <= 0:
-          raise ValueError('adaptive_clip_learning_rate must be positive if '
-                           'adaptive clipping is enabled.')
-        clip = tff.aggregators.PrivateQuantileEstimationProcess.no_noise(
-            initial_estimate=FLAGS.clip,
-            target_quantile=FLAGS.target_unclipped_quantile,
-            learning_rate=FLAGS.adaptive_clip_learning_rate)
-      return tff.aggregators.clipping_factory(clip, aggregation_factory)
+    if FLAGS.target_unclipped_quantile < 1.0:
+      clip = tff.aggregators.PrivateQuantileEstimationProcess.no_noise(
+          initial_estimate=INITIAL_CLIP,
+          target_quantile=FLAGS.target_unclipped_quantile,
+          learning_rate=ADAPTIVE_CLIP_LEARNING_RATE)
+      aggregation_factory = tff.aggregators.clipping_factory(
+          clip, aggregation_factory)
+    return aggregation_factory
   else:
     if not FLAGS.uniform_weighting:
       raise ValueError(
           'Differential privacy is only implemented for uniform weighting.')
     if FLAGS.noise_multiplier <= 0:
       raise ValueError('noise_multiplier must be positive if DP is enabled.')
-    if FLAGS.clip is None or FLAGS.clip <= 0:
-      raise ValueError('clip must be positive if DP is enabled.')
-    if FLAGS.adaptive_clip_learning_rate is None:
-      return tff.aggregators.DifferentiallyPrivateFactory.gaussian_fixed(
-          noise_multiplier=FLAGS.noise_multiplier,
-          clients_per_round=FLAGS.clients_per_round,
-          clip=FLAGS.clip)
-    else:
-      if FLAGS.adaptive_clip_learning_rate <= 0:
-        raise ValueError('adaptive_clip_learning_rate must be positive if '
-                         'adaptive clipping is enabled.')
-      return tff.aggregators.DifferentiallyPrivateFactory.gaussian_adaptive(
-          noise_multiplier=FLAGS.noise_multiplier,
-          clients_per_round=FLAGS.clients_per_round,
-          initial_l2_norm_clip=FLAGS.clip,
-          target_unclipped_quantile=FLAGS.target_unclipped_quantile,
-          learning_rate=FLAGS.adaptive_clip_learning_rate)
+    return tff.aggregators.DifferentiallyPrivateFactory.gaussian_adaptive(
+        noise_multiplier=FLAGS.noise_multiplier,
+        clients_per_round=FLAGS.clients_per_round,
+        initial_l2_norm_clip=INITIAL_CLIP,
+        target_unclipped_quantile=FLAGS.target_unclipped_quantile,
+        learning_rate=ADAPTIVE_CLIP_LEARNING_RATE)
 
 
-def main(argv):
-  if len(argv) > 1:
-    raise app.UsageError('Expected no command-line arguments, '
-                         'got: {}'.format(argv))
-
+def train_and_eval():
+  """Train and evaluate StackOver NWP task with secrets."""
   client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
   server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
 
@@ -229,7 +211,7 @@ def main(argv):
       train_client_spec, vocab_size=FLAGS.stackoverflow_word_vocab_size)
 
   logging.info('Trainable weights:')
-  for weight in task.model_fn().weights.trainable:
+  for weight in task.model_fn().trainable_variables:
     logging.info('name: %s  shape: %s', weight.name, weight.shape)
 
   if FLAGS.uniform_weighting:
@@ -239,7 +221,7 @@ def main(argv):
     def client_weighting(local_outputs):
       return tf.cast(tf.squeeze(local_outputs['num_tokens']), tf.float32)
 
-    aggregation_factory = make_aggregation_factory()
+  aggregation_factory = make_aggregation_factory()
 
   training_process = tff.learning.build_federated_averaging_process(
       model_fn=task.model_fn,
@@ -341,6 +323,23 @@ def main(argv):
 
   for metrics_manager in metrics_managers:
     metrics_manager.save_metrics(test_metrics, FLAGS.total_rounds + 1)
+
+
+def main(argv):
+  if len(argv) > 1:
+    raise app.UsageError('Expected no command-line arguments, '
+                         'got: {}'.format(argv))
+
+  # Multi-GPU configuration
+  client_devices = tf.config.list_logical_devices('GPU')
+  server_device = tf.config.list_logical_devices('CPU')[0]
+  tff.backends.native.set_local_execution_context(
+      max_fanout=2 * FLAGS.clients_per_round,
+      server_tf_device=server_device,
+      client_tf_devices=client_devices,
+      clients_per_thread=FLAGS.clients_per_thread)
+
+  train_and_eval()
 
 
 if __name__ == '__main__':

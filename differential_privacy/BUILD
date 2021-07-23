@@ -5,9 +5,16 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])
 
 py_binary(
-    name = "federated_stackoverflow_with_secrets",
-    srcs = ["federated_stackoverflow_with_secrets.py"],
+    name = "run_stackoverflow_with_secrets",
+    srcs = ["run_stackoverflow_with_secrets.py"],
     python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":run_stackoverflow_with_secrets_lib"],
+)
+
+py_library(
+    name = "run_stackoverflow_with_secrets_lib",
+    srcs = ["run_stackoverflow_with_secrets.py"],
     srcs_version = "PY3",
     deps = [
         ":secret_sharer",
