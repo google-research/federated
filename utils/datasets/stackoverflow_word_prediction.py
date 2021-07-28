@@ -41,8 +41,9 @@ class SpecialTokens(object):
 
 def create_vocab(vocab_size: int) -> List[str]:
   """Creates vocab from `vocab_size` most common words in Stackoverflow."""
-  vocab_dict = tff.simulation.datasets.stackoverflow.load_word_counts()
-  return list(vocab_dict.keys())[:vocab_size]
+  return list(
+      tff.simulation.datasets.stackoverflow.load_word_counts(
+          vocab_size=vocab_size).keys())
 
 
 def split_input_target(chunk: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
