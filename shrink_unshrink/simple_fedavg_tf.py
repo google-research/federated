@@ -33,13 +33,13 @@ import attr
 import tensorflow as tf
 import tensorflow_federated as tff
 
-ModelWeights = collections.namedtuple('ModelWeights', 'trainable non_trainable')
 ModelOutputs = collections.namedtuple('ModelOutputs', 'loss')
+WEIGHT_DENOM_TYPE = tf.float32
 
 
 def get_model_weights(
     model: Union[tff.learning.Model, 'KerasModelWrapper']
-) -> Union[tff.learning.ModelWeights, ModelWeights]:
+) -> tff.learning.ModelWeights:
   """Gets the appropriate ModelWeights object based on the model type."""
   if isinstance(model, tff.learning.Model):
     return tff.learning.ModelWeights.from_model(model)
@@ -82,7 +82,7 @@ class KerasModelWrapper(object):
 
   @property
   def weights(self):
-    return ModelWeights(
+    return tff.learning.ModelWeights(
         trainable=self.keras_model.trainable_variables,
         non_trainable=self.keras_model.non_trainable_variables)
 
@@ -223,7 +223,7 @@ def client_update(model, dataset, server_message, client_optimizer):
                         initial_weights)
 
   num_examples = tf.constant(0, dtype=tf.int32)
-  loss_sum = tf.constant(0, dtype=tf.float32)
+  loss_sum = tf.constant(0, dtype=WEIGHT_DENOM_TYPE)
   # Explicit use `iter` for dataset is a trick that makes TFF more robust in
   # GPU simulation and slightly more performant in the unconventional usage
   # of large number of small datasets.
@@ -234,10 +234,10 @@ def client_update(model, dataset, server_message, client_optimizer):
     client_optimizer.apply_gradients(zip(grads, model_weights.trainable))
     batch_size = tf.shape(batch['x'])[0]
     num_examples += batch_size
-    loss_sum += outputs.loss * tf.cast(batch_size, tf.float32)
+    loss_sum += outputs.loss * tf.cast(batch_size, WEIGHT_DENOM_TYPE)
 
   weights_delta = tf.nest.map_structure(lambda a, b: a - b,
                                         model_weights.trainable,
                                         initial_weights.trainable)
-  client_weight = tf.cast(num_examples, tf.float32)
+  client_weight = tf.cast(num_examples, WEIGHT_DENOM_TYPE)
   return ClientOutput(weights_delta, client_weight, loss_sum / client_weight)

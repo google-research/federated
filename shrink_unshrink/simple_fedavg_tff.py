@@ -55,7 +55,7 @@ def _initialize_optimizer_vars(model: Union[tff.learning.Model,
 
 
 def build_federated_averaging_process(
-    model_fn,
+    model_fn,  # CHANGE
     server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
     client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1)):
   """Builds the TFF computations for optimization using federated averaging.
@@ -108,8 +108,21 @@ def build_federated_averaging_process(
     client_optimizer = client_optimizer_fn()
     return client_update(model, tf_dataset, server_message, client_optimizer)
 
+  client_update_output_type = client_update_fn.type_signature.result
+
   federated_server_state_type = tff.type_at_server(server_state_type)
   federated_dataset_type = tff.type_at_clients(tf_dataset_type)
+  federated_client_outputs_type = tff.type_at_clients(client_update_output_type)
+
+  @tff.federated_computation(federated_server_state_type,
+                             federated_client_outputs_type)
+  def unshrink(server_state, client_outputs):
+
+    round_model_delta = tff.federated_mean(
+        client_outputs.weights_delta, weight=client_outputs.client_weight)
+
+    return tff.federated_map(server_update_fn,
+                             (server_state, round_model_delta))
 
   @tff.federated_computation(federated_server_state_type,
                              federated_dataset_type)
@@ -131,15 +144,10 @@ def build_federated_averaging_process(
     client_outputs = tff.federated_map(
         client_update_fn, (federated_dataset, server_message_at_client))
 
-    weight_denom = client_outputs.client_weight
-    round_model_delta = tff.federated_mean(
-        client_outputs.weights_delta, weight=weight_denom)
-
-    server_state = tff.federated_map(server_update_fn,
-                                     (server_state, round_model_delta))
+    server_state = unshrink(server_state, client_outputs)
 
     round_loss_metric = tff.federated_mean(
-        client_outputs.model_output, weight=weight_denom)
+        client_outputs.model_output, weight=client_outputs.client_weight)
 
     return server_state, round_loss_metric
 
