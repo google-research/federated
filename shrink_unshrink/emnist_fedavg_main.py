@@ -150,7 +150,9 @@ def main(argv):
                                               test_data.element_spec, loss)
 
   iterative_process = simple_fedavg_tff.build_federated_averaging_process(
-      tff_model_fn, server_optimizer_fn, client_optimizer_fn)
+      server_model_fn=tff_model_fn,
+      client_model_fn=server_optimizer_fn,
+      client_optimizer_fn=client_optimizer_fn)
   server_state = iterative_process.initialize()
 
   metric = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')

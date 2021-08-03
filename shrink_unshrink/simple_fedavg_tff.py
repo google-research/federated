@@ -54,15 +54,89 @@ def _initialize_optimizer_vars(model: Union[tff.learning.Model,
   assert optimizer.variables()
 
 
+def make_identity_unshrink(federated_server_state_type,
+                           federated_client_outputs_type, server_update_fn,
+                           server_model_fn, client_model_fn):
+  """Creates an whimsy unshrink function.
+
+  This version does not do anything different from the original code, it
+  just changed the structural organization.
+
+  Args:
+    federated_server_state_type: the type of server_state placed on server.
+    federated_client_outputs_type: the type of client_outputs placed on client.
+    server_update_fn: a function which evolves the server_state.
+    server_model_fn: a `tf.keras.Model' which specifies the server-side model.
+    client_model_fn: a `tf.keras.Model' which specifies the client-side model.
+
+  Returns:
+    A corresponding unshrink function.
+  """
+  del server_model_fn
+  del client_model_fn
+
+  @tff.federated_computation(federated_server_state_type,
+                             federated_client_outputs_type)
+  def unshrink(server_state, client_outputs):
+    round_model_delta = tff.federated_mean(
+        client_outputs.weights_delta, weight=client_outputs.client_weight)
+    return tff.federated_map(server_update_fn,
+                             (server_state, round_model_delta))
+
+  return unshrink
+
+
+def make_identity_shrink(federated_server_state_type, federated_dataset_type,
+                         server_message_fn, server_model_fn, client_model_fn):
+  """Creates an whimsy shrink function.
+
+  This version does not do anything different from the original code, it
+  just changed the structural organization.
+
+  Args:
+    federated_server_state_type: the type of server_state placed on server.
+    federated_dataset_type: the type of the dataset placed on client.
+    server_message_fn: a function which creates a BroadcastMessage object.
+    server_model_fn: a `tf.keras.Model' which specifies the server-side model.
+    client_model_fn: a `tf.keras.Model' which specifies the client-side model.
+
+  Returns:
+    A corresponding unshrink function.
+  """
+  del server_model_fn
+  del client_model_fn
+
+  @tff.federated_computation(federated_server_state_type,
+                             federated_dataset_type)
+  def shrink(server_state, federated_dataset):
+    del federated_dataset
+    server_message = tff.federated_map(
+        server_message_fn, server_state)  # this becomes the shrink function
+    server_message_at_client = tff.federated_broadcast(server_message)
+    return server_message_at_client
+
+  return shrink
+
+
 def build_federated_averaging_process(
-    model_fn,  # CHANGE
+    *,
+    server_model_fn,
+    client_model_fn,
+    make_shrink=make_identity_shrink,
+    make_unshrink=make_identity_unshrink,
     server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
     client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1)):
   """Builds the TFF computations for optimization using federated averaging.
 
   Args:
-    model_fn: A no-arg function that returns a
+    server_model_fn: A no-arg function that returns a
       `simple_fedavg_tf.KerasModelWrapper`.
+    client_model_fn: A no-arg function that returns a
+      `simple_fedavg_tf.KerasModelWrapper`.
+    make_shrink: A shrink function which shrinks the server model weights to
+      client model size
+    make_unshrink: An unshrink function which unshrinks client model weights to
+      server model size
     server_optimizer_fn: A no-arg function that returns a
       `tf.keras.optimizers.Optimizer` for server update.
     client_optimizer_fn: A no-arg function that returns a
@@ -71,11 +145,14 @@ def build_federated_averaging_process(
   Returns:
     A `tff.templates.IterativeProcess`.
   """
-  whimsy_model = model_fn()
+  whimsy_client_model = client_model_fn()
+  whimsy_server_model = server_model_fn()
+
+  del whimsy_server_model  # currently used as a placeholder for the future
 
   @tff.tf_computation
   def server_init_tf():
-    model = model_fn()
+    model = server_model_fn()
     model_weights = get_model_weights(model)
     server_optimizer = server_optimizer_fn()
     _initialize_optimizer_vars(model, server_optimizer)
@@ -90,7 +167,7 @@ def build_federated_averaging_process(
 
   @tff.tf_computation(server_state_type, model_weights_type.trainable)
   def server_update_fn(server_state, model_delta):
-    model = model_fn()
+    model = server_model_fn()
     server_optimizer = server_optimizer_fn()
     _initialize_optimizer_vars(model, server_optimizer)
     return server_update(model, server_optimizer, server_state, model_delta)
@@ -100,29 +177,19 @@ def build_federated_averaging_process(
     return build_server_broadcast_message(server_state)
 
   server_message_type = server_message_fn.type_signature.result
-  tf_dataset_type = tff.SequenceType(whimsy_model.input_spec)
+  tf_client_dataset_type = tff.SequenceType(whimsy_client_model.input_spec)
 
-  @tff.tf_computation(tf_dataset_type, server_message_type)
+  @tff.tf_computation(tf_client_dataset_type, server_message_type)
   def client_update_fn(tf_dataset, server_message):
-    model = model_fn()
+    model = client_model_fn()
     client_optimizer = client_optimizer_fn()
     return client_update(model, tf_dataset, server_message, client_optimizer)
 
   client_update_output_type = client_update_fn.type_signature.result
 
   federated_server_state_type = tff.type_at_server(server_state_type)
-  federated_dataset_type = tff.type_at_clients(tf_dataset_type)
+  federated_dataset_type = tff.type_at_clients(tf_client_dataset_type)
   federated_client_outputs_type = tff.type_at_clients(client_update_output_type)
-
-  @tff.federated_computation(federated_server_state_type,
-                             federated_client_outputs_type)
-  def unshrink(server_state, client_outputs):
-
-    round_model_delta = tff.federated_mean(
-        client_outputs.weights_delta, weight=client_outputs.client_weight)
-
-    return tff.federated_map(server_update_fn,
-                             (server_state, round_model_delta))
 
   @tff.federated_computation(federated_server_state_type,
                              federated_dataset_type)
@@ -137,9 +204,14 @@ def build_federated_averaging_process(
     Returns:
       A tuple of updated `ServerState` and `tf.Tensor` of average loss.
     """
-    server_message = tff.federated_map(
-        server_message_fn, server_state)  # this becomes the shrink function
-    server_message_at_client = tff.federated_broadcast(server_message)
+    unshrink = make_unshrink(federated_server_state_type,
+                             federated_client_outputs_type, server_update_fn,
+                             server_model_fn, client_model_fn)
+
+    shrink = make_shrink(federated_server_state_type, federated_dataset_type,
+                         server_message_fn, server_model_fn, client_model_fn)
+
+    server_message_at_client = shrink(server_state, federated_dataset)
 
     client_outputs = tff.federated_map(
         client_update_fn, (federated_dataset, server_message_at_client))

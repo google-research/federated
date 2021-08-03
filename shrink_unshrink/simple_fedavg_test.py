@@ -216,7 +216,8 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
       ('simple_fedavg_wrapper', _simple_fedavg_model_fn),
       ('tff.learning.Model_wrapper', _tff_learning_model_fn))
   def test_something(self, model_fn):
-    it_process = simple_fedavg_tff.build_federated_averaging_process(model_fn)
+    it_process = simple_fedavg_tff.build_federated_averaging_process(
+        server_model_fn=model_fn, client_model_fn=model_fn)
     self.assertIsInstance(it_process, tff.templates.IterativeProcess)
     federated_data_type = it_process.next.type_signature.parameter[1]
     self.assertEqual(
@@ -227,7 +228,8 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
       ('simple_fedavg_wrapper', _simple_fedavg_model_fn),
       ('tff.learning.Model_wrapper', _tff_learning_model_fn))
   def test_simple_training(self, model_fn):
-    it_process = simple_fedavg_tff.build_federated_averaging_process(model_fn)
+    it_process = simple_fedavg_tff.build_federated_averaging_process(
+        server_model_fn=model_fn, client_model_fn=model_fn)
     server_state = it_process.initialize()
 
     def deterministic_batch():
@@ -250,7 +252,8 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
     client_data = _create_client_data()
     train_data = [client_data()]
 
-    trainer = simple_fedavg_tff.build_federated_averaging_process(MnistModel)
+    trainer = simple_fedavg_tff.build_federated_averaging_process(
+        server_model_fn=MnistModel, client_model_fn=MnistModel)
     state = trainer.initialize()
     losses = []
     for _ in range(2):
@@ -272,7 +275,8 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_tff_learning_evaluate(self):
     it_process = simple_fedavg_tff.build_federated_averaging_process(
-        _tff_learning_model_fn)
+        server_model_fn=_tff_learning_model_fn,
+        client_model_fn=_tff_learning_model_fn)
     server_state = it_process.initialize()
     sample_data = [
         collections.OrderedDict(
@@ -393,7 +397,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_build_fedavg_process(self):
     it_process = simple_fedavg_tff.build_federated_averaging_process(
-        _rnn_model_fn)
+        server_model_fn=_rnn_model_fn, client_model_fn=_rnn_model_fn)
     self.assertIsInstance(it_process, tff.templates.IterativeProcess)
     federated_type = it_process.next.type_signature.parameter
     model_type = tff.learning.framework.weights_type_from_model(_rnn_model_fn)
@@ -406,7 +410,8 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_client_adagrad_train(self):
     it_process = simple_fedavg_tff.build_federated_averaging_process(
-        _rnn_model_fn,
+        server_model_fn=_rnn_model_fn,
+        client_model_fn=_rnn_model_fn,
         client_optimizer_fn=functools.partial(
             tf.keras.optimizers.Adagrad, learning_rate=0.01))
     server_state = it_process.initialize()
