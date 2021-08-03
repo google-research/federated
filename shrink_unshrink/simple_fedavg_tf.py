@@ -27,7 +27,7 @@ Communication-Efficient Learning of Deep Networks from Decentralized Data
 """
 
 import collections
-from typing import Union
+from typing import Union, Sequence, Tuple, List
 
 import attr
 import tensorflow as tf
@@ -204,8 +204,71 @@ def build_server_broadcast_message(server_state):
       round_num=server_state.round_num)
 
 
+def flatten_list_of_tensors(
+    list_of_tensors: Sequence[tf.Tensor]
+) -> Tuple[tf.Tensor, List[tf.Tensor], List[tf.Tensor]]:
+  """Flattens and concatenates the tensors in `list_of_tensors` into one vector.
+
+  Args:
+    list_of_tensors: A Sequence of Tensors.
+
+  Returns:
+    The flattened and concatenated vector,
+    a list of sizes of original tensors from `list_of_tensors`,
+    a list of shapes of original tensors from `list_of_tensors`.
+  """
+  list_of_shapes = [tf.shape(x) for x in list_of_tensors]
+  list_of_sizes = [tf.size(x) for x in list_of_tensors]
+  list_of_flattened = tf.nest.map_structure(lambda x: tf.reshape(x, [-1]),
+                                            list_of_tensors)
+  concatenated = tf.concat(list_of_flattened, axis=0)
+  return concatenated, list_of_sizes, list_of_shapes
+
+
+def reshape_flattened_tensor(
+    concatenated: tf.Tensor, list_of_sizes: Sequence[tf.Tensor],
+    list_of_shapes: Sequence[tf.Tensor]) -> Sequence[tf.Tensor]:
+  """Reshapes `concatenated` into the form specified by `list_of_shapes`.
+
+  Args:
+    concatenated: A flat Tensor to be reshaped.
+    list_of_sizes: a list of desired sizes of returned tensors
+    list_of_shapes: a list of desired shapes of returned tensors
+
+  Returns:
+    A Sequence of Tensors.
+  """
+  if len(tf.shape(concatenated)) != 1:
+    raise ValueError(
+        f'rank of input tensor is {tf.shape(concatenated)}, expected 1.')
+  return [
+      tf.reshape(flat_tensor, shape=shape) for flat_tensor, shape in zip(
+          tf.split(concatenated, list_of_sizes), list_of_shapes)
+  ]
+
+
+def projection(projection_matrix: tf.Tensor,
+               flattened_vector: tf.Tensor) -> tf.Tensor:
+  """Projects `flattened_vector` using `projection_matrix`.
+
+  Args:
+    projection_matrix: A rank-2 Tensor that specifies the projection.
+    flattened_vector: A flat Tensor to be projected
+
+  Returns:
+    A flat Tensor returned from projection.
+  """
+  return tf.reshape(
+      projection_matrix @ (tf.transpose(projection_matrix) @ tf.reshape(
+          flattened_vector, [-1, 1])), [-1])
+
+
 @tf.function
-def client_update(model, dataset, server_message, client_optimizer):
+def client_update(model,
+                  dataset,
+                  server_message,
+                  client_optimizer,
+                  projection_matrix=None):
   """Performans client local training of `model` on `dataset`.
 
   Args:
@@ -213,6 +276,8 @@ def client_update(model, dataset, server_message, client_optimizer):
     dataset: A 'tf.data.Dataset'.
     server_message: A `BroadcastMessage` from server.
     client_optimizer: A `tf.keras.optimizers.Optimizer`.
+    projection_matrix: A projection matrix used to project updates;
+      if unspecified, no projection is done.
 
   Returns:
     A 'ClientOutput`.
@@ -239,5 +304,19 @@ def client_update(model, dataset, server_message, client_optimizer):
   weights_delta = tf.nest.map_structure(lambda a, b: a - b,
                                         model_weights.trainable,
                                         initial_weights.trainable)
+
+  flattened_weights_delta, list_of_sizes, list_of_shapes = flatten_list_of_tensors(
+      weights_delta)
+
+  if projection_matrix is not None:
+    projected_flattened_weights_delta = projection(projection_matrix,
+                                                   flattened_weights_delta)
+  else:
+    projected_flattened_weights_delta = flattened_weights_delta
+
+  projected_weights_delta = reshape_flattened_tensor(
+      projected_flattened_weights_delta, list_of_sizes, list_of_shapes)
+  weights_delta = projected_weights_delta
   client_weight = tf.cast(num_examples, WEIGHT_DENOM_TYPE)
   return ClientOutput(weights_delta, client_weight, loss_sum / client_weight)
+  # Note that loss_sum corresponds to the loss of the weights before projection

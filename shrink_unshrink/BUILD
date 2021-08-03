@@ -39,3 +39,11 @@ py_test(
         ":simple_fedavg_tff",
     ],
 )
+
+py_test(
+    name = "simple_fedavg_tf_test",
+    srcs = ["simple_fedavg_tf_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":simple_fedavg_tf"],
+)
