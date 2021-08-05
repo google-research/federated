@@ -52,8 +52,8 @@ def build_secret_inserting_transform_fn(
 
   secret_client_count = sum(cc for (cc, _) in secrets.values())
   if secret_client_count >= len(client_ids):
-    raise ValueError(
-        'Client counts cannot sum to more than total number of clients.')
+    raise ValueError(f'Client counts sum ({secret_client_count}) exceeds total '
+                     f'number of clients ({len(client_ids)}).')
 
   secret, count, prob = zip(*[(s, c, p) for s, (c, p) in secrets.items()])
 

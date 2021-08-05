@@ -234,7 +234,7 @@ def train_and_eval():
 
   num_train_secrets = len(secret_group_info) * FLAGS.num_secrets_per_group
   word_counts = tff.simulation.datasets.stackoverflow.load_word_counts(
-      FLAGS.stackoverflow_word_vocab_size)
+      vocab_size=FLAGS.stackoverflow_word_vocab_size)
   secrets = secret_sharer.generate_secrets(
       word_counts, FLAGS.secret_len,
       num_train_secrets + FLAGS.num_reference_secrets)
@@ -298,12 +298,14 @@ def train_and_eval():
     model_weights.assign_weights_to(prediction_model)
     prediction_model.compile(loss=tf.keras.losses.CategoricalCrossentropy())
     cce = tf.keras.losses.SparseCategoricalCrossentropy(
-        reduction=tf.keras.losses.Reduction.NONE)
+        reduction=tf.keras.losses.Reduction.SUM)
+
+    log_2_e = np.log2(np.e)
 
     def get_perplexity(secret):
       ids = to_ids_fn({'tokens': tf.convert_to_tensor(secret)})
       prediction = prediction_model.predict(ids[:-1])
-      return np.mean(cce(ids[1:], prediction))
+      return log_2_e * cce(ids[1:], prediction)
 
     exposures = secret_sharer.compute_exposure(
         secrets=secrets[:num_train_secrets],
