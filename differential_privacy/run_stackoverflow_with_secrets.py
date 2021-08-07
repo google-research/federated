@@ -304,8 +304,8 @@ def train_and_eval():
 
     def get_perplexity(secret):
       ids = to_ids_fn({'tokens': tf.convert_to_tensor(secret)})
-      prediction = prediction_model.predict(ids[:-1])
-      return log_2_e * cce(ids[1:], prediction)
+      prediction = prediction_model.predict(tf.expand_dims(ids[:-1], axis=0))
+      return log_2_e * cce(tf.expand_dims(ids[1:], axis=0), prediction)
 
     exposures = secret_sharer.compute_exposure(
         secrets=secrets[:num_train_secrets],
