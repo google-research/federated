@@ -19,9 +19,7 @@ commands:
 ```
 pip install absl-py
 pip install attr
-pip install dm-tree
 pip install numpy
-pip install pandas
 pip install tensorflow
 ```
 
@@ -99,19 +97,27 @@ the documentation for
 
 ## Benchmarking experiments
 
-For the purposes of testing out our adaptive learning rate decay methods, we
-have also included federated training binaries for four different datasets,
-CIFAR-100, FEMNIST, Shakespeare, and Stack Overflow. For Stack Overflow, we
-perform two distinct tasks, tag prediction, and next word prediction. A summary
-of the datasets, models, and tasks are given below.
+We use the
+[`tff.simulation.baselines`](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/baselines)
+API to provide a number of pre-canned models/datasets that can be used with the
+adaptive learning rate decay algorithm above. To run these, use the
+[federated_trainer.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/federated_trainer.py)
+binary. This binary will, according to `absl` flags, run any of the tasks in the
+[`tff.simulation.baselines`](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/baselines)
+A summary of the tasks, which are set via the `--task` flag, is given below.
 
-Dataset        | Model                             | Task Summary              | Binary
--------------- | --------------------------------- | ------------------------- | ------
-CIFAR-100      | ResNet-18 (with GroupNorm layers) | Image classification      | [run_federated_cifar100.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_cifar100.py)
-FEMNIST        | Convolutional Neural Network      | Digit recognition         | [run_federated_emnist.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_emnist.py)
-Shakespeare    | RNN with 2 LSTM layers            | Next character prediction | [run_federated_shakespeare.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_shakespeare.py)
-Stack Overflow | RNN with 1 LSTM layer             | Next word prediction      | [run_federated_stackoverflow.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_stackoverflow.py)
-Stack Overflow | Logistic regression classifier    | Tag prediction            | [run_federated_stackoverflow_lr.py](https://github.com/google-research/federated/blob/master/adaptive_lr_decay/run_federated_stackoverflow_lr.py)
+<!-- mdformat off(This table is sensitive to automatic formatting changes) -->
+
+Task | Dataset        | Model                             | Task Summary              |
+----------|----------------|-----------------------------------|---------------------------|
+cifar100_image | [CIFAR-100](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/cifar100/load_data)      | ResNet-18 (with GroupNorm layers) | Image classification      |
+emnist_autoencoder | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data)         | Bottleneck network                | Autoencoder               |
+emnist_character | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data)         | CNN (with dropout)                | Character recognition         |
+shakespeare_character | [Shakespeare](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/shakespeare/load_data)    | RNN with 2 LSTM layers            | Next-character prediction |
+stackoverflow_word | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | RNN with 1 LSTM layer             | Next-word prediction      |
+stackoverflow_tag | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | Logistic regression classifier    | Tag prediction            |
+
+<!-- mdformat on -->
 
 To run the corresponding binaries, we require [Bazel](https://www.bazel.build/).
 Instructions for installing Bazel can be found
@@ -121,7 +127,7 @@ To run a baseline classifier on CIFAR-100, for example, one would run (inside
 this directory):
 
 ```
-bazel run :federated_trainer -- --task=cifar100 --total_rounds=100
+bazel run :federated_trainer -- --task=cifar100_image --total_rounds=100
 --client_optimizer=sgd --client_learning_rate=0.1 --server_optimizer=sgd
 --server_learning_rate=0.1 --clients_per_round=10 --client_epochs_per_round=1
 --experiment_name=cifar100_classification
