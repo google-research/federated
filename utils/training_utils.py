@@ -26,7 +26,9 @@ from utils import utils_impl
 def configure_managers(
     root_output_dir: str,
     experiment_name: str,
-    rounds_per_checkpoint: int = 50
+    rounds_per_checkpoint: int = 50,
+    csv_metrics_manager_save_mode: tff.simulation.SaveMode = tff.simulation
+    .SaveMode.APPEND
 ) -> Tuple[tff.simulation.FileCheckpointManager,
            List[tff.simulation.MetricsManager]]:
   """Configures checkpoint and metrics managers.
@@ -38,6 +40,8 @@ def configure_managers(
     experiment_name: A unique identifier for the current training simulation,
       used to create appropriate subdirectories of `root_output_dir`.
     rounds_per_checkpoint: How often to write checkpoints.
+    csv_metrics_manager_save_mode: A SaveMode specifying the save mode for
+      CSVMetricsManager.
 
   Returns:
     A `tff.simulation.FileCheckpointManager`, and a list of
@@ -49,7 +53,8 @@ def configure_managers(
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  csv_manager = tff.simulation.CSVMetricsManager(csv_file)
+  csv_manager = tff.simulation.CSVMetricsManager(
+      csv_file, save_mode=csv_metrics_manager_save_mode)
 
   summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
   tensorboard_manager = tff.simulation.TensorBoardManager(summary_dir)
