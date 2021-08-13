@@ -121,7 +121,8 @@ def run_federated(
           random_seed=client_datasets_random_seed),
       size=clients_per_round)
 
-  evaluate_fn = tff.learning.build_federated_evaluation(tff_model_fn)
+  evaluate_fn = tff.learning.build_federated_evaluation(
+      tff_model_fn, use_experimental_simulation_loop=True)
 
   def validation_fn(model_weights, round_num):
     del round_num
