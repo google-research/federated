@@ -72,6 +72,9 @@ with utils_impl.record_hparam_flags() as shared_flags:
       'num_validation_examples', -1, 'The number of validation'
       'examples to use. If set to -1, all available examples '
       'are used.')
+  flags.DEFINE_boolean(
+      'uniform_sampling', False, 'Whether to use uniform '
+      'client sampling or permuted batches.')
 
 with utils_impl.record_hparam_flags() as dp_flags:
   # Differential privacy flags
@@ -193,6 +196,28 @@ def make_aggregation_factory():
         learning_rate=ADAPTIVE_CLIP_LEARNING_RATE)
 
 
+class PermuteAndBatch():
+  """Permute users and return batches.
+
+  This class creates a permutation of the supplied values and at each round
+  returns the next batch of values, stepping through the permutation.
+  """
+
+  def __init__(self, values, seed, clients_per_round):
+    rng = np.random.default_rng(seed)
+    self._perm = rng.permutation(values)
+    self._clients_per_round = clients_per_round
+
+  def __call__(self, round_num):
+    """Gets the batch for the `round_num`th round."""
+    i = (round_num * self._clients_per_round) % len(self._perm)
+    next_i = i + self._clients_per_round
+    if next_i > len(self._perm):
+      return list(self._perm[i:]) + list(self._perm[:next_i - len(self._perm)])
+    else:
+      return list(self._perm[i:next_i])
+
+
 def train_and_eval():
   """Train and evaluate StackOver NWP task with secrets."""
   client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
@@ -264,10 +289,16 @@ def train_and_eval():
       tff.simulation.compose_dataset_computation_with_iterative_process(
           train_data.dataset_computation, training_process))
 
-  client_selection_fn = functools.partial(
-      tff.simulation.build_uniform_sampling_fn(
-          train_data.client_ids, random_seed=FLAGS.client_datasets_random_seed),
-      size=FLAGS.clients_per_round)
+  if FLAGS.uniform_sampling:
+    client_selection_fn = functools.partial(
+        tff.simulation.build_uniform_sampling_fn(
+            train_data.client_ids,
+            random_seed=FLAGS.client_datasets_random_seed),
+        size=FLAGS.clients_per_round)
+  else:
+    client_selection_fn = PermuteAndBatch(train_data.client_ids,
+                                          FLAGS.client_datasets_random_seed,
+                                          FLAGS.clients_per_round)
   validation_fn = training_utils.create_validation_fn(
       task,
       validation_frequency=FLAGS.rounds_per_eval,

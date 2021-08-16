@@ -12,6 +12,14 @@ py_binary(
     deps = [":run_stackoverflow_with_secrets_lib"],
 )
 
+py_test(
+    name = "run_stackoverflow_with_secrets_test",
+    srcs = ["run_stackoverflow_with_secrets_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":run_stackoverflow_with_secrets_lib"],
+)
+
 py_library(
     name = "run_stackoverflow_with_secrets_lib",
     srcs = ["run_stackoverflow_with_secrets.py"],
