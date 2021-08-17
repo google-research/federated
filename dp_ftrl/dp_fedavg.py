@@ -411,6 +411,7 @@ def build_federated_averaging_process(
       initialize_fn=server_init_tff, next_fn=run_one_round)
 
 
+# TODO(b/187312400): remove this function after upstreaming to TFF.
 def _create_tree_aggregation_factory(
     noise_multiplier: float,
     clients_per_round: float,
