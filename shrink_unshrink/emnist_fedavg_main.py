@@ -19,6 +19,7 @@ core TFF.
 
 import collections
 import functools
+
 from absl import app
 from absl import flags
 import numpy as np
@@ -149,9 +150,10 @@ def main(argv):
     return simple_fedavg_tf.KerasModelWrapper(keras_model,
                                               test_data.element_spec, loss)
 
-  iterative_process = simple_fedavg_tff.build_federated_averaging_process(
+  iterative_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
       server_model_fn=tff_model_fn,
-      client_model_fn=server_optimizer_fn,
+      client_model_fn=tff_model_fn,
+      server_optimizer_fn=server_optimizer_fn,
       client_optimizer_fn=client_optimizer_fn)
   server_state = iterative_process.initialize()
 

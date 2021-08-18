@@ -15,9 +15,9 @@
 
 import collections
 import functools
+
 from absl.testing import parameterized
 import numpy as np
-
 import tensorflow as tf
 import tensorflow_federated as tff
 
@@ -215,8 +215,8 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
   @parameterized.named_parameters(
       ('simple_fedavg_wrapper', _simple_fedavg_model_fn),
       ('tff.learning.Model_wrapper', _tff_learning_model_fn))
-  def test_something(self, model_fn):
-    it_process = simple_fedavg_tff.build_federated_averaging_process(
+  def test_data_type_signature(self, model_fn):
+    it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=model_fn, client_model_fn=model_fn)
     self.assertIsInstance(it_process, tff.templates.IterativeProcess)
     federated_data_type = it_process.next.type_signature.parameter[1]
@@ -228,7 +228,7 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
       ('simple_fedavg_wrapper', _simple_fedavg_model_fn),
       ('tff.learning.Model_wrapper', _tff_learning_model_fn))
   def test_simple_training(self, model_fn):
-    it_process = simple_fedavg_tff.build_federated_averaging_process(
+    it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=model_fn, client_model_fn=model_fn)
     server_state = it_process.initialize()
 
@@ -243,7 +243,7 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
     loss_list = []
     for _ in range(3):
       server_state, loss = it_process.next(server_state, federated_data)
-      loss_list.append(loss)
+      loss_list.append(loss['metric'])
 
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
@@ -252,13 +252,13 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
     client_data = _create_client_data()
     train_data = [client_data()]
 
-    trainer = simple_fedavg_tff.build_federated_averaging_process(
+    trainer = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=MnistModel, client_model_fn=MnistModel)
     state = trainer.initialize()
     losses = []
     for _ in range(2):
       state, loss = trainer.next(state, train_data)
-      losses.append(loss)
+      losses.append(loss['metric'])
     self.assertLess(losses[1], losses[0])
 
   def test_keras_evaluate(self):
@@ -274,7 +274,7 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
     self.assertBetween(accuracy, 0.0, 1.0)
 
   def test_tff_learning_evaluate(self):
-    it_process = simple_fedavg_tff.build_federated_averaging_process(
+    it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=_tff_learning_model_fn,
         client_model_fn=_tff_learning_model_fn)
     server_state = it_process.initialize()
@@ -396,7 +396,7 @@ def _rnn_model_fn() -> tff.learning.Model:
 class RNNTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_build_fedavg_process(self):
-    it_process = simple_fedavg_tff.build_federated_averaging_process(
+    it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=_rnn_model_fn, client_model_fn=_rnn_model_fn)
     self.assertIsInstance(it_process, tff.templates.IterativeProcess)
     federated_type = it_process.next.type_signature.parameter
@@ -409,7 +409,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
         str(federated_type[1]), '{<x=int32[?,5],y=int32[?,5]>*}@CLIENTS')
 
   def test_client_adagrad_train(self):
-    it_process = simple_fedavg_tff.build_federated_averaging_process(
+    it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=_rnn_model_fn,
         client_model_fn=_rnn_model_fn,
         client_optimizer_fn=functools.partial(
@@ -427,7 +427,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
     loss_list = []
     for _ in range(3):
       server_state, loss = it_process.next(server_state, federated_data)
-      loss_list.append(loss)
+      loss_list.append(loss['metric'])
 
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 

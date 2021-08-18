@@ -15,6 +15,23 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "trainer",
+    srcs = ["trainer.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":models",
+        ":shrink_unshrink_tff",
+        ":simple_fedavg_tf",
+        ":simple_fedavg_tff",
+        "//utils:task_utils",
+        "//utils:training_utils",
+        "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
+    ],
+)
+
 py_library(
     name = "simple_fedavg_tf",
     srcs = ["simple_fedavg_tf.py"],
@@ -25,7 +42,23 @@ py_library(
     name = "simple_fedavg_tff",
     srcs = ["simple_fedavg_tff.py"],
     srcs_version = "PY3",
+    deps = [
+        ":shrink_unshrink_tff",
+        ":simple_fedavg_tf",
+    ],
+)
+
+py_library(
+    name = "shrink_unshrink_tff",
+    srcs = ["shrink_unshrink_tff.py"],
+    srcs_version = "PY3",
     deps = [":simple_fedavg_tf"],
+)
+
+py_library(
+    name = "models",
+    srcs = ["models.py"],
+    srcs_version = "PY3",
 )
 
 py_test(
@@ -45,5 +78,22 @@ py_test(
     srcs = ["simple_fedavg_tf_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    deps = [":simple_fedavg_tf"],
+    deps = [
+        ":models",
+        ":simple_fedavg_tf",
+        ":simple_fedavg_tff",
+    ],
+)
+
+py_test(
+    name = "shrink_unshrink_tff_test",
+    srcs = ["shrink_unshrink_tff_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":models",
+        ":shrink_unshrink_tff",
+        ":simple_fedavg_tf",
+        ":simple_fedavg_tff",
+    ],
 )
