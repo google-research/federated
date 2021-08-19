@@ -674,55 +674,17 @@ class DatasetReduceTest(parameterized.TestCase):
 class TFFLearningDPFTRLTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('total4_std1_d1000', [1, 1, 2, 1], 1., [1000], 0.15, False),
-      ('total4_std1_d10000', [1, 1, 2, 1], 1., [10000], 0.05, False),
-      ('total8_std1_d1000', [1, 1, 2, 1, 2, 2, 3, 1], 1., [1000], 0.15, False),
-      ('total8_std2_d10000', [4, 4, 8, 4, 8, 8, 12, 4], 2., [10000
-                                                            ], 0.05, False),
-      ('total8_std0d5_d1000', [0.25, 0.25, 0.5, 0.25, 0.5, 0.5, 0.75, 0.25
-                              ], 0.5, [1000], 0.15, False),
-      ('total4_std1_d10000_eff', [1., 2. / 3., 1. + 2. / 3., 4. / 7.
-                                 ], 1., [10000], 0.05, True),
+      ('default', True, False, 0.1, 0.9),
+      ('nomomentum', True, False, 0.1, 0.),
+      ('nomomentum_nonoise', True, False, 0., 0.),
+      ('reduce_nonoise', False, False, 0., 0.9),
+      ('nesterov_nonoise', True, True, 0., 0.9),
+      ('nesterov', True, True, 0.1, 0.9),
   )
-  def test_tree_aggregation_factory(self, expected_variance, noise_std,
-                                    variable_shape, tolerance, use_efficient):
-    record = tf.zeros(variable_shape, tf.float32)
-    record_shape = tf.nest.map_structure(lambda t: t.shape, record)
-    record_type = tff.types.to_type((tf.float32, variable_shape))
-    specs = tf.nest.map_structure(tf.TensorSpec, record_shape)
-
-    tree_factory = dp_fedavg._create_tree_aggregation_factory(
-        noise_multiplier=noise_std,
-        l2_norm_clip=1.,
-        record_specs=specs,
-        clients_per_round=1.,
-        noise_seed=1,
-        use_efficient=use_efficient,
-    )
-
-    process = tree_factory.create(record_type)
-
-    state = process.initialize()
-    client_data = [record]
-    cumsum_result = tf.zeros(variable_shape, tf.float32)
-    for expected_var in expected_variance:
-      output = process.next(state, client_data)
-      state = output.state
-      cumsum_result += output.result
-      self.assertAllClose(
-          np.sqrt(expected_var), np.std(cumsum_result), rtol=tolerance)
-
-  @parameterized.named_parameters(
-      ('r5_nonoise', 5, True, False, 0, 0),
-      ('r5m_reduce', 5, False, False, 0, 0.9),
-      ('r5', 5, True, False, 0.1, 0),
-      ('r5m_nesterov', 5, True, True, 0, 0.9),
-      ('r5m_noise', 5, True, True, 0.1, 0.9),
-  )
-  def test_dpftrl_training(self, total_rounds, simulation_flag, use_nesterov,
+  def test_dpftrl_training(self, simulation_flag, use_nesterov,
                            noise_multiplier, momentum):
 
-    learning_rate, clip_norm, seed = 0.1, 1, 1
+    total_rounds, learning_rate, clip_norm, seed = 5, 0.1, 1., 1
 
     def server_optimzier_fn(model_weights):
       model_weight_specs = tf.nest.map_structure(

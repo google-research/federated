@@ -18,12 +18,11 @@ This is forked from TFF/simple_fedavg with the following changes for DP:
 (2) aggregate the model delta from clients with uniform weighting.
 """
 import collections
-from typing import Callable, Collection, Optional
+from typing import Callable, Optional
 import attr
 
 import tensorflow as tf
 import tensorflow_federated as tff
-import tensorflow_privacy as tfp
 
 from dp_ftrl import optimizer_utils
 from utils import tensor_utils
@@ -411,50 +410,6 @@ def build_federated_averaging_process(
       initialize_fn=server_init_tff, next_fn=run_one_round)
 
 
-# TODO(b/187312400): remove this function after upstreaming to TFF.
-def _create_tree_aggregation_factory(
-    noise_multiplier: float,
-    clients_per_round: float,
-    l2_norm_clip: float,
-    record_specs: Collection[tf.TensorSpec],
-    noise_seed: Optional[int] = None,
-    use_efficient: bool = True,
-) -> tff.aggregators.DifferentiallyPrivateFactory:
-  """`DifferentiallyPrivateFactory` with post-processed tree aggregation noise.
-
-  Performs clipping on client, averages clients records, and adds noise for
-  differential privacy. The noise is estimated based on tree aggregation for
-  the cumulative summation over rounds, and then take the residual between the
-  current round and the previous round. Combining this aggregator with a SGD
-  optimizer on server can be used to implement the DP-FTRL algorithm in
-  "Practical and Private (Deep) Learning without Sampling or Shuffling".
-
-  Args:
-      noise_multiplier: Noise multiplier for the Gaussian mechanism for model
-        updates. Note that this is the effective noise multiplier for the sum of
-        client results in each round.
-      clients_per_round: A positive number specifying the expected number of
-        clients per round.
-      l2_norm_clip: The initial value of the adaptive clipping norm.
-      record_specs: The specs of client results to be aggregated.
-      noise_seed: Random seed for the Gaussian noise generator. If `None`, a
-        nondeterministic seed based on system time will be generated.
-      use_efficient: If ture, use the efficient tree aggregation algorithm based
-        on the paper "Efficient Use of Differentially Private Binary Trees".
-
-  Returns:
-      A `DifferentiallyPrivateFactory` with Gaussian noise by tree aggregation.
-  """
-  sum_query = tfp.TreeResidualSumQuery.build_l2_gaussian_query(
-      l2_norm_clip,
-      noise_multiplier,
-      record_specs,
-      noise_seed=noise_seed,
-      use_efficient=use_efficient)
-  mean_query = tfp.NormalizedQuery(sum_query, denominator=clients_per_round)
-  return tff.aggregators.DifferentiallyPrivateFactory(mean_query)
-
-
 def build_dpftrl_fedavg_process(
     model_fn: Callable[[], tff.learning.Model],
     client_optimizer_fn: Callable[
@@ -523,7 +478,7 @@ def build_dpftrl_fedavg_process(
     model_weights = _get_model_weights(model)
     model_weight_specs = tf.nest.map_structure(
         lambda v: tf.TensorSpec(v.shape, v.dtype), model_weights.trainable)
-    aggregator = _create_tree_aggregation_factory(
+    aggregator = tff.aggregators.DifferentiallyPrivateFactory.tree_aggregation(
         noise_multiplier=noise_multiplier,
         clients_per_round=report_goal,
         l2_norm_clip=clip_norm,
