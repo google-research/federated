@@ -1,17 +1,104 @@
 # FedOpt Guide experiments
 
-Note: This directory is a work-in-progress.
+## Overview
 
-This is a shared folder for developing a field guide to federated optimization.
+Implements and experiments with three tasks for "A Field Guide to Federated
+Optimization" ([arXiv link](https://arxiv.org/abs/2107.06917)).
 
-*   The code in this folder should mimic the structure in `optimization/`.
-*   Minimize the number of PRs when you try to commit your code. Note that you
-    do not need to commit your code at this point if it will not be used by
-    others.
-*   Consider creating a subfolder for each task by `dataset_model`, for example,
-    `fedopt_guide/gld23k_mobilenet`.
-*   Re-use the shared code in `optimization/shared/` and `utils/` whenever
-    possible. Use `training_loop` in this folder instead of
-    `utils.training_loop` for your federated traning module. Use
-    `tff.learning.build_federated_averaging_process` instead of
-    `optimization.shared.fed_avg_schedule` to build your TFF iterative process.
+## Requirements
+
+This code is implemented with
+[TensorFlow Federated](https://www.tensorflow.org/federated). See
+[Using TFF for Federated Learning Research](https://www.tensorflow.org/federated/tff_for_research)
+for more instructions on using TensorFlow Federated for research.
+
+The following packages may need to be installed
+
+<!-- mdformat off (multiple lines of small code piece) -->
+
+```bash
+absl-py~=0.10
+attrs~=19.3.0
+numpy~=1.19.2
+pandas~=0.24.2
+tensorflow-federated-nightly
+tf-nightly
+```
+
+<!-- mdformat on -->
+
+## Example usage
+
+The following command can be used to train 100 rounds for the Stack Overflow
+Transformer task.
+
+```
+bazel run stackoverflow_transformer:federated_trainer -- --total_rounds=100
+--client_optimizer=sgd --client_learning_rate=0.1 --client_batch_size=16
+--server_optimizer=adam --server_learning_rate=0.03 --server_adam_epsilon=0.001
+--clients_per_round=10 --client_epochs_per_round=1
+--experiment_name=stackoverflow_experiment
+```
+
+## Citation
+
+```
+@article{fedopt_guide,
+  author    = {Jianyu Wang and
+               Zachary Charles and
+               Zheng Xu and
+               Gauri Joshi and
+               H. Brendan McMahan and
+               Blaise Ag{\"{u}}era y Arcas and
+               Maruan Al{-}Shedivat and
+               Galen Andrew and
+               Salman Avestimehr and
+               Katharine Daly and
+               Deepesh Data and
+               Suhas N. Diggavi and
+               Hubert Eichner and
+               Advait Gadhikar and
+               Zachary Garrett and
+               Antonious M. Girgis and
+               Filip Hanzely and
+               Andrew Hard and
+               Chaoyang He and
+               Samuel Horvath and
+               Zhouyuan Huo and
+               Alex Ingerman and
+               Martin Jaggi and
+               Tara Javidi and
+               Peter Kairouz and
+               Satyen Kale and
+               Sai Praneeth Karimireddy and
+               Jakub Kone{\v{c}}n{\'y} and
+               Sanmi Koyejo and
+               Tian Li and
+               Luyang Liu and
+               Mehryar Mohri and
+               Hang Qi and
+               Sashank J. Reddi and
+               Peter Richt{\'{a}}rik and
+               Karan Singhal and
+               Virginia Smith and
+               Mahdi Soltanolkotabi and
+               Weikang Song and
+               Ananda Theertha Suresh and
+               Sebastian U. Stich and
+               Ameet Talwalkar and
+               Hongyi Wang and
+               Blake E. Woodworth and
+               Shanshan Wu and
+               Felix X. Yu and
+               Honglin Yuan and
+               Manzil Zaheer and
+               Mi Zhang and
+               Tong Zhang and
+               Chunxiang Zheng and
+               Chen Zhu and
+               Wennan Zhu},
+  title     = {A Field Guide to Federated Optimization},
+  journal   = {arXiv preprint arXiv:2107.06917},
+  year      = {2021}
+}
+```
