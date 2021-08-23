@@ -30,14 +30,10 @@ class ModelCollectionTest(tf.test.TestCase):
 
   def test_model_initialization_uses_random_seed(self):
 
-    def create_seeded_model(seed):
-      tf.random.set_seed(seed)
-      return emnist_ae_models.create_autoencoder_model(seed=seed)
-
-    model_1_with_seed_0 = create_seeded_model(seed=0)
-    model_2_with_seed_0 = create_seeded_model(seed=0)
-    model_1_with_seed_1 = create_seeded_model(seed=1)
-    model_2_with_seed_1 = create_seeded_model(seed=1)
+    model_1_with_seed_0 = emnist_ae_models.create_autoencoder_model(seed=0)
+    model_2_with_seed_0 = emnist_ae_models.create_autoencoder_model(seed=0)
+    model_1_with_seed_1 = emnist_ae_models.create_autoencoder_model(seed=1)
+    model_2_with_seed_1 = emnist_ae_models.create_autoencoder_model(seed=1)
     self.assertAllClose(model_1_with_seed_0.weights,
                         model_2_with_seed_0.weights)
     self.assertAllClose(model_1_with_seed_1.weights,

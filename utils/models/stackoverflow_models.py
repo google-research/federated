@@ -39,7 +39,7 @@ def create_recurrent_model(vocab_size: int = 10000,
                            num_layers: int = 1,
                            name: str = 'rnn',
                            shared_embedding: bool = False,
-                           seed: Optional[int] = 0):
+                           seed: Optional[int] = None):
   """Constructs zero-padded keras model with the given parameters and cell.
 
   Args:
@@ -52,11 +52,14 @@ def create_recurrent_model(vocab_size: int = 10000,
     shared_embedding: (Optional) Whether to tie the input and output
       embeddings.
     seed: A random seed governing the model initialization and layer randomness.
-      If set to `None`, No random seed is used.
+      If not `None`, then the global random seed will be set before constructing
+      the tensor initializer, in order to guarantee the same model is produced.
 
   Returns:
     `tf.keras.Model`.
   """
+  if seed is not None:
+    tf.random.set_seed(seed)
   extended_vocab_size = vocab_size + 3 + num_oov_buckets  # For pad/bos/eos/oov.
   inputs = tf.keras.layers.Input(shape=(None,))
   input_embedding = tf.keras.layers.Embedding(

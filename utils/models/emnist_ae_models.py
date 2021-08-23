@@ -19,16 +19,19 @@ from typing import Optional
 import tensorflow as tf
 
 
-def create_autoencoder_model(seed: Optional[int] = 0):
+def create_autoencoder_model(seed: Optional[int] = None):
   """Bottleneck autoencoder for EMNIST autoencoder experiments.
 
   Args:
     seed: A random seed governing the model initialization and layer randomness.
-      If set to `None`, No random seed is used.
+      If not `None`, then the global random seed will be set before constructing
+      the tensor initializer, in order to guarantee the same model is produced.
 
   Returns:
     A `tf.keras.Model`.
   """
+  if seed is not None:
+    tf.random.set_seed(seed)
   initializer = tf.keras.initializers.GlorotNormal(seed=seed)
   dense_layer = functools.partial(
       tf.keras.layers.Dense, kernel_initializer=initializer)

@@ -22,7 +22,7 @@ import tensorflow as tf
 def create_recurrent_model(vocab_size: int,
                            sequence_length: int,
                            mask_zero: bool = True,
-                           seed: Optional[int] = 0) -> tf.keras.Model:
+                           seed: Optional[int] = None) -> tf.keras.Model:
   """Creates a RNN model using LSTM layers for Shakespeare language models.
 
   This replicates the model structure in the paper:
@@ -38,11 +38,14 @@ def create_recurrent_model(vocab_size: int,
     sequence_length: the length of input sequences.
     mask_zero: Whether to mask zero tokens in the input.
     seed: A random seed governing the model initialization and layer randomness.
-      If set to `None`, No random seed is used.
+      If not `None`, then the global random seed will be set before constructing
+      the tensor initializer, in order to guarantee the same model is produced.
 
   Returns:
     An uncompiled `tf.keras.Model`.
   """
+  if seed is not None:
+    tf.random.set_seed(seed)
   model = tf.keras.Sequential()
   model.add(
       tf.keras.layers.Embedding(

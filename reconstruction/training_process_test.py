@@ -139,11 +139,11 @@ class NumBatchesCounter(tf.keras.metrics.Sum):
 
 
 def create_emnist_client_data():
-  np.random.seed(42)
+  rng = np.random.default_rng(42)
   emnist_data = collections.OrderedDict([('x', [
-      np.random.randn(784).astype(np.float32),
-      np.random.randn(784).astype(np.float32),
-      np.random.randn(784).astype(np.float32)
+      rng.standard_normal(784).astype(np.float32),
+      rng.standard_normal(784).astype(np.float32),
+      rng.standard_normal(784).astype(np.float32)
   ]), ('y', [[5], [5], [9]])])
 
   dataset = tf.data.Dataset.from_tensor_slices(emnist_data)
@@ -568,7 +568,7 @@ class TrainingProcessTest(tf.test.TestCase):
 
   def test_custom_model_no_recon(self):
     client_data = create_emnist_client_data()
-    train_data = [client_data(), client_data()]
+    train_data = [client_data(batch_size=3), client_data(batch_size=3)]
 
     def loss_fn():
       return tf.keras.losses.SparseCategoricalCrossentropy()
@@ -602,6 +602,8 @@ class TrainingProcessTest(tf.test.TestCase):
     # All weights and biases are initialized to 0, so initial logits are all 0
     # and softmax probabilities are uniform over 10 classes. So negative log
     # likelihood is -ln(1/10). This is on expectation, so increase tolerance.
+    # Note that this only holds when our batch size is large enough so that
+    # clients only take a single training step.
     self.assertAllClose(outputs[0]['loss'], tf.math.log(10.0), rtol=1e-4)
     self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
     self.assertNotAllClose(states[0].model.trainable, states[1].model.trainable)
@@ -611,10 +613,10 @@ class TrainingProcessTest(tf.test.TestCase):
     self.assertEqual(outputs[0]['num_examples_total'], 6.0)
     self.assertEqual(outputs[1]['num_examples_total'], 6.0)
 
-    # Expect 4 reconstruction batches and 4 training batches. Only training
+    # Expect 2 reconstruction batches and 2 training batches. Only training
     # included in metrics.
-    self.assertEqual(outputs[0]['num_batches_total'], 4.0)
-    self.assertEqual(outputs[1]['num_batches_total'], 4.0)
+    self.assertEqual(outputs[0]['num_batches_total'], 2.0)
+    self.assertEqual(outputs[1]['num_batches_total'], 2.0)
 
   def test_custom_model_adagrad_server_optimizer(self):
     client_data = create_emnist_client_data()
@@ -653,7 +655,7 @@ class TrainingProcessTest(tf.test.TestCase):
     # All weights and biases are initialized to 0, so initial logits are all 0
     # and softmax probabilities are uniform over 10 classes. So negative log
     # likelihood is -ln(1/10). This is on expectation, so increase tolerance.
-    self.assertAllClose(outputs[0]['loss'], tf.math.log(10.0), rtol=1e-4)
+    self.assertAllClose(outputs[0]['loss'], tf.math.log(10.0), atol=1e-3)
     self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
     self.assertNotAllClose(states[0].model.trainable, states[1].model.trainable)
 
@@ -710,7 +712,7 @@ class TrainingProcessTest(tf.test.TestCase):
     # All weights and biases are initialized to 0, so initial logits are all 0
     # and softmax probabilities are uniform over 10 classes. So negative log
     # likelihood is -ln(1/10). This is on expectation, so increase tolerance.
-    self.assertAllClose(outputs[0]['loss'], tf.math.log(10.0), rtol=1e-4)
+    self.assertAllClose(outputs[0]['loss'], tf.math.log(10.0), atol=1e-3)
     self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
     self.assertNotAllClose(states[0].model.trainable, states[1].model.trainable)
 
@@ -811,7 +813,7 @@ class TrainingProcessTest(tf.test.TestCase):
     # All weights and biases are initialized to 0, so initial logits are all 0
     # and softmax probabilities are uniform over 10 classes. So negative log
     # likelihood is -ln(1/10). This is on expectation, so increase tolerance.
-    self.assertAllClose(outputs[0]['loss'], tf.math.log(10.0), rtol=1e-4)
+    self.assertAllClose(outputs[0]['loss'], tf.math.log(10.0), atol=1e-3)
     self.assertLess(outputs[1]['loss'], outputs[0]['loss'])
     self.assertNotAllClose(states[0].model.trainable, states[1].model.trainable)
 

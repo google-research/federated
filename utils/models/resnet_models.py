@@ -18,6 +18,7 @@ Related papers/blogs:
 - http://arxiv.org/pdf/1603.05027v2.pdf
 
 """
+from typing import Optional
 
 import tensorflow as tf
 import tensorflow_addons.layers.normalizations as tfa_norms
@@ -49,7 +50,7 @@ def _conv_norm_relu(input_tensor,
                     kernel_size,
                     strides=(1, 1),
                     norm='group',
-                    seed=0):
+                    seed: Optional[int] = None):
   """Helper function to make a Conv -> Norm -> ReLU block."""
   x = tf.keras.layers.Conv2D(
       filters,
@@ -68,7 +69,7 @@ def _norm_relu_conv(input_tensor,
                     kernel_size,
                     strides=(1, 1),
                     norm='group',
-                    seed=0):
+                    seed: Optional[int] = None):
   """Helper function to make a Norm -> ReLU -> Conv block."""
   x = _norm_relu(input_tensor, norm=norm)
   x = tf.keras.layers.Conv2D(
@@ -83,7 +84,7 @@ def _norm_relu_conv(input_tensor,
   return x
 
 
-def _shortcut(input_tensor, residual, norm='group', seed=0):
+def _shortcut(input_tensor, residual, norm='group', seed: Optional[int] = None):
   """Adds a shortcut between input and the residual."""
   input_shape = tf.keras.backend.int_shape(input_tensor)
   residual_shape = tf.keras.backend.int_shape(residual)
@@ -130,7 +131,7 @@ def _basic_block(input_tensor,
                  strides=(1, 1),
                  avoid_norm=False,
                  norm='group',
-                 seed=0):
+                 seed: Optional[int] = None):
   """Basic convolutional block for use on resnets with <= 34 layers."""
   if avoid_norm:
     x = tf.keras.layers.Conv2D(
@@ -166,7 +167,7 @@ def _bottleneck_block(input_tensor,
                       strides=(1, 1),
                       avoid_norm=False,
                       norm='group',
-                      seed=0):
+                      seed: Optional[int] = None):
   """Bottleneck convolutional block for use on resnets with > 34 layers."""
   if avoid_norm:
     x = tf.keras.layers.Conv2D(
@@ -212,7 +213,7 @@ def _residual_block(input_tensor,
                     strides=(1, 1),
                     is_first_layer=False,
                     norm='group',
-                    seed=0):
+                    seed: Optional[int] = None):
   """Builds a residual block with repeating bottleneck or basic blocks."""
   x = input_tensor
   for i in range(num_blocks):
@@ -236,7 +237,7 @@ def create_resnet(input_shape,
                   initial_kernel_size=(7, 7),
                   initial_pooling='max',
                   norm='group',
-                  seed=0):
+                  seed: Optional[int] = None):
   """Instantiates a ResNet v2 model with Group Normalization.
 
   Instantiates the architecture from http://arxiv.org/pdf/1603.05027v2.pdf.
@@ -256,7 +257,8 @@ def create_resnet(input_shape,
     initial_pooling: The type of pooling after the initial conv layer.
     norm: Type of normalization to be used. Can be 'group' or 'batch'.
     seed: A random seed governing the model initialization and layer randomness.
-      If set to `None`, No random seed is used.
+      If not `None`, then the global random seed will be set before constructing
+      the tensor initializer, in order to guarantee the same model is produced.
 
   Returns:
     A `tf.keras.Model`.
@@ -264,6 +266,8 @@ def create_resnet(input_shape,
   Raises:
     Exception: Input shape should be a tuple of length 3.
   """
+  if seed is not None:
+    tf.random.set_seed(seed)
 
   if len(input_shape) != 3:
     raise Exception(
@@ -321,7 +325,10 @@ def create_resnet(input_shape,
   return model
 
 
-def create_resnet18(input_shape, num_classes, norm='group', seed=0):
+def create_resnet18(input_shape,
+                    num_classes,
+                    norm='group',
+                    seed: Optional[int] = None):
   """ResNet with 18 layers and basic residual blocks."""
   return create_resnet(
       input_shape,
@@ -332,7 +339,10 @@ def create_resnet18(input_shape, num_classes, norm='group', seed=0):
       seed=seed)
 
 
-def create_resnet34(input_shape, num_classes, norm='group', seed=0):
+def create_resnet34(input_shape,
+                    num_classes,
+                    norm='group',
+                    seed: Optional[int] = None):
   """ResNet with 34 layers and basic residual blocks."""
   return create_resnet(
       input_shape,
@@ -343,7 +353,10 @@ def create_resnet34(input_shape, num_classes, norm='group', seed=0):
       seed=seed)
 
 
-def create_resnet50(input_shape, num_classes, norm='group', seed=0):
+def create_resnet50(input_shape,
+                    num_classes,
+                    norm='group',
+                    seed: Optional[int] = None):
   """ResNet with 50 layers and bottleneck residual blocks."""
   return create_resnet(
       input_shape,
@@ -354,7 +367,10 @@ def create_resnet50(input_shape, num_classes, norm='group', seed=0):
       seed=seed)
 
 
-def create_resnet101(input_shape, num_classes, norm='group', seed=0):
+def create_resnet101(input_shape,
+                     num_classes,
+                     norm='group',
+                     seed: Optional[int] = None):
   """ResNet with 101 layers and bottleneck residual blocks."""
   return create_resnet(
       input_shape,
@@ -365,7 +381,10 @@ def create_resnet101(input_shape, num_classes, norm='group', seed=0):
       seed=seed)
 
 
-def create_resnet152(input_shape, num_classes, norm='group', seed=0):
+def create_resnet152(input_shape,
+                     num_classes,
+                     norm='group',
+                     seed: Optional[int] = None):
   """ResNet with 152 layers and bottleneck residual blocks."""
   return create_resnet(
       input_shape,

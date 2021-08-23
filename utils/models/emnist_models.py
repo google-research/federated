@@ -20,7 +20,7 @@ import tensorflow as tf
 
 
 def create_conv_dropout_model(only_digits: bool = True,
-                              seed: Optional[int] = 0):
+                              seed: Optional[int] = None):
   """Convolutional model with droupout for EMNIST experiments.
 
   Args:
@@ -28,12 +28,15 @@ def create_conv_dropout_model(only_digits: bool = True,
       digits only EMNIST dataset. If False, uses 62 outputs for the larger
       dataset.
     seed: A random seed governing the model initialization and layer randomness.
-      If set to `None`, No random seed is used.
+      If not `None`, then the global random seed will be set before constructing
+      the tensor initializer, in order to guarantee the same model is produced.
 
   Returns:
     A `tf.keras.Model`.
   """
   data_format = 'channels_last'
+  if seed is not None:
+    tf.random.set_seed(seed)
   initializer = tf.keras.initializers.GlorotNormal(seed=seed)
 
   model = tf.keras.models.Sequential([
@@ -66,7 +69,7 @@ def create_conv_dropout_model(only_digits: bool = True,
 
 
 def create_original_fedavg_cnn_model(only_digits: bool = True,
-                                     seed: Optional[int] = 0):
+                                     seed: Optional[int] = None):
   """The CNN model used in https://arxiv.org/abs/1602.05629.
 
   The number of parameters when `only_digits=True` is (1,663,370), which matches
@@ -77,11 +80,15 @@ def create_original_fedavg_cnn_model(only_digits: bool = True,
       digits only EMNIST dataset. If False, uses 62 outputs for the larger
       dataset.
     seed: A random seed governing the model initialization and layer randomness.
+      If not `None`, then the global random seed will be set before constructing
+      the tensor initializer, in order to guarantee the same model is produced.
 
   Returns:
     A `tf.keras.Model`.
   """
   data_format = 'channels_last'
+  if seed is not None:
+    tf.random.set_seed(seed)
   initializer = tf.keras.initializers.GlorotNormal(seed=seed)
 
   max_pool = functools.partial(
@@ -96,7 +103,6 @@ def create_original_fedavg_cnn_model(only_digits: bool = True,
       data_format=data_format,
       activation=tf.nn.relu,
       kernel_initializer=initializer)
-
   model = tf.keras.models.Sequential([
       conv2d(filters=32, input_shape=(28, 28, 1)),
       max_pool(),
@@ -116,7 +122,7 @@ def create_original_fedavg_cnn_model(only_digits: bool = True,
 
 def create_two_hidden_layer_model(only_digits: bool = True,
                                   hidden_units: int = 200,
-                                  seed: Optional[int] = 0):
+                                  seed: Optional[int] = None):
   """Create a two hidden-layer fully connected neural network.
 
   Args:
@@ -128,10 +134,14 @@ def create_two_hidden_layer_model(only_digits: bool = True,
       We default to 200 units, which matches that in
       https://arxiv.org/abs/1602.05629.
     seed: A random seed governing the model initialization and layer randomness.
+      If not `None`, then the global random seed will be set before constructing
+      the tensor initializer, in order to guarantee the same model is produced.
 
   Returns:
     A `tf.keras.Model`.
   """
+  if seed is not None:
+    tf.random.set_seed(seed)
   initializer = tf.keras.initializers.GlorotNormal(seed=seed)
 
   model = tf.keras.models.Sequential([
@@ -149,7 +159,7 @@ def create_two_hidden_layer_model(only_digits: bool = True,
   return model
 
 
-def create_1m_cnn_model(only_digits: bool = True, seed: Optional[int] = 0):
+def create_1m_cnn_model(only_digits: bool = True, seed: Optional[int] = None):
   """A CNN model with slightly under 2^20 (roughly 1 million) params.
 
   A simple CNN model for the EMNIST character recognition task that is very
@@ -169,11 +179,15 @@ def create_1m_cnn_model(only_digits: bool = True, seed: Optional[int] = 0):
       digits only EMNIST dataset. If False, uses 62 outputs for the larger
       dataset.
     seed: A random seed governing the model initialization and layer randomness.
+      If not `None`, then the global random seed will be set before constructing
+      the tensor initializer, in order to guarantee the same model is produced.
 
   Returns:
     A `tf.keras.Model`.
   """
   data_format = 'channels_last'
+  if seed is not None:
+    tf.random.set_seed(seed)
   initializer = tf.keras.initializers.GlorotUniform(seed=seed)
 
   model = tf.keras.models.Sequential([
