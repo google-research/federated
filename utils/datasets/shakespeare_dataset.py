@@ -13,7 +13,7 @@
 # limitations under the License.
 """Libraries to prepare Shakespeare datasets for CharRNN experiments."""
 
-from typing import Callable, Optional, Tuple
+from typing import Callable, Tuple
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -204,11 +204,11 @@ def get_federated_datasets(
 
 
 def get_centralized_datasets(
-    train_batch_size: Optional[int] = 20,
-    test_batch_size: Optional[int] = 100,
-    train_shuffle_buffer_size: Optional[int] = 1000,
-    test_shuffle_buffer_size: Optional[int] = 1,
-    sequence_length: Optional[int] = SEQUENCE_LENGTH
+    train_batch_size: int = 20,
+    test_batch_size: int = 100,
+    train_shuffle_buffer_size: int = 1000,
+    test_shuffle_buffer_size: int = 1,
+    sequence_length: int = SEQUENCE_LENGTH
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
   """Loads and preprocesses centralized Shakespeare datasets.
 
