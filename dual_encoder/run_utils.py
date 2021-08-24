@@ -37,7 +37,8 @@ def _configure_managers(
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   tf.io.gfile.makedirs(results_dir)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  csv_manager = tff.simulation.CSVMetricsManager(csv_file)
+  csv_manager = tff.simulation.CSVMetricsManager(
+      csv_file, save_mode=tff.simulation.SaveMode.WRITE)
 
   summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
   tensorboard_manager = tff.simulation.TensorBoardManager(summary_dir)
