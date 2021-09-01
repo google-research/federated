@@ -222,7 +222,7 @@ class CompressionSumQuery(tfp.SumAggregationDPQuery):
 
   def get_noised_result(self, sample_state, global_state):
     # Delegate to inner query for final aggregation result.
-    agg_record, new_inner_query_state = self._inner_query.get_noised_result(
+    agg_record, new_inner_query_state, event = self._inner_query.get_noised_result(
         sample_state, global_state.inner_query_state)
 
     # Decode the aggregated result.
@@ -235,7 +235,7 @@ class CompressionSumQuery(tfp.SumAggregationDPQuery):
         sample_hadamard_seed=new_seed_pair(),
         inner_query_state=new_inner_query_state)
 
-    return decoded_agg_record, new_global_state
+    return decoded_agg_record, new_global_state, event
 
 
 def new_seed_pair() -> tf.Tensor:

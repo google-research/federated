@@ -20,6 +20,7 @@ py_test(
     name = "compression_query_test",
     srcs = ["compression_query_test.py"],
     python_version = "PY3",
+    tags = ["nokokoro"],  # TODO(b/198312839): Replace kokoro tests after TFP Pip release
     deps = [
         ":compression_query",
         ":distributed_discrete_gaussian_query",
@@ -71,6 +72,7 @@ py_test(
     name = "distributed_discrete_gaussian_query_test",
     srcs = ["distributed_discrete_gaussian_query_test.py"],
     python_version = "PY3",
+    tags = ["nokokoro"],  # TODO(b/198312839): Replace kokoro tests after TFP Pip release
     deps = [
         ":discrete_gaussian_utils",
         ":distributed_discrete_gaussian_query",

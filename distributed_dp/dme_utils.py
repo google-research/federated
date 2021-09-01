@@ -68,7 +68,7 @@ def compute_dp_average(client_data, dp_query, is_compressed, bits):
           sample_params, sample_state, record=record)
 
   # Apply server post-processing.
-  agg_result, _ = dp_query.get_noised_result(sample_state, global_state)
+  agg_result, _, _ = dp_query.get_noised_result(sample_state, global_state)
 
   # The agg_result should have the same input type as client_data.
   assert agg_result.shape == client_data[0].shape

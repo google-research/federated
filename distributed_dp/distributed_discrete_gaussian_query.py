@@ -109,4 +109,5 @@ class DistributedDiscreteGaussianSumQuery(tfp.SumAggregationDPQuery):
   def get_noised_result(self, sample_state, global_state):
     # Note that by directly returning the aggregate, this assumes that there
     # will not be missing local noise shares during execution.
-    return sample_state, global_state
+    event = tfp.UnsupportedDpEvent()
+    return sample_state, global_state, event
