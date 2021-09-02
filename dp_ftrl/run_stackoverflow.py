@@ -402,7 +402,7 @@ def main(argv):
   # Multi-GPU configuration
   client_devices = tf.config.list_logical_devices('GPU')
   server_device = tf.config.list_logical_devices('CPU')[0]
-  tff.backends.native.set_local_execution_context(
+  tff.backends.native.set_local_python_execution_context(
       max_fanout=2 * FLAGS.clients_per_round,
       server_tf_device=server_device,
       client_tf_devices=client_devices,

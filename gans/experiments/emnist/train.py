@@ -398,7 +398,7 @@ def main(argv):
   for k, v in hparam_dict.items():
     print('{} : {} '.format(k, v))
 
-  tff.backends.native.set_local_execution_context(
+  tff.backends.native.set_local_python_execution_context(
       default_num_clients=FLAGS.num_clients_per_round)
 
   # Trained classifier model.

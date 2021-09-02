@@ -220,7 +220,7 @@ def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Expected no command-line arguments, '
                          'got: {}'.format(argv))
-  tff.backends.native.set_local_execution_context(max_fanout=25)
+  tff.backends.native.set_local_python_execution_context(max_fanout=25)
   run_experiment()
 
 
