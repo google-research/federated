@@ -7,7 +7,7 @@ of datasets
 and apply various kinds of pre-processing.
 
 These datasets are intended primarily for research in TFF (see
-[Using TFF for Federated Learning Research](https://github.com/tensorflow/federated/blob/master/docs/tff_for_research.md))
+[Using TFF for Federated Learning Research](https://github.com/tensorflow/federated/blob/main/docs/tff_for_research.md))
 and are not necessarily intended to be production-ready. Moreover, these
 datasets are tied to prior and ongoing research. While changes designed to clean
 up or speed up the dataset preprocessing are welcome, any fundamental changes to

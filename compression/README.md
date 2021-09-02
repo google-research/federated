@@ -16,7 +16,7 @@ Averaging algorithm in particular).
     use in TFF, see
     [sparsity.py](https://github.com/google-research/federated/blob/master/compression/sparsity.py)
     for an example of implementing a custom compression algorithm. See also
-    [TFF for research](https://github.com/tensorflow/federated/blob/master/docs/tff_for_research.md).
+    [TFF for research](https://github.com/tensorflow/federated/blob/main/docs/tff_for_research.md).
 
 The specific algorithm implemented here applies the following transform to every
 model variable of more than `10,000` elements. It first applies uniform

@@ -11,7 +11,7 @@ assumes some familiarity with libraries such as
 ## Dependencies
 
 To use this library, one should first follow the instructions
-[here](https://github.com/tensorflow/federated/blob/master/docs/install.md) to
+[here](https://github.com/tensorflow/federated/blob/main/docs/install.md) to
 install TensorFlow Federated using pip. Other pip packages are required by this
 library, and may need to be installed. They can be installed via the following
 commands:
