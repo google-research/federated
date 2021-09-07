@@ -27,7 +27,6 @@ import tensorflow_federated as tff
 from dp_ftrl import optimizer_utils
 from utils import tensor_utils
 
-
 DEFAULT_SERVER_OPTIMIZER_FN = lambda w: optimizer_utils.SGDServerOptimizer(  # pylint: disable=g-long-lambda
     learning_rate=1.0)
 DEFAULT_CLIENT_OPTIMIZER_FN = lambda: tf.keras.optimizers.SGD(learning_rate=0.1)
@@ -474,10 +473,8 @@ def build_dpftrl_fedavg_process(
       raise ValueError(
           '`report_goal` must be positive when `noise_multiplier` is not None, '
           f'get {report_goal}.')
-    model = model_fn()
-    model_weights = _get_model_weights(model)
-    model_weight_specs = tf.nest.map_structure(
-        lambda v: tf.TensorSpec(v.shape, v.dtype), model_weights.trainable)
+    model_weight_specs = tff.framework.type_to_tf_tensor_specs(
+        tff.learning.framework.weights_type_from_model(model_fn).trainable)
     aggregator = tff.aggregators.DifferentiallyPrivateFactory.tree_aggregation(
         noise_multiplier=noise_multiplier,
         clients_per_round=report_goal,
