@@ -166,7 +166,7 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     train_client_spec = tff.simulation.baselines.ClientSpec(
         num_epochs=3, batch_size=32, max_elements=1000)
     my_task = tff.simulation.baselines.stackoverflow.create_word_prediction_task(
-        train_client_spec, use_synthetic_data=True)
+        train_client_spec, use_synthetic_data=False)
     big_model_fn, small_model_fn = models.make_big_and_small_stackoverflow_model_fn(
         my_task,
         big_embedding_size=96,
