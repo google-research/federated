@@ -210,7 +210,7 @@ def get_matrix_factorization_model(
   model = tf.keras.Model(inputs=keras_inputs, outputs=pred)
 
   return MatrixFactorizationModel(model, global_layers, local_layers,
-                                  input_spec)
+                                  input_spec)  # pytype: disable=wrong-arg-types
 
 
 def build_reconstruction_model(

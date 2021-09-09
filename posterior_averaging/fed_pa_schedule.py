@@ -31,6 +31,7 @@ References:
 
 import collections
 import functools
+import typing
 from typing import Callable, Collection, Optional, Union
 
 import attr
@@ -867,11 +868,15 @@ def build_fed_pa_process(
     # Aggregate model outputs that contain local metrics and various statistics.
     aggregated_outputs = placeholder_model.federated_output_computation(
         client_outputs.model_output)
+    aggregated_outputs_type = typing.cast(tff.FederatedType,
+                                          aggregated_outputs.type_signature)
     additional_outputs = tff.federated_mean(
         client_outputs.additional_output, weight=client_weight)
+    additional_outputs_type = typing.cast(tff.FederatedType,
+                                          additional_outputs.type_signature)
 
-    @tff.tf_computation(aggregated_outputs.type_signature.member,
-                        additional_outputs.type_signature.member)
+    @tff.tf_computation(aggregated_outputs_type.member,
+                        additional_outputs_type.member)
     def _update_aggregated_outputs(aggregated_outputs, additional_outputs):
       aggregated_outputs.update(additional_outputs)
       return aggregated_outputs

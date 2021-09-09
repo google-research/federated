@@ -217,7 +217,8 @@ def read_metric_variables(
 
 
 def federated_output_computation_from_metrics(
-    metrics: List[tf.keras.metrics.Metric]) -> tff.federated_computation:
+    metrics: List[tf.keras.metrics.Metric]
+) -> tff.federated_computation:  # pytype: disable=invalid-annotation
   """Produces a federated computation for aggregating Keras metrics.
 
   This can be used to evaluate both Keras and non-Keras models using Keras

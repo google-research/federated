@@ -77,7 +77,7 @@ def create_preprocess_fn(
         batch_size, drop_remainder=False).map(
             mapping_fn, num_parallel_calls=num_parallel_calls)
 
-  return preprocess_fn
+  return preprocess_fn  # pytype: disable=bad-return-type
 
 
 def get_federated_datasets(

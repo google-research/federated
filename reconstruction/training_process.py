@@ -65,7 +65,7 @@ LossFn = Callable[[], tf.keras.losses.Loss]
 MetricsFn = Callable[[], List[tf.keras.metrics.Metric]]
 ModelFn = Callable[[], reconstruction_model.ReconstructionModel]
 OptimizerFn = Callable[[], tf.keras.optimizers.Optimizer]
-TFComputationFn = Callable[..., tff.tf_computation]
+TFComputationFn = Callable[..., tff.tf_computation]  # pytype: disable=invalid-annotation
 
 
 def build_server_init_fn(
@@ -119,7 +119,8 @@ def build_server_init_fn(
 def build_server_update_fn(
     model_fn: ModelFn, server_optimizer_fn: OptimizerFn,
     server_state_type: tff.Type, model_weights_type: tff.Type,
-    aggregator_state_type: tff.Type) -> tff.tf_computation:
+    aggregator_state_type: tff.Type
+) -> tff.tf_computation:  # pytype: disable=invalid-annotation
   """Builds a `tff.tf_computation` that updates `ServerState`.
 
   Args:
@@ -184,7 +185,9 @@ def build_server_update_fn(
         aggregator_state=aggregator_state,
     )
 
-  @tff.tf_computation(server_state_type, model_weights_type.trainable,
+  trainable_variables = model_weights_type.trainable  # pytype: disable=attribute-error
+
+  @tff.tf_computation(server_state_type, trainable_variables,
                       aggregator_state_type)
   def server_update_tf(server_state, model_delta, aggregator_state):
     """Updates the `server_state`.
@@ -224,7 +227,7 @@ def build_client_update_fn(
     evaluate_reconstruction: bool,
     jointly_train_variables: bool,
     client_weight_fn: Optional[ClientWeightFn] = None,
-) -> tff.tf_computation:
+) -> tff.tf_computation:  # pytype: disable=invalid-annotation
   """Builds a `tff.tf_computation` for local model reconstruction and training.
 
   Args:
@@ -432,9 +435,9 @@ def build_run_one_round_fn(
     client_update_fn: TFComputationFn,
     federated_output_computation: tff.federated_computation,
     federated_server_state_type: tff.Type,
-    federated_dataset_type: tff.SequenceType,
+    federated_dataset_type: tff.FederatedType,
     aggregation_process: tff.templates.AggregationProcess,
-) -> tff.federated_computation:
+) -> tff.federated_computation:  # pytype: disable=invalid-annotation
   """Builds a `tff.federated_computation` for a round of training.
 
   Args:
