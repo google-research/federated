@@ -20,40 +20,73 @@ from utils import tensor_utils
 
 class TensorUtilsTest(tf.test.TestCase):
 
-  def test_zero_all_if_any_non_finite(self):
+  def expect_ok_graph_mode(self, structure):
+    with tf.Graph().as_default():
+      result, error = tensor_utils.zero_all_if_any_non_finite(structure)
+      with self.session() as sess:
+        result, error = sess.run((result, error))
+      try:
+        tf.nest.map_structure(np.testing.assert_allclose, result, structure)
+      except AssertionError:
+        self.fail('Expected to get input {} back, but instead got {}'.format(
+            structure, result))
+      self.assertEqual(error, 0)
 
-    def expect_ok(structure):
-      with tf.Graph().as_default():
-        result, error = tensor_utils.zero_all_if_any_non_finite(structure)
-        with self.session() as sess:
-          result, error = sess.run((result, error))
-        try:
-          tf.nest.map_structure(np.testing.assert_allclose, result, structure)
-        except AssertionError:
-          self.fail('Expected to get input {} back, but instead got {}'.format(
-              structure, result))
-        self.assertEqual(error, 0)
+  def expect_ok_eager_mode(self, structure):
+    result, error = tensor_utils.zero_all_if_any_non_finite(structure)
+    try:
+      tf.nest.map_structure(np.testing.assert_allclose, result, structure)
+    except AssertionError:
+      self.fail('Expected to get input {} back, but instead got {}'.format(
+          structure, result))
+    self.assertEqual(error, 0)
 
-    expect_ok([])
-    expect_ok([(), {}])
-    expect_ok(1.1)
-    expect_ok([1.0, 0.0])
-    expect_ok([1.0, 2.0, {'a': 0.0, 'b': -3.0}])
+  def expect_zeros_graph_mode(self, structure, expected):
+    with tf.Graph().as_default():
+      result, error = tensor_utils.zero_all_if_any_non_finite(structure)
+      with self.session() as sess:
+        result, error = sess.run((result, error))
+      try:
+        tf.nest.map_structure(np.testing.assert_allclose, result, expected)
+      except AssertionError:
+        self.fail('Expected to get zeros, but instead got {}'.format(result))
+      self.assertEqual(error, 1)
 
-    def expect_zeros(structure, expected):
-      with tf.Graph().as_default():
-        result, error = tensor_utils.zero_all_if_any_non_finite(structure)
-        with self.session() as sess:
-          result, error = sess.run((result, error))
-        try:
-          tf.nest.map_structure(np.testing.assert_allclose, result, expected)
-        except AssertionError:
-          self.fail('Expected to get zeros, but instead got {}'.format(result))
-        self.assertEqual(error, 1)
+  def expect_zeros_eager_mode(self, structure, expected):
+    result, error = tensor_utils.zero_all_if_any_non_finite(structure)
+    try:
+      tf.nest.map_structure(np.testing.assert_allclose, result, expected)
+    except AssertionError:
+      self.fail('Expected to get zeros, but instead got {}'.format(result))
+    self.assertEqual(error, 1)
 
-    expect_zeros(np.inf, 0.0)
-    expect_zeros((1.0, (2.0, np.nan)), (0.0, (0.0, 0.0)))
-    expect_zeros((1.0, (2.0, {
+  def test_zero_all_if_any_non_finite_graph_mode(self):
+    tf.config.experimental_run_functions_eagerly(False)
+    self.expect_ok_graph_mode([])
+    self.expect_ok_graph_mode([(), {}])
+    self.expect_ok_graph_mode(1.1)
+    self.expect_ok_graph_mode([1.0, 0.0])
+    self.expect_ok_graph_mode([1.0, 2.0, {'a': 0.0, 'b': -3.0}])
+    self.expect_zeros_graph_mode(np.inf, 0.0)
+    self.expect_zeros_graph_mode((1.0, (2.0, np.nan)), (0.0, (0.0, 0.0)))
+    self.expect_zeros_graph_mode((1.0, (2.0, {
+        'a': 3.0,
+        'b': [[np.inf], [np.nan]]
+    })), (0.0, (0.0, {
+        'a': 0.0,
+        'b': [[0.0], [0.0]]
+    })))
+
+  def test_zero_all_if_any_non_finite_eager_mode(self):
+    tf.config.experimental_run_functions_eagerly(True)
+    self.expect_ok_eager_mode([])
+    self.expect_ok_eager_mode([(), {}])
+    self.expect_ok_eager_mode(1.1)
+    self.expect_ok_eager_mode([1.0, 0.0])
+    self.expect_ok_eager_mode([1.0, 2.0, {'a': 0.0, 'b': -3.0}])
+    self.expect_zeros_eager_mode(np.inf, 0.0)
+    self.expect_zeros_eager_mode((1.0, (2.0, np.nan)), (0.0, (0.0, 0.0)))
+    self.expect_zeros_eager_mode((1.0, (2.0, {
         'a': 3.0,
         'b': [[np.inf], [np.nan]]
     })), (0.0, (0.0, {

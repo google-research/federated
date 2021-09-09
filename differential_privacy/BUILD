@@ -40,6 +40,13 @@ py_binary(
     srcs = ["run_federated.py"],
     python_version = "PY3",
     srcs_version = "PY3",
+    deps = [":run_federated_lib"],
+)
+
+py_library(
+    name = "run_federated_lib",
+    srcs = ["run_federated.py"],
+    srcs_version = "PY3",
     deps = [
         "//utils:task_utils",
         "//utils:training_utils",
