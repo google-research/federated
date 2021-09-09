@@ -68,8 +68,8 @@ class TaskUtilsTest(tf.test.TestCase, parameterized.TestCase):
 
   @flagsaver.flagsaver
   def test_create_stackoverflow_tag_uses_vocab_sizes(self):
-    word_vocab_size = 123
-    tag_vocab_size = 17
+    word_vocab_size = 5
+    tag_vocab_size = 3
     FLAGS.task = 'stackoverflow_tag'
     FLAGS.stackoverflow_tag_word_vocab_size = word_vocab_size
     FLAGS.stackoverflow_tag_tag_vocab_size = tag_vocab_size
