@@ -53,10 +53,26 @@ class TrainingUtilsTest(tf.test.TestCase):
     checkpoint_manager.save_checkpoint(test_state, 1)
     self.assertCountEqual(tf.io.gfile.listdir(checkpoint_path), ['ckpt_1'])
 
+  def test_program_state_manager_saves_to_correct_dir(self):
+    root_output_dir = self.get_temp_dir()
+    experiment_name = 'test'
+    program_state_manager, _ = training_utils.configure_output_managers(
+        root_output_dir, experiment_name)
+    self.assertIsInstance(program_state_manager,
+                          tff.simulation.FileProgramStateManager)
+
+    program_state_dir = os.path.join(root_output_dir, 'program_states',
+                                     experiment_name)
+    test_state = create_scalar_metrics()
+    program_state_manager.set_structure(test_state)
+    program_state_manager.save(test_state, 1)
+    self.assertCountEqual(
+        tf.io.gfile.listdir(program_state_dir), ['program_state_1'])
+
   def test_csv_manager_saves_to_correct_dir(self):
     root_output_dir = self.get_temp_dir()
     experiment_name = 'test'
-    _, metrics_managers = training_utils.configure_managers(
+    _, metrics_managers = training_utils.configure_output_managers(
         root_output_dir, experiment_name)
     csv_manager, _ = metrics_managers
     self.assertIsInstance(csv_manager, tff.simulation.CSVMetricsManager)
@@ -69,7 +85,7 @@ class TrainingUtilsTest(tf.test.TestCase):
   def test_tensorboard_manager_saves_to_correct_dir(self):
     root_output_dir = self.get_temp_dir()
     experiment_name = 'test'
-    _, metrics_managers = training_utils.configure_managers(
+    _, metrics_managers = training_utils.configure_output_managers(
         root_output_dir, experiment_name)
     _, tensorboard_manager = metrics_managers
     self.assertIsInstance(tensorboard_manager,

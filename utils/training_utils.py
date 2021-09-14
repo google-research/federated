@@ -15,6 +15,7 @@
 
 import os.path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+import warnings
 
 from absl import logging
 import tensorflow as tf
@@ -33,6 +34,10 @@ def configure_managers(
            List[tff.simulation.MetricsManager]]:
   """Configures checkpoint and metrics managers.
 
+  DEPRECATED: This is deprecated due to its usage of the deprecated
+  `tff.simulation.FileCheckpointManager`. Please use `configure_output_managers`
+  instead.
+
   Args:
     root_output_dir: A string representing the root output directory for the
       training simulation. All metrics and checkpoints will be logged to
@@ -47,6 +52,8 @@ def configure_managers(
     A `tff.simulation.FileCheckpointManager`, and a list of
     `tff.simulation.MetricsManager` instances.
   """
+  warnings.warn('`configure_managers` is deprecated, please use '
+                '`configure_output_managers` instead.')
   checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
   checkpoint_manager = tff.simulation.FileCheckpointManager(
       checkpoint_dir, step=rounds_per_checkpoint)
@@ -64,6 +71,47 @@ def configure_managers(
   logging.info('    CSV metrics to: %s', csv_file)
   logging.info('    TensorBoard summaries to: %s', summary_dir)
   return checkpoint_manager, [csv_manager, tensorboard_manager]
+
+
+def configure_output_managers(
+    root_output_dir: str,
+    experiment_name: str,
+    csv_metrics_manager_save_mode: tff.simulation.SaveMode = tff.simulation
+    .SaveMode.APPEND
+) -> Tuple[tff.simulation.FileCheckpointManager,
+           List[tff.simulation.MetricsManager]]:
+  """Configures a file program state manager and metrics managers.
+
+  Args:
+    root_output_dir: A string representing the root output directory for the
+      training simulation. All metrics and checkpoints will be logged to
+      subdirectories of this directory.
+    experiment_name: A unique identifier for the current training simulation,
+      used to create appropriate subdirectories of `root_output_dir`.
+    csv_metrics_manager_save_mode: A SaveMode specifying the save mode for
+      CSVMetricsManager.
+
+  Returns:
+    A `tff.simulation.FileProgramStateManager`, and a list of
+    `tff.simulation.MetricsManager` instances.
+  """
+  program_state_dir = os.path.join(root_output_dir, 'program_states',
+                                   experiment_name)
+  program_state_manager = tff.simulation.FileProgramStateManager(
+      root_dir=program_state_dir)
+  results_dir = os.path.join(root_output_dir, 'results', experiment_name)
+  csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
+  csv_manager = tff.simulation.CSVMetricsManager(
+      csv_file, save_mode=csv_metrics_manager_save_mode)
+
+  summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
+  tensorboard_manager = tff.simulation.TensorBoardManager(summary_dir)
+
+  logging.info('Writing...')
+  logging.info('    program states to: %s', program_state_dir)
+  logging.info('    CSV metrics to: %s', csv_file)
+  logging.info('    TensorBoard summaries to: %s', summary_dir)
+  return program_state_manager, [csv_manager, tensorboard_manager]
 
 
 def write_hparams_to_csv(hparam_dict: Dict[str, Any], root_output_dir: str,
