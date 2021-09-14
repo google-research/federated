@@ -27,10 +27,10 @@ from gans import tff_gans
 # all other hyperparams are set as they are. These values are asserted so as to
 # provide a check for code changes that alter the behavior of the TFF GAN.
 BEFORE_DP_L2_NORM_CLIP = 100.0
-AFTER_2_RDS_DP_L2_NORM_CLIP = 100.4799957
+AFTER_2_RDS_DP_L2_NORM_CLIP = 100.08
 
 BEFORE_DP_STD_DEV = 30.0000019
-AFTER_2_RDS_DP_STD_DEV = 30.1439991
+AFTER_2_RDS_DP_STD_DEV = 30.024002
 
 UPDATE_DP_L2_NORM_CLIP = 500.0
 
@@ -49,7 +49,7 @@ def _get_gan(with_dp=False):
         tensorflow_privacy.QuantileAdaptiveClipSumQuery(
             initial_l2_norm_clip=BEFORE_DP_L2_NORM_CLIP,
             noise_multiplier=0.3,
-            target_unclipped_quantile=3,
+            target_unclipped_quantile=1,
             learning_rate=0.1,
             clipped_count_stddev=0.0,
             expected_num_records=10,
