@@ -39,7 +39,7 @@ def _get_dp_average_query():
       tensorflow_privacy.QuantileAdaptiveClipSumQuery(
           initial_l2_norm_clip=100.0,
           noise_multiplier=0.3,
-          target_unclipped_quantile=3,
+          target_unclipped_quantile=1,
           learning_rate=0.1,
           clipped_count_stddev=0.0,
           expected_num_records=10),
