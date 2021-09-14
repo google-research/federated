@@ -23,6 +23,7 @@ from absl import logging
 import tensorflow as tf
 import tensorflow_federated as tff
 
+from shrink_unshrink.simple_fedavg_tf import BroadcastMessage
 from shrink_unshrink.simple_fedavg_tf import create_left_maskval_to_projmat_dict
 from shrink_unshrink.simple_fedavg_tf import get_model_weights
 from shrink_unshrink.simple_fedavg_tf import project_server_weights
@@ -221,9 +222,146 @@ def make_layerwise_projection_unshrink(*, server_state_type,
   @tff.federated_computation(federated_server_state_type,
                              federated_client_outputs_type)
   def unshrink(server_state, client_outputs):
-    # If we ever needed to track state,
-    # we would likely need to put shrink_unshrink_info in server_state
+    client_outputs = tff.federated_map(unproject_client_weights_fn,
+                                       client_outputs)
+    my_weights_delta = tff.federated_map(reshape_a,
+                                         client_outputs.weights_delta)
+    round_model_delta = tff.federated_mean(
+        my_weights_delta, weight=client_outputs.client_weight)
+    logging.info("finished computing mean")
 
+    return tff.federated_map(server_update_fn,
+                             (server_state, round_model_delta))
+
+  return unshrink
+
+
+def make_client_specific_layerwise_projection_shrink(
+    *, server_state_type, tf_client_dataset_type, server_message_fn,
+    server_model_fn, client_model_fn, shrink_unshrink_info):
+  """Creates a shrink function which shrink by projecting weight matrices.
+
+  Args:
+    server_state_type: the type of server_state.
+    tf_client_dataset_type: the type of the client dataset.
+    server_message_fn: a function which converts the server_state into a
+      `BroadcastMessage` object to be sent to clients.
+    server_model_fn: a `tf.keras.Model' which specifies the server-side model.
+    client_model_fn: a `tf.keras.Model' which specifies the client-side model.
+    shrink_unshrink_info: an object specifying how the shrink and unshrink
+      operations are performed.
+
+  Returns:
+    A corresponding shrink and unshrink functions.
+  """
+  del server_message_fn
+  left_mask = shrink_unshrink_info.left_mask
+  right_mask = shrink_unshrink_info.right_mask
+  tf.debugging.assert_equal(len(left_mask), len(right_mask))
+  tf.debugging.assert_equal(
+      len(left_mask), len(get_model_weights(server_model_fn()).trainable))
+  tf.debugging.assert_equal(
+      len(left_mask), len(get_model_weights(client_model_fn()).trainable))
+  build_projection_matrix = shrink_unshrink_info.build_projection_matrix
+
+  federated_server_state_type = tff.type_at_server(server_state_type)
+  federated_dataset_type = tff.type_at_clients(tf_client_dataset_type)
+
+  @tff.tf_computation(server_state_type, tf_client_dataset_type)
+  def project_weights_and_create_broadcast_message_fn(server_state,
+                                                      federated_dataset):
+    del federated_dataset
+    gen = tf.random.Generator.from_non_deterministic_state()
+    my_seed = gen.uniform_full_int(())
+    whimsy_server_weights = get_model_weights(server_model_fn()).trainable
+    whimsy_client_weights = get_model_weights(client_model_fn()).trainable
+    left_maskval_to_projmat_dict = create_left_maskval_to_projmat_dict(
+        my_seed,
+        whimsy_server_weights,
+        whimsy_client_weights,
+        left_mask,
+        right_mask,
+        build_projection_matrix=build_projection_matrix)
+    new_server_state = project_server_weights(server_state,
+                                              left_maskval_to_projmat_dict,
+                                              left_mask, right_mask)
+    return BroadcastMessage(
+        model_weights=new_server_state.model_weights,
+        round_num=new_server_state.round_num,
+        shrink_unshrink_dynamic_info=my_seed)
+    # shrink_unshrink_dynamic_info=left_maskval_to_projmat_dict)
+    # could try to pass the whole dictionary
+
+  @tff.federated_computation(federated_server_state_type,
+                             federated_dataset_type)
+  def shrink(server_state, federated_dataset):
+    server_state_at_client = tff.federated_broadcast(server_state)
+    server_message_at_client = tff.federated_map(
+        project_weights_and_create_broadcast_message_fn,
+        (server_state_at_client, federated_dataset))
+
+    return server_message_at_client
+
+  return shrink
+
+
+def make_client_specific_layerwise_projection_unshrink(
+    *, server_state_type, client_update_output_type, server_update_fn,
+    server_model_fn, client_model_fn, shrink_unshrink_info):
+  """Creates an unshrink function which unshrinks by unprojecting weight matrices.
+
+  Args:
+    server_state_type: the type of server_state.
+    client_update_output_type: the type of client_outputs.
+    server_update_fn: a function which evolves the server_state.
+    server_model_fn: a `tf.keras.Model' which specifies the server-side model.
+    client_model_fn: a `tf.keras.Model' which specifies the client-side model.
+    shrink_unshrink_info: an object specifying how the shrink and unshrink
+      operations are performed.
+
+  Returns:
+    A corresponding shrink and unshrink functions.
+  """
+  left_mask = shrink_unshrink_info.left_mask
+  right_mask = shrink_unshrink_info.right_mask
+  tf.debugging.assert_equal(len(left_mask), len(right_mask))
+  tf.debugging.assert_equal(
+      len(left_mask), len(get_model_weights(server_model_fn()).trainable))
+  tf.debugging.assert_equal(
+      len(left_mask), len(get_model_weights(client_model_fn()).trainable))
+  build_projection_matrix = shrink_unshrink_info.build_projection_matrix
+
+  federated_server_state_type = tff.type_at_server(server_state_type)
+  federated_client_outputs_type = tff.type_at_clients(client_update_output_type)
+
+  @tff.tf_computation(client_update_output_type)
+  def unproject_client_weights_fn(client_output):
+    whimsy_server_weights = get_model_weights(server_model_fn()).trainable
+    # gTODO should be get_model_weights(...).trainable_variables?
+    whimsy_client_weights = get_model_weights(client_model_fn()).trainable
+    # left_maskval_to_projmat_dict = client_output.shrink_unshrink_dynamic_info
+    # could try to pass the whole dictionary
+    my_seed = client_output.shrink_unshrink_dynamic_info
+    left_maskval_to_projmat_dict = create_left_maskval_to_projmat_dict(
+        my_seed,
+        whimsy_server_weights,
+        whimsy_client_weights,
+        left_mask,
+        right_mask,
+        build_projection_matrix=build_projection_matrix)
+    return unproject_client_weights(client_output, left_maskval_to_projmat_dict,
+                                    left_mask, right_mask)
+
+  @tff.tf_computation
+  def reshape_a(client_ouput_weight_delta):
+    whimsy_server_weights = get_model_weights(server_model_fn()).trainable
+    return tf.nest.map_structure(lambda a, b: tf.reshape(a, tf.shape(b)),
+                                 client_ouput_weight_delta,
+                                 whimsy_server_weights)
+
+  @tff.federated_computation(federated_server_state_type,
+                             federated_client_outputs_type)
+  def unshrink(server_state, client_outputs):
     client_outputs = tff.federated_map(unproject_client_weights_fn,
                                        client_outputs)
     logging.info("going to compute mean")

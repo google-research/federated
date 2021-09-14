@@ -81,7 +81,7 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_enum(
       name='shrink_unshrink_type',
       default='identity',
-      enum_values=['identity', 'layerwise'],
+      enum_values=['identity', 'layerwise', 'client_layerwise'],
       help='what type of shrink_unshrink to do')
   flags.DEFINE_enum(
       name='build_projection_matrix_type',
@@ -146,12 +146,23 @@ def main(argv):
     make_unshrink = shrink_unshrink_tff.make_layerwise_projection_unshrink
     server_model_fn = big_rnn_model_fn
     client_model_fn = small_rnn_model_fn
+  elif FLAGS.shrink_unshrink_type == 'client_layerwise':
+    logging.info('using client_layerwise shrink')
+    make_shrink = shrink_unshrink_tff.make_client_specific_layerwise_projection_shrink
+    make_unshrink = shrink_unshrink_tff.make_client_specific_layerwise_projection_unshrink
+    server_model_fn = big_rnn_model_fn
+    client_model_fn = small_rnn_model_fn
   else:
     raise ValueError('invalid shrink unshrink passed')
 
   print('creating iterative process')
-  left_mask = [-1, 0, 2, -1, 2, -1, 0, -1]
-  right_mask = [0, 1, 1, 1, 0, 0, -1, -1]
+  # allows for modifications to lstm layers
+  # left_mask = [-1, 0, 2, -1, 2, -1, 0, -1]
+  # right_mask = [0, 1, 1, 1, 0, 0, -1, -1]
+
+  # does not allow for modifications to lstm layers
+  left_mask = [-1, 0, -1, -1, 2, -1, 0, -1]
+  right_mask = [0, -1, -1, -1, 0, 0, -1, -1]
   if FLAGS.build_projection_matrix_type == 'normal':
     logging.info('using normal projection matrix')
     build_projection_matrix = simple_fedavg_tf.build_normal_projection_matrix
@@ -169,7 +180,7 @@ def main(argv):
       build_projection_matrix=build_projection_matrix)
 
   iterative_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
-      server_model_fn=server_model_fn,  # formerly used task.model_fn
+      server_model_fn=server_model_fn,
       client_model_fn=client_model_fn,
       make_shrink=make_shrink,
       make_unshrink=make_unshrink,
@@ -194,7 +205,6 @@ def main(argv):
 
   def validation_fn_from_state(state, round_num):
     return validation_fn(state.model_weights, round_num)
-    # return validation_fn(state.model, round_num)
 
   checkpoint_manager, metrics_managers = training_utils.configure_managers(
       FLAGS.root_output_dir,

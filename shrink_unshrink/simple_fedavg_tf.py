@@ -345,6 +345,7 @@ def client_update(model,
     num_examples += batch_size
     loss_sum += outputs.loss * tf.cast(batch_size, WEIGHT_DENOM_TYPE)
 
+  aggregated_outputs = model.report_local_outputs()
   weights_delta = tf.nest.map_structure(lambda a, b: a - b,
                                         model_weights.trainable,
                                         initial_weights.trainable)
@@ -361,7 +362,7 @@ def client_update(model,
   return ClientOutput(
       weights_delta=weights_delta,
       client_weight=client_weight,
-      model_output=loss_sum / client_weight,
+      model_output=aggregated_outputs,
       round_num=server_message.round_num,
       shrink_unshrink_dynamic_info=server_message.shrink_unshrink_dynamic_info)
   # Note that loss_sum corresponds to the loss of the weights before projection
@@ -486,7 +487,8 @@ def unproject_client_weights(client_output, left_maskval_to_projmat_dict,
       client_weight=client_output
       .client_weight,  # note this is not the model weights
       model_output=client_output.model_output,
-      round_num=client_output.round_num)
+      round_num=client_output.round_num,
+      shrink_unshrink_dynamic_info=client_output.shrink_unshrink_dynamic_info)
 
 
 @tf.function

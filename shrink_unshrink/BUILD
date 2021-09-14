@@ -1,6 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
-package(default_visibility = ["//visibility:private"])
+package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
@@ -19,6 +19,13 @@ py_binary(
     name = "trainer",
     srcs = ["trainer.py"],
     python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":trainer_lib"],
+)
+
+py_library(
+    name = "trainer_lib",
+    srcs = ["trainer.py"],
     srcs_version = "PY3",
     deps = [
         ":models",

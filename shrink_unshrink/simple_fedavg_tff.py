@@ -91,6 +91,7 @@ def build_federated_shrink_unshrink_process(
     A `tff.templates.IterativeProcess`.
   """
   whimsy_client_model = client_model_fn()
+  whimsy_server_model = server_model_fn()
 
   @tff.tf_computation
   def server_init_tf():
@@ -176,11 +177,14 @@ def build_federated_shrink_unshrink_process(
     logging.info("unshrink")
     server_state = unshrink(server_state, client_outputs)
 
-    round_loss_metric = tff.federated_mean(
-        client_outputs.model_output, weight=client_outputs.client_weight)
+    # the following code is not amenable with KerasModelWrapper
+    aggregated_outputs = whimsy_server_model.federated_output_computation(
+        client_outputs.model_output)
+    if aggregated_outputs.type_signature.is_struct():
+      aggregated_outputs = tff.federated_zip(aggregated_outputs)
     logging.info("end of round")
 
-    return server_state, {"metric": round_loss_metric}
+    return server_state, aggregated_outputs
 
   @tff.federated_computation
   def server_init_tff():

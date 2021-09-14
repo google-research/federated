@@ -213,7 +213,6 @@ def _create_client_data():
 class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('simple_fedavg_wrapper', _simple_fedavg_model_fn),
       ('tff.learning.Model_wrapper', _tff_learning_model_fn))
   def test_data_type_signature(self, model_fn):
     it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
@@ -225,7 +224,6 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
         '{<x=float32[?,28,28,1],y=int32[?]>*}@CLIENTS')
 
   @parameterized.named_parameters(
-      ('simple_fedavg_wrapper', _simple_fedavg_model_fn),
       ('tff.learning.Model_wrapper', _tff_learning_model_fn))
   def test_simple_training(self, model_fn):
     it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
@@ -243,7 +241,7 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
     loss_list = []
     for _ in range(3):
       server_state, loss = it_process.next(server_state, federated_data)
-      loss_list.append(loss['metric'])
+      loss_list.append(loss['loss'])
 
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
@@ -258,7 +256,7 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
     losses = []
     for _ in range(2):
       state, loss = trainer.next(state, train_data)
-      losses.append(loss['metric'])
+      losses.append(loss['loss'])
     self.assertLess(losses[1], losses[0])
 
   def test_keras_evaluate(self):
@@ -356,7 +354,7 @@ class ClientTest(tf.test.TestCase):
           model_weights=model.weights, round_num=r)
       outputs = simple_fedavg_tf.client_update(model, client_data(),
                                                server_message, optimizer)
-      losses.append(outputs.model_output.numpy())
+      losses.append(outputs.model_output['loss'])
 
     self.assertAllEqual(int(outputs.client_weight.numpy()), 2)
     self.assertLess(losses[1], losses[0])
@@ -427,7 +425,7 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
     loss_list = []
     for _ in range(3):
       server_state, loss = it_process.next(server_state, federated_data)
-      loss_list.append(loss['metric'])
+      loss_list.append(loss['loss'])
 
     self.assertLess(np.mean(loss_list[1:]), loss_list[0])
 
