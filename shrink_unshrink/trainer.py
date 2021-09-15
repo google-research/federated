@@ -78,6 +78,17 @@ with utils_impl.record_hparam_flags() as shared_flags:
                        'The embedding size of the lstm.')
   flags.DEFINE_integer('small_lstm_size', 503, 'The size of the lstm layer.')
 
+  flags.DEFINE_integer('small_conv1_filters', 24,
+                       'The filter size of the conv.')
+  flags.DEFINE_integer('small_conv2_filters', 48,
+                       'The filter size of the conv.')
+  flags.DEFINE_integer('small_dense_size', 96, 'The size of the dense layer.')
+
+  flags.DEFINE_integer(
+      'new_projection_dict_decimate', 1,
+      'The number of iterations before a new set of projection matrices are created.'
+  )
+
   flags.DEFINE_enum(
       name='shrink_unshrink_type',
       default='identity',
@@ -127,42 +138,58 @@ def main(argv):
       max_elements=FLAGS.max_elements_per_client)
   task = task_utils.create_task_from_flags(train_client_spec)
 
-  big_rnn_model_fn, small_rnn_model_fn = models.make_big_and_small_stackoverflow_model_fn(
-      task,
-      big_embedding_size=96,
-      big_lstm_size=670,
-      small_embedding_size=FLAGS.small_embedding_size,
-      small_lstm_size=FLAGS.small_lstm_size)
+  if FLAGS.task == 'stackoverflow_word':
+
+    big_model_fn, small_model_fn = models.make_big_and_small_stackoverflow_model_fn(
+        task,
+        big_embedding_size=96,
+        big_lstm_size=670,
+        small_embedding_size=FLAGS.small_embedding_size,
+        small_lstm_size=FLAGS.small_lstm_size)
+    # allows for modifications to lstm layers
+    # left_mask = [-1, 0, 2, -1, 2, -1, 0, -1]
+    # right_mask = [0, 1, 1, 1, 0, 0, -1, -1]
+
+    # does not allow for modifications to lstm layers
+    left_mask = [-1, 0, -1, -1, 2, -1, 0, -1]
+    right_mask = [0, -1, -1, -1, 0, 0, -1, -1]
+  elif FLAGS.task == 'emnist_character':
+    big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_dropout_model_fn(
+        task,
+        big_conv1_filters=32,
+        big_conv2_filters=64,
+        big_dense_size=128,
+        small_conv1_filters=FLAGS.small_conv1_filters,
+        small_conv2_filters=FLAGS.small_conv2_filters,
+        small_dense_size=FLAGS.small_dense_size)
+    left_mask = [-1, -1, 0, -1, 1000, -1, 3, -1]
+    right_mask = [0, 0, 1, 1, 3, 3, -1, -1]
+  else:
+    raise ValueError('task is unsupported')
 
   if FLAGS.shrink_unshrink_type == 'identity':
     logging.info('using identity shrink')
     make_shrink = shrink_unshrink_tff.make_identity_shrink
     make_unshrink = shrink_unshrink_tff.make_identity_unshrink
-    server_model_fn = big_rnn_model_fn
-    client_model_fn = big_rnn_model_fn
+    server_model_fn = big_model_fn
+    client_model_fn = big_model_fn
   elif FLAGS.shrink_unshrink_type == 'layerwise':
     logging.info('using layerwise shrink')
     make_shrink = shrink_unshrink_tff.make_layerwise_projection_shrink
     make_unshrink = shrink_unshrink_tff.make_layerwise_projection_unshrink
-    server_model_fn = big_rnn_model_fn
-    client_model_fn = small_rnn_model_fn
+    server_model_fn = big_model_fn
+    client_model_fn = small_model_fn
   elif FLAGS.shrink_unshrink_type == 'client_layerwise':
     logging.info('using client_layerwise shrink')
     make_shrink = shrink_unshrink_tff.make_client_specific_layerwise_projection_shrink
     make_unshrink = shrink_unshrink_tff.make_client_specific_layerwise_projection_unshrink
-    server_model_fn = big_rnn_model_fn
-    client_model_fn = small_rnn_model_fn
+    server_model_fn = big_model_fn
+    client_model_fn = small_model_fn
   else:
     raise ValueError('invalid shrink unshrink passed')
 
   print('creating iterative process')
-  # allows for modifications to lstm layers
-  # left_mask = [-1, 0, 2, -1, 2, -1, 0, -1]
-  # right_mask = [0, 1, 1, 1, 0, 0, -1, -1]
 
-  # does not allow for modifications to lstm layers
-  left_mask = [-1, 0, -1, -1, 2, -1, 0, -1]
-  right_mask = [0, -1, -1, -1, 0, 0, -1, -1]
   if FLAGS.build_projection_matrix_type == 'normal':
     logging.info('using normal projection matrix')
     build_projection_matrix = simple_fedavg_tf.build_normal_projection_matrix
@@ -177,7 +204,8 @@ def main(argv):
   shrink_unshrink_info = simple_fedavg_tf.LayerwiseProjectionShrinkUnshrinkInfoV2(
       left_mask=left_mask,
       right_mask=right_mask,
-      build_projection_matrix=build_projection_matrix)
+      build_projection_matrix=build_projection_matrix,
+      new_projection_dict_decimate=FLAGS.new_projection_dict_decimate)
 
   iterative_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
       server_model_fn=server_model_fn,

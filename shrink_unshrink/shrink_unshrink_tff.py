@@ -144,7 +144,8 @@ def make_layerwise_projection_shrink(*, server_state_type,
     whimsy_server_weights = get_model_weights(server_model_fn()).trainable
     whimsy_client_weights = get_model_weights(client_model_fn()).trainable
     left_maskval_to_projmat_dict = create_left_maskval_to_projmat_dict(
-        server_state.round_num,
+        server_state.round_num //
+        shrink_unshrink_info.new_projection_dict_decimate,
         whimsy_server_weights,
         whimsy_client_weights,
         left_mask,
@@ -203,7 +204,8 @@ def make_layerwise_projection_unshrink(*, server_state_type,
     # gTODO should this be get_model_weights(...).trainable_variables?
     whimsy_client_weights = get_model_weights(client_model_fn()).trainable
     left_maskval_to_projmat_dict = create_left_maskval_to_projmat_dict(
-        client_output.round_num,
+        client_output.round_num //
+        shrink_unshrink_info.new_projection_dict_decimate,
         whimsy_server_weights,
         whimsy_client_weights,
         left_mask,

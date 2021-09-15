@@ -40,7 +40,8 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
     shrink_unshrink_info = simple_fedavg_tf.LayerwiseProjectionShrinkUnshrinkInfoV2(
         left_mask=[-1, 0, 2, -1, 2, -1, 0, -1],
         right_mask=[0, 1, 1, 1, 0, 0, -1, -1],
-        build_projection_matrix=simple_fedavg_tf.build_normal_projection_matrix)
+        build_projection_matrix=simple_fedavg_tf.build_normal_projection_matrix,
+        new_projection_dict_decimate=1)
 
     _, shrink, unshrink = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=server_model_fn,
@@ -51,9 +52,6 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
         server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
         client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
         debugging=True)
-    # logging.info('shrink unshrink type_signature')
-    # logging.info(shrink.type_signature)
-    # logging.info(unshrink.type_signature)
 
     self.assertEqual(
         str(shrink.type_signature),
@@ -80,7 +78,8 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
     shrink_unshrink_info = simple_fedavg_tf.LayerwiseProjectionShrinkUnshrinkInfoV2(
         left_mask=[-1, 0, 2, -1, 2, -1, 0, -1],
         right_mask=[0, 1, 1, 1, 0, 0, -1, -1],
-        build_projection_matrix=simple_fedavg_tf.build_normal_projection_matrix)
+        build_projection_matrix=simple_fedavg_tf.build_normal_projection_matrix,
+        new_projection_dict_decimate=1)
     _, shrink, unshrink = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=server_model_fn,
         client_model_fn=client_model_fn,

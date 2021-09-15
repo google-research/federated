@@ -179,13 +179,16 @@ class LayerwiseProjectionShrinkUnshrinkInfoV2(object):
   """Structure for state on the server.
 
   Fields:
-  -   `model_weights`: A dictionary of model's trainable variables.
-  -   `optimizer_state`: Variables of optimizer.
-  -   'round_num': Current round index
+  -  `model_weights`: A dictionary of model's trainable variables.
+  -  `optimizer_state`: Variables of optimizer.
+  -  'round_num': Current round index
+  -  'new_projection_dict_decimate': An integer corresponding to how many rounds
+    pass before a new left_maskval_to_projmat_dict dictionary is computed.
   """
   left_mask = attr.ib()
   right_mask = attr.ib()
   build_projection_matrix = attr.ib()
+  new_projection_dict_decimate = attr.ib()
 
 
 @tf.function
@@ -368,6 +371,7 @@ def client_update(model,
   # Note that loss_sum corresponds to the loss of the weights before projection
 
 
+@tf.function
 def left_right_multiply(left_matrix, mid_matrix, right_matrix, is_left_scalar,
                         is_right_scalar):
   """Mutiplies three quantities together.
@@ -384,13 +388,30 @@ def left_right_multiply(left_matrix, mid_matrix, right_matrix, is_left_scalar,
   """
   if is_left_scalar == -1:
     return_val = left_matrix * mid_matrix
+  elif is_left_scalar % 1000 == 0 and is_left_scalar > 0:
+    logging.info('SPECIAL: convolutional condition triggerred')
+    desired_shape = (-1, tf.shape(left_matrix)[1], tf.shape(mid_matrix)[1])
+    new_mid_matrix = tf.reshape(mid_matrix, shape=desired_shape)
+    temp_return_val = tf.einsum('ij,bjk->bik', left_matrix, new_mid_matrix)
+    return_val = tf.reshape(
+        temp_return_val, shape=(-1, tf.shape(mid_matrix)[1]))
   else:
-    return_val = left_matrix @ mid_matrix
+    try:
+      return_val = left_matrix @ mid_matrix
+    except ValueError:
+      return_val = tf.einsum('ij,abjk->abik', left_matrix, mid_matrix)
 
   if is_right_scalar == -1:
     return_val = return_val * right_matrix
+  elif is_right_scalar % 1000 == 0 and is_right_scalar > 0:
+    raise ValueError(
+        'special convolational support is only used in left multiplies.')
   else:
-    return_val = return_val @ right_matrix
+    try:
+      return_val = return_val @ right_matrix
+    except ValueError:
+      return_val = tf.einsum('ij,abjk->abik', left_matrix, mid_matrix)
+
   return return_val
 
 
@@ -414,12 +435,14 @@ def project_server_weights(server_state, left_maskval_to_projmat_dict,
     A `ServerState`.
   """
 
-  left_projection_mat_lst = [
-      left_maskval_to_projmat_dict[val] for val in left_mask
-  ]
-  right_projection_mat_lst = [
-      tf.transpose(left_maskval_to_projmat_dict[val]) for val in right_mask
-  ]
+  def helper(val):
+    if val % 1000 == 0 and val > 0:
+      logging.info('SPECIAL1: convolutional condition triggerred')
+      return left_maskval_to_projmat_dict[val // 1000]
+    return left_maskval_to_projmat_dict[val]
+
+  left_projection_mat_lst = [helper(val) for val in left_mask]
+  right_projection_mat_lst = [tf.transpose(helper(val)) for val in right_mask]
   flat_mask = get_flat_mask(server_state.model_weights.trainable)
   reshaped_model_weights = reshape_flattened_weights(
       server_state.model_weights.trainable, flat_mask)
@@ -464,13 +487,16 @@ def unproject_client_weights(client_output, left_maskval_to_projmat_dict,
     A `ClientOutput`.
   """
 
-  left_projection_mat_lst = [
-      tf.transpose(left_maskval_to_projmat_dict[val]) for val in left_mask
-  ]
-  right_projection_mat_lst = [
-      left_maskval_to_projmat_dict[val] for val in right_mask
-  ]
+  def helper(val):
+    if val % 1000 == 0 and val > 0:
+      logging.info('SPECIAL2: convolutional condition triggerred')
+      return left_maskval_to_projmat_dict[val // 1000]
+    return left_maskval_to_projmat_dict[val]
+
+  left_projection_mat_lst = [tf.transpose(helper(val)) for val in left_mask]
+  right_projection_mat_lst = [helper(val) for val in right_mask]
   flat_mask = get_flat_mask(client_output.weights_delta)
+
   reshaped_weights_delta = reshape_flattened_weights(
       client_output.weights_delta, flat_mask)
   new_weights_delta = tf.nest.map_structure(left_right_multiply,
@@ -481,7 +507,6 @@ def unproject_client_weights(client_output, left_maskval_to_projmat_dict,
   flattened_new_weights_delta = flatten_reshaped_weights(
       new_weights_delta, flat_mask)
 
-  # gTODO should model_output be modified?
   return ClientOutput(
       weights_delta=flattened_new_weights_delta,
       client_weight=client_output
@@ -680,45 +705,55 @@ def create_left_maskval_to_projmat_dict(seed, whimsy_server_weights,
   for idx, val in enumerate(left_mask):
     server_weight_mat_shape = tf.shape(whimsy_server_trainable_variables[idx])
     client_weight_mat_shape = tf.shape(whimsy_client_trainable_variables[idx])
-    desired_shape = (client_weight_mat_shape[0], server_weight_mat_shape[0]
+    desired_shape = (client_weight_mat_shape[-2], server_weight_mat_shape[-2]
                     )  # left multiply server_mat to generate client_mat
+    if len(client_weight_mat_shape) == 2:
+      old_desired_shape = (client_weight_mat_shape[0],
+                           server_weight_mat_shape[0])
+      tf.debugging.assert_equal(desired_shape, old_desired_shape, 'yoho1')
 
     if val < 0:
       left_maskval_to_projmat_dict[val] = tf.ones([1], dtype=tf.float32)
       tf.debugging.assert_equal(server_weight_mat_shape[0],
-                                client_weight_mat_shape[0])
+                                client_weight_mat_shape[0], 'yoho2')
     elif val not in left_maskval_to_projmat_dict:
       projection_matrix = build_projection_matrix(
           seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=True)
 
       left_maskval_to_projmat_dict[val] = projection_matrix
       actual_shape = tf.shape(left_maskval_to_projmat_dict[val])
-      tf.debugging.assert_equal(actual_shape, desired_shape)
+      tf.debugging.assert_equal(actual_shape, desired_shape, 'yoho3')
     else:
       actual_mat = left_maskval_to_projmat_dict[val]
       actual_shape = tf.shape(actual_mat)
-      tf.debugging.assert_equal(actual_shape, desired_shape)
+      tf.debugging.assert_equal(actual_shape, desired_shape, f'yoho4{val}')
 
   for idx, val in enumerate(right_mask):
     server_weight_mat_shape = tf.shape(whimsy_server_trainable_variables[idx])
     client_weight_mat_shape = tf.shape(whimsy_client_trainable_variables[idx])
-    desired_shape = (server_weight_mat_shape[1], client_weight_mat_shape[1]
+    desired_shape = (server_weight_mat_shape[-1], client_weight_mat_shape[-1]
                     )  # right multiply server_mat to generate client_mat
+
+    if len(client_weight_mat_shape) == 2:
+      old_desired_shape = (server_weight_mat_shape[1],
+                           client_weight_mat_shape[1])
+      tf.debugging.assert_equal(desired_shape, old_desired_shape, 'yoho5')
+
     if val < 0:
       left_maskval_to_projmat_dict[val] = tf.ones([1], dtype=tf.float32)
       tf.debugging.assert_equal(server_weight_mat_shape[1],
-                                client_weight_mat_shape[1])
+                                client_weight_mat_shape[1], 'yoho6')
     elif val not in left_maskval_to_projmat_dict:
       projection_matrix = build_projection_matrix(
           seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=False)
 
       left_maskval_to_projmat_dict[val] = tf.transpose(projection_matrix)
       actual_shape = tf.shape(tf.transpose(left_maskval_to_projmat_dict[val]))
-      tf.debugging.assert_equal(actual_shape, desired_shape)
+      tf.debugging.assert_equal(actual_shape, desired_shape, 'yoho7')
     else:
       actual_mat = tf.transpose(left_maskval_to_projmat_dict[val]
                                )  # transposed because of right multiply
       actual_shape = tf.shape(actual_mat)
-      tf.debugging.assert_equal(actual_shape, desired_shape)
+      tf.debugging.assert_equal(actual_shape, desired_shape, 'yoho8')
   logging.info('finished create_left_maskval_projmat_dict')
   return left_maskval_to_projmat_dict

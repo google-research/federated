@@ -162,35 +162,59 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     self.assertDTypeEqual(projection_matrix, np.float32)
     self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
 
-  def test_make_big_and_small_stackoverflow_model_fn_model_equality(self):
+  def test_make_big_and_small_emnist_cnn_model(self):
     train_client_spec = tff.simulation.baselines.ClientSpec(
         num_epochs=3, batch_size=32, max_elements=1000)
-    my_task = tff.simulation.baselines.stackoverflow.create_word_prediction_task(
-        train_client_spec, use_synthetic_data=False)
-    big_model_fn, small_model_fn = models.make_big_and_small_stackoverflow_model_fn(
+    my_task = tff.simulation.baselines.emnist.create_character_recognition_task(
+        train_client_spec, use_synthetic_data=True, model_id="cnn")
+    big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_model_fn(
         my_task,
-        big_embedding_size=96,
-        big_lstm_size=670,
-        small_embedding_size=72,
-        small_lstm_size=503)
+        big_conv1_filters=32,
+        big_conv2_filters=64,
+        big_dense_size=512,
+        small_conv1_filters=24,
+        small_conv2_filters=48,
+        small_dense_size=384)
 
-    tf.random.set_seed(1)
-    og_model = my_task.model_fn()
-    tf.random.set_seed(1)
-    big_model = big_model_fn()
-    tf.random.set_seed(1)
-    small_model = small_model_fn()
+    model = big_model_fn()
+    model_weights = simple_fedavg_tf.get_model_weights(model)
+    server_optimizer = tf.keras.optimizers.SGD(learning_rate=1.0)
+    simple_fedavg_tff._initialize_optimizer_vars(model, server_optimizer)
+    server_state = simple_fedavg_tf.ServerState(
+        model_weights=model_weights,
+        optimizer_state=server_optimizer.variables(),
+        round_num=0)
 
-    for x, y in zip(big_model.trainable_variables,
-                    og_model.trainable_variables):
-      self.assertAllEqual(x, y)
+    whimsy_server_weights = simple_fedavg_tf.get_model_weights(
+        big_model_fn()).trainable
+    whimsy_client_weights = simple_fedavg_tf.get_model_weights(
+        small_model_fn()).trainable
 
-    for x, y in zip(big_model.non_trainable_variables,
-                    og_model.non_trainable_variables):
-      self.assertAllEqual(x, y)
+    # left_mask = [-1, -1, 0, -1, 2, -1, 3, -1]
+    left_mask = [-1, -1, 0, -1, 1000, -1, 3, -1]
+    right_mask = [0, 0, 1, 1, 3, 3, -1, -1]
 
-    self.assertEqual(big_model.input_spec, og_model.input_spec)
-    self.assertEqual(small_model.input_spec, og_model.input_spec)
+    left_maskval_to_projmat_dict = simple_fedavg_tf.create_left_maskval_to_projmat_dict(
+        seed=1,
+        whimsy_server_weights=whimsy_server_weights,
+        whimsy_client_weights=whimsy_client_weights,
+        left_mask=left_mask,
+        right_mask=right_mask,
+        build_projection_matrix=simple_fedavg_tf.build_normal_projection_matrix)
+
+    new_server_state = simple_fedavg_tf.project_server_weights(
+        server_state, left_maskval_to_projmat_dict, left_mask, right_mask)
+
+    weights_delta = new_server_state.model_weights.trainable
+    client_ouput = simple_fedavg_tf.ClientOutput(weights_delta, 1, 1, 1)
+    final_client_output = simple_fedavg_tf.unproject_client_weights(
+        client_ouput, left_maskval_to_projmat_dict, left_mask, right_mask)
+
+    for _, z in enumerate(
+        zip(final_client_output.weights_delta,
+            server_state.model_weights.trainable)):
+      x, y = z
+      self.assertAllEqual(tf.shape(x), tf.shape(y))
 
   def test_make_big_and_small_stackoverflow_model(self):
     train_client_spec = tff.simulation.baselines.ClientSpec(

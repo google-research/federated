@@ -69,6 +69,15 @@ py_library(
 )
 
 py_test(
+    name = "models_test",
+    srcs = ["models_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    tags = ["nokokoro"],
+    deps = [":models"],
+)
+
+py_test(
     name = "simple_fedavg_test",
     size = "medium",
     srcs = ["simple_fedavg_test.py"],
