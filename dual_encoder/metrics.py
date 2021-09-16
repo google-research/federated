@@ -24,7 +24,7 @@ from dual_encoder import model_utils as utils
 
 
 @tf.function
-def _compute_recall(similarities, label_indices, recall_k):
+def compute_recall(similarities, label_indices, recall_k):
   """Compute the label recall of each example."""
 
   # Get the indices of similar labels in sorted order for each context.
@@ -101,8 +101,7 @@ class BatchRecall(tf.keras.metrics.Mean):
     curr_batch_size = tf.shape(similarities)[0]
     label_indices = tf.expand_dims(tf.range(curr_batch_size), -1)
     # Compute the example recall in batch.
-    example_recalls = _compute_recall(
-        similarities, label_indices, self.recall_k)
+    example_recalls = compute_recall(similarities, label_indices, self.recall_k)
 
     super().update_state(example_recalls, sample_weight=sample_weight)
 
@@ -182,8 +181,8 @@ class BatchRecallWithGlobalSimilarity(tf.keras.metrics.Mean):
     label_indices = tf.expand_dims(tf.range(curr_batch_size), -1)
 
     # Compute the example recall in batch.
-    example_recalls = _compute_recall(
-        batch_similarities, label_indices, self.recall_k)
+    example_recalls = compute_recall(batch_similarities, label_indices,
+                                     self.recall_k)
 
     super().update_state(example_recalls, sample_weight)
 
@@ -253,7 +252,7 @@ class GlobalRecall(tf.keras.metrics.Mean):
             y_pred, y_true, self.expect_embeddings, self.normalization_fn))
 
     # Compute the example recall among the full vocab.
-    example_recalls = _compute_recall(similarities, y_true, self.recall_k)
+    example_recalls = compute_recall(similarities, y_true, self.recall_k)
 
     super().update_state(example_recalls, sample_weight)
 
