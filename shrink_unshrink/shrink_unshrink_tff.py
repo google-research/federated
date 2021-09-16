@@ -698,7 +698,8 @@ def make_static_client_specific_layerwise_projection_shrink(
     server_message_fn,
     server_model_fn,
     client_model_fn,
-    shrink_unshrink_info):
+    shrink_unshrink_info,
+    static_client_layerwise_num_buckets):
   """Creates a shrink function which shrink by projecting weight matrices.
 
   Args:
@@ -710,6 +711,9 @@ def make_static_client_specific_layerwise_projection_shrink(
     client_model_fn: a `tf.keras.Model' which specifies the client-side model.
     shrink_unshrink_info: an object specifying how the shrink and unshrink
       operations are performed.
+    static_client_layerwise_num_buckets: an integer corresponding to the total
+      number of hashbuckets a client id could be hashed to. Used to generate
+      seeds for clients.
 
   Returns:
     A corresponding shrink and unshrink functions.
@@ -729,7 +733,8 @@ def make_static_client_specific_layerwise_projection_shrink(
 
   @tff.tf_computation(server_state_type, tf_client_id_type)
   def project_weights_and_create_broadcast_message_fn(server_state, client_id):
-    my_seed = tf.strings.to_hash_bucket(client_id, num_buckets=50)
+    my_seed = tf.strings.to_hash_bucket(
+        client_id, num_buckets=static_client_layerwise_num_buckets)
     whimsy_server_weights = get_model_weights(server_model_fn()).trainable
     whimsy_client_weights = get_model_weights(client_model_fn()).trainable
     left_maskval_to_projmat_dict = create_left_maskval_to_projmat_dict(

@@ -219,6 +219,7 @@ def build_federated_shrink_unshrink_process_with_client_id(
     client_model_fn,
     client_id_to_dataset_preprocessor,
     # a tff computation accepting client ID returning dataset
+    static_client_layerwise_num_buckets,
     make_shrink=make_identity_shrink,
     make_unshrink=make_identity_unshrink,
     shrink_unshrink_info=None,
@@ -234,7 +235,10 @@ def build_federated_shrink_unshrink_process_with_client_id(
     client_model_fn: A no-arg function that returns a
       `simple_fedavg_tf.KerasModelWrapper`.
     client_id_to_dataset_preprocessor: A function that maps a client_id string
-      to a tf.data.Dataset object
+      to a tf.data.Dataset object.
+    static_client_layerwise_num_buckets: an integer corresponding to the total
+      number of hashbuckets a client id could be hashed to. Used to generate
+      seeds for clients.
     make_shrink: A function which creates and returns a `shrink` function based
       on passed in parameters.
     make_unshrink: A function which creates and returns an `unshrink` function
@@ -301,7 +305,8 @@ def build_federated_shrink_unshrink_process_with_client_id(
       server_message_fn=server_message_fn,
       server_model_fn=server_model_fn,
       client_model_fn=client_model_fn,
-      shrink_unshrink_info=shrink_unshrink_info)
+      shrink_unshrink_info=shrink_unshrink_info,
+      static_client_layerwise_num_buckets=static_client_layerwise_num_buckets)
 
   server_message_type = shrink.type_signature.result.member
 

@@ -87,9 +87,18 @@ with utils_impl.record_hparam_flags() as shared_flags:
                        'The filter size of the conv.')
   flags.DEFINE_integer('small_dense_size', 96, 'The size of the dense layer.')
 
+  flags.DEFINE_integer('big_conv1_filters', 32, 'The filter size of the conv.')
+  flags.DEFINE_integer('big_conv2_filters', 64, 'The filter size of the conv.')
+  flags.DEFINE_integer('big_dense_size', 128, 'The size of the dense layer.')
+
   flags.DEFINE_integer(
       'new_projection_dict_decimate', 1,
       'The number of iterations before a new set of projection matrices are created.'
+  )
+
+  flags.DEFINE_integer(
+      'static_client_layerwise_num_buckets', 1,
+      'The number of hash buckets associated with static_client_layerwise_num_buckets.'
   )
 
   flags.DEFINE_enum(
@@ -111,7 +120,7 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_enum(
       name='build_projection_matrix_type',
       default='normal',
-      enum_values=['normal', 'dropout', 'qr', 'sparse'],
+      enum_values=['normal', 'dropout', 'qr', 'sparse', 'ensemble'],
       help='what type of shrink_unshrink to do')
 
 with utils_impl.record_hparam_flags() as task_flags:
@@ -169,22 +178,20 @@ def main(argv):
   elif FLAGS.task == 'emnist_character':
     if FLAGS.my_emnist_model_id == 'cnn_dropout':
       # originally only used to be cnn_dropout
-      logging.info('using cnn dropout')
       big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_dropout_model_fn(
           task,
-          big_conv1_filters=32,
-          big_conv2_filters=64,
-          big_dense_size=128,
+          big_conv1_filters=FLAGS.big_conv1_filters,
+          big_conv2_filters=FLAGS.big_conv2_filters,
+          big_dense_size=FLAGS.big_dense_size,
           small_conv1_filters=FLAGS.small_conv1_filters,
           small_conv2_filters=FLAGS.small_conv2_filters,
           small_dense_size=FLAGS.small_dense_size)
     elif FLAGS.my_emnist_model_id == 'cnn':
-      logging.info('using original cnn')
       big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_model_fn(
           task,
-          big_conv1_filters=32,
-          big_conv2_filters=64,
-          big_dense_size=512,
+          big_conv1_filters=FLAGS.big_conv1_filters,
+          big_conv2_filters=FLAGS.big_conv2_filters,
+          big_dense_size=FLAGS.big_dense_size,
           small_conv1_filters=FLAGS.small_conv1_filters,
           small_conv2_filters=FLAGS.small_conv2_filters,
           small_dense_size=FLAGS.small_dense_size)
@@ -194,37 +201,31 @@ def main(argv):
     raise ValueError('task is unsupported')
 
   if FLAGS.shrink_unshrink_type == 'identity':
-    logging.info('using identity shrink')
     make_shrink = shrink_unshrink_tff.make_identity_shrink
     make_unshrink = shrink_unshrink_tff.make_identity_unshrink
     server_model_fn = small_model_fn
     client_model_fn = small_model_fn
   elif FLAGS.shrink_unshrink_type == 'layerwise':
-    logging.info('using layerwise shrink')
     make_shrink = shrink_unshrink_tff.make_layerwise_projection_shrink
     make_unshrink = shrink_unshrink_tff.make_layerwise_projection_unshrink
     server_model_fn = big_model_fn
     client_model_fn = small_model_fn
   elif FLAGS.shrink_unshrink_type == 'client_layerwise':
-    logging.info('using client_layerwise shrink')
     make_shrink = shrink_unshrink_tff.make_client_specific_layerwise_projection_shrink
     make_unshrink = shrink_unshrink_tff.make_client_specific_layerwise_projection_unshrink
     server_model_fn = big_model_fn
     client_model_fn = small_model_fn
   elif FLAGS.shrink_unshrink_type == 'learned_layerwise':
-    logging.info('using learned_layerwise shrink')
     make_shrink = shrink_unshrink_tff.make_learned_layerwise_projection_shrink
     make_unshrink = shrink_unshrink_tff.make_learned_layerwise_projection_unshrink
     server_model_fn = big_model_fn
     client_model_fn = small_model_fn
   elif FLAGS.shrink_unshrink_type == 'learned_layerwise_v2':
-    logging.info('using learned_layerwise_v2 shrink')
     make_shrink = shrink_unshrink_tff.make_learnedv2_layerwise_projection_shrink
     make_unshrink = shrink_unshrink_tff.make_learned_layerwise_projection_unshrink
     server_model_fn = big_model_fn
     client_model_fn = small_model_fn
   elif FLAGS.shrink_unshrink_type == 'learned_sparse_layerwise_v2':
-    logging.info('using learned_sparse_layerwise_v2 shrink')
     make_shrink = shrink_unshrink_tff.make_learnedv2_layerwise_projection_shrink
     make_unshrink = shrink_unshrink_tff.make_learned_sparse_layerwise_projection_unshrink
     server_model_fn = big_model_fn
@@ -245,6 +246,9 @@ def main(argv):
   elif FLAGS.build_projection_matrix_type == 'dropout':
     logging.info('using dropout projection matrix')
     build_projection_matrix = simple_fedavg_tf.build_dropout_projection_matrix
+  elif FLAGS.build_projection_matrix_type == 'ensemble':
+    logging.info('using ensemble projection matrix')
+    build_projection_matrix = simple_fedavg_tf.build_ensemble_dropout_projection_matrix
   elif FLAGS.build_projection_matrix_type == 'qr':
     logging.info('using qr projection matrix')
     build_projection_matrix = simple_fedavg_tf.build_qr_projection_matrix
@@ -263,6 +267,7 @@ def main(argv):
       task.datasets.train_preprocess_fn)
 
   if FLAGS.shrink_unshrink_type == 'static_client_layerwise':
+    logging.info('static_client_layerwise iterative process')
     iterative_process = simple_fedavg_tff.build_federated_shrink_unshrink_process_with_client_id(
         server_model_fn=server_model_fn,
         client_model_fn=client_model_fn,
@@ -272,9 +277,12 @@ def main(argv):
         shrink_unshrink_info=shrink_unshrink_info,
         client_optimizer_fn=client_optimizer_fn,
         server_optimizer_fn=server_optimizer_fn,
-        oja_hyperparameter=FLAGS.oja_hyperparameter)
+        oja_hyperparameter=FLAGS.oja_hyperparameter,
+        static_client_layerwise_num_buckets=FLAGS
+        .static_client_layerwise_num_buckets)
     training_process = iterative_process
   else:
+    logging.info('standard iterative process')
     iterative_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=server_model_fn,
         client_model_fn=client_model_fn,

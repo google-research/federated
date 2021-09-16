@@ -314,6 +314,77 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     self.assertDTypeEqual(projection_matrix, np.float32)
     self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
 
+  def test_build_ensemble_dropout_projection_matrix(self):
+    seed = 5
+    idx = 2
+
+    desired_shape = tf.shape(tf.ones(shape=(3, 6)))
+    projection_matrix = simple_fedavg_tf.build_ensemble_dropout_projection_matrix(
+        seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=True)
+    print(projection_matrix)
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=0)[3:], 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=0)[3:], 1)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=0)[:3], 0)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=0)[:3], 0)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=1), 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=1), 1)
+    self.assertEqual(tf.reduce_sum(projection_matrix), 3)
+    self.assertDTypeEqual(projection_matrix, np.float32)
+    self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
+
+    desired_shape = tf.shape(tf.ones(shape=(6, 3)))
+    projection_matrix = simple_fedavg_tf.build_ensemble_dropout_projection_matrix(
+        seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=False)
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=0), 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=0), 1)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=1)[3:], 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=1)[3:], 1)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=1)[:3], 0)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=1)[:3], 0)
+
+    self.assertEqual(tf.reduce_sum(projection_matrix), 3)
+    self.assertDTypeEqual(projection_matrix, np.float32)
+    self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
+
+    seed = 5
+    idx = 6
+
+    desired_shape = tf.shape(tf.ones(shape=(3, 9)))
+    projection_matrix = simple_fedavg_tf.build_ensemble_dropout_projection_matrix(
+        seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=True)
+    print(projection_matrix)
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=0)[6:], 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=0)[6:], 1)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=0)[:6], 0)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=0)[:6], 0)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=1), 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=1), 1)
+    self.assertEqual(tf.reduce_sum(projection_matrix), 3)
+    self.assertDTypeEqual(projection_matrix, np.float32)
+    self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
+
+    desired_shape = tf.shape(tf.ones(shape=(9, 3)))
+    projection_matrix = simple_fedavg_tf.build_ensemble_dropout_projection_matrix(
+        seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=False)
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=0), 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=0), 1)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=1)[6:], 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=1)[6:], 1)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=1)[:6], 0)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=1)[:6], 0)
+
+    self.assertEqual(tf.reduce_sum(projection_matrix), 3)
+    self.assertDTypeEqual(projection_matrix, np.float32)
+    self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
+
   def test_build_learned_sparse_projection_matrix(self):
     desired_shape = tf.shape(tf.ones(shape=(3, 100)))
     samp_cov_mat = tf.tile(

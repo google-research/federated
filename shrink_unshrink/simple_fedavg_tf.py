@@ -606,6 +606,51 @@ def build_dropout_projection_matrix(seed, desired_shape, is_left_multiply=True):
 
 
 @tf.function
+def build_ensemble_dropout_projection_matrix(seed,
+                                             desired_shape,
+                                             is_left_multiply=True):
+  """Builds a random projection matrix that corresponds to random dropout.
+
+  Args:
+    seed: a tuple of two integers which is the seed
+    desired_shape: desired shape of the random projection matrix
+    is_left_multiply: a boolean specifying whether the projection matrix is
+      being left or right multiplied
+
+  Returns:
+    A matrix with values of 0 or 1 in the shape of desired_shape
+  """
+  if is_left_multiply:
+    num_to_select = desired_shape[0]
+    num_cand_indices = desired_shape[1]
+    tf.debugging.assert_equal(
+        tf.math.floormod(num_cand_indices, num_to_select), 0)
+    num_batches = tf.cast(num_cand_indices / num_to_select, tf.int32)
+    batch_size = num_to_select
+
+    batch_index = tf.math.floormod(tf.cast(seed[0], tf.int32), num_batches)
+    one_indices = tf.range(batch_index * batch_size,
+                           (batch_index + 1) * batch_size)
+    tf.debugging.assert_equal(tf.size(one_indices), batch_size)
+
+    return tf.one_hot(one_indices, depth=num_cand_indices)
+  else:
+    num_to_select = desired_shape[1]
+    num_cand_indices = desired_shape[0]
+    tf.debugging.assert_equal(
+        tf.math.floormod(num_cand_indices, num_to_select), 0)
+    num_batches = tf.cast(num_cand_indices / num_to_select, tf.int32)
+    batch_size = num_to_select
+
+    batch_index = tf.math.floormod(tf.cast(seed[0], tf.int32), num_batches)
+    one_indices = tf.range(batch_index * batch_size,
+                           (batch_index + 1) * batch_size)
+    tf.debugging.assert_equal(tf.size(one_indices), batch_size)
+
+    return tf.transpose(tf.one_hot(one_indices, depth=num_cand_indices))
+
+
+@tf.function
 def build_learned_sparse_projection_matrix(samp_cov_mat,
                                            desired_shape,
                                            is_left_multiply=True):

@@ -404,10 +404,4 @@ def make_big_and_small_emnist_cnn_dropout_model_fn(my_task,
         input_spec=my_task.datasets.element_type_structure,
         metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
 
-  og_model = my_task.model_fn()
-  big_model = big_model_fn()
-  for x, y in zip(big_model.trainable_variables, og_model.trainable_variables):
-    tf.debugging.assert_equal(tf.shape(x), tf.shape(y))
-  tf.debugging.assert_equal(big_model.input_spec, og_model.input_spec)
-
   return big_model_fn, small_model_fn
