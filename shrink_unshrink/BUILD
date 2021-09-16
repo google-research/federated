@@ -107,6 +107,7 @@ py_test(
     srcs = ["shrink_unshrink_tff_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
+    tags = ["nokokoro"],
     deps = [
         ":models",
         ":shrink_unshrink_tff",

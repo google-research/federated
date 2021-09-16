@@ -97,7 +97,8 @@ with utils_impl.record_hparam_flags() as shared_flags:
       default='identity',
       enum_values=[
           'identity', 'layerwise', 'client_layerwise', 'learned_layerwise',
-          'learned_layerwise_v2', 'learned_sparse_layerwise_v2'
+          'learned_layerwise_v2', 'learned_sparse_layerwise_v2',
+          'static_client_layerwise'
       ],
       help='what type of shrink_unshrink to do')
 
@@ -228,6 +229,11 @@ def main(argv):
     make_unshrink = shrink_unshrink_tff.make_learned_sparse_layerwise_projection_unshrink
     server_model_fn = big_model_fn
     client_model_fn = small_model_fn
+  elif FLAGS.shrink_unshrink_type == 'static_client_layerwise':
+    make_shrink = shrink_unshrink_tff.make_static_client_specific_layerwise_projection_shrink
+    make_unshrink = shrink_unshrink_tff.make_client_specific_layerwise_projection_unshrink
+    server_model_fn = big_model_fn
+    client_model_fn = small_model_fn
   else:
     raise ValueError('invalid shrink unshrink passed')
 
@@ -253,21 +259,34 @@ def main(argv):
       build_projection_matrix=build_projection_matrix,
       new_projection_dict_decimate=FLAGS.new_projection_dict_decimate)
 
-  iterative_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
-      server_model_fn=server_model_fn,
-      client_model_fn=client_model_fn,
-      make_shrink=make_shrink,
-      make_unshrink=make_unshrink,
-      shrink_unshrink_info=shrink_unshrink_info,
-      client_optimizer_fn=client_optimizer_fn,
-      server_optimizer_fn=server_optimizer_fn,
-      oja_hyperparameter=FLAGS.oja_hyperparameter)
-
   train_data = task.datasets.train_data.preprocess(
       task.datasets.train_preprocess_fn)
-  training_process = (
-      tff.simulation.compose_dataset_computation_with_iterative_process(
-          train_data.dataset_computation, iterative_process))
+
+  if FLAGS.shrink_unshrink_type == 'static_client_layerwise':
+    iterative_process = simple_fedavg_tff.build_federated_shrink_unshrink_process_with_client_id(
+        server_model_fn=server_model_fn,
+        client_model_fn=client_model_fn,
+        client_id_to_dataset_preprocessor=train_data.dataset_computation,
+        make_shrink=make_shrink,
+        make_unshrink=make_unshrink,
+        shrink_unshrink_info=shrink_unshrink_info,
+        client_optimizer_fn=client_optimizer_fn,
+        server_optimizer_fn=server_optimizer_fn,
+        oja_hyperparameter=FLAGS.oja_hyperparameter)
+    training_process = iterative_process
+  else:
+    iterative_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
+        server_model_fn=server_model_fn,
+        client_model_fn=client_model_fn,
+        make_shrink=make_shrink,
+        make_unshrink=make_unshrink,
+        shrink_unshrink_info=shrink_unshrink_info,
+        client_optimizer_fn=client_optimizer_fn,
+        server_optimizer_fn=server_optimizer_fn,
+        oja_hyperparameter=FLAGS.oja_hyperparameter)
+    training_process = (
+        tff.simulation.compose_dataset_computation_with_iterative_process(
+            train_data.dataset_computation, iterative_process))
 
   client_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(

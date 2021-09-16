@@ -26,6 +26,8 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
 
   def test_make_learnedv2_and_sparse_layerwise_projection_shrink_and_unshrink(
       self):
+    if tf.config.list_logical_devices('GPU'):
+      self.skipTest('skip GPU test')
     train_client_spec = tff.simulation.baselines.ClientSpec(
         num_epochs=3, batch_size=32, max_elements=1000)
     my_task = tff.simulation.baselines.emnist.create_character_recognition_task(
@@ -252,7 +254,7 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
     train_client_spec = tff.simulation.baselines.ClientSpec(
         num_epochs=3, batch_size=32, max_elements=1000)
     my_task = tff.simulation.baselines.stackoverflow.create_word_prediction_task(
-        train_client_spec, use_synthetic_data=True)
+        train_client_spec, use_synthetic_data=False)
     server_model_fn, client_model_fn = models.make_big_and_small_stackoverflow_model_fn(
         my_task,
         big_embedding_size=96 * 2,
@@ -305,7 +307,7 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
     train_client_spec = tff.simulation.baselines.ClientSpec(
         num_epochs=3, batch_size=32, max_elements=1000)
     my_task = tff.simulation.baselines.stackoverflow.create_word_prediction_task(
-        train_client_spec, use_synthetic_data=True)
+        train_client_spec, use_synthetic_data=False)
     server_model_fn, client_model_fn = models.make_big_and_small_stackoverflow_model_fn(
         my_task,
         big_embedding_size=96 * 2,

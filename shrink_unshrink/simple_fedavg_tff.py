@@ -211,3 +211,156 @@ def build_federated_shrink_unshrink_process(
 
   return tff.templates.IterativeProcess(
       initialize_fn=server_init_tff, next_fn=run_one_round)
+
+
+def build_federated_shrink_unshrink_process_with_client_id(
+    *,
+    server_model_fn,
+    client_model_fn,
+    client_id_to_dataset_preprocessor,
+    # a tff computation accepting client ID returning dataset
+    make_shrink=make_identity_shrink,
+    make_unshrink=make_identity_unshrink,
+    shrink_unshrink_info=None,
+    server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
+    client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
+    oja_hyperparameter=1.0,
+    debugging=False):
+  """Builds the TFF computations for optimization using federated averaging.
+
+  Args:
+    server_model_fn: A no-arg function that returns a
+      `simple_fedavg_tf.KerasModelWrapper`.
+    client_model_fn: A no-arg function that returns a
+      `simple_fedavg_tf.KerasModelWrapper`.
+    client_id_to_dataset_preprocessor: A function that maps a client_id string
+      to a tf.data.Dataset object
+    make_shrink: A function which creates and returns a `shrink` function based
+      on passed in parameters.
+    make_unshrink: A function which creates and returns an `unshrink` function
+      based on passed in parameters.
+    shrink_unshrink_info: Context needed by the algorithm containing information
+      about how shrinking and unshrinking operations are performed.
+    server_optimizer_fn: A no-arg function that returns a
+      `tf.keras.optimizers.Optimizer` for server update.
+    client_optimizer_fn: A no-arg function that returns a
+      `tf.keras.optimizers.Optimizer` for client update.
+    oja_hyperparameter: Hyperparameter used for learned shrink unshrink
+      algorithms.
+    debugging: A boolean which if True returns the shrink and unshrink functions
+      for testing/debugging purposes
+
+  Returns:
+    A `tff.templates.IterativeProcess`. If debugging==True, the constructed
+    shrink and unshrink functions are returned as well.
+  """
+  whimsy_server_model = server_model_fn()
+
+  @tff.tf_computation
+  def shrink_unshrink_server_info_init():
+    return initialize_oja_left_maskval_to_projmat_dict(
+        lmbda=oja_hyperparameter,
+        seed=-1,
+        whimsy_server_weights=get_model_weights(server_model_fn()).trainable,
+        whimsy_client_weights=get_model_weights(client_model_fn()).trainable,
+        left_mask=shrink_unshrink_info.left_mask,
+        right_mask=shrink_unshrink_info.right_mask)
+
+  @tff.tf_computation
+  def server_init_tf():
+    model = server_model_fn()
+    model_weights = get_model_weights(model)
+    server_optimizer = server_optimizer_fn()
+    _initialize_optimizer_vars(model, server_optimizer)
+    return ServerState(
+        model_weights=model_weights,
+        optimizer_state=server_optimizer.variables(),
+        round_num=0,
+        shrink_unshrink_server_info=shrink_unshrink_server_info_init())
+
+  server_state_type = server_init_tf.type_signature.result
+
+  @tff.tf_computation
+  def server_update_fn(
+      server_state,
+      model_delta):  # (server_state_type, model_weights_type.trainable)
+    model = server_model_fn()
+    server_optimizer = server_optimizer_fn()
+    _initialize_optimizer_vars(model, server_optimizer)
+    return server_update(model, server_optimizer, server_state, model_delta)
+
+  tf_client_id_type = client_id_to_dataset_preprocessor.type_signature.parameter
+
+  @tff.tf_computation
+  def server_message_fn(server_state):  # (server_state_type)
+    return build_server_broadcast_message(server_state)
+
+  shrink = make_shrink(
+      server_state_type=server_state_type,
+      tf_client_id_type=tf_client_id_type,
+      server_message_fn=server_message_fn,
+      server_model_fn=server_model_fn,
+      client_model_fn=client_model_fn,
+      shrink_unshrink_info=shrink_unshrink_info)
+
+  server_message_type = shrink.type_signature.result.member
+
+  @tff.tf_computation(tf_client_id_type, server_message_type)
+  def client_update_fn(client_id, server_message):
+    model = client_model_fn()
+    client_optimizer = client_optimizer_fn()
+    tf_dataset = client_id_to_dataset_preprocessor(client_id)
+    return client_update(model, tf_dataset, server_message, client_optimizer)
+
+  client_update_output_type = client_update_fn.type_signature.result
+
+  unshrink = make_unshrink(
+      server_state_type=server_state_type,
+      client_update_output_type=client_update_output_type,
+      server_update_fn=server_update_fn,
+      server_model_fn=server_model_fn,
+      client_model_fn=client_model_fn,
+      shrink_unshrink_info=shrink_unshrink_info)
+
+  federated_server_state_type = tff.type_at_server(server_state_type)
+  federated_client_id_type = tff.type_at_clients(tf_client_id_type)
+
+  @tff.federated_computation(federated_server_state_type,
+                             federated_client_id_type)
+  def run_one_round(server_state, federated_client_id):
+    """Orchestration logic for one round of computation.
+
+    Args:
+      server_state: A `ServerState`.
+      federated_client_id: A list of client id objects
+
+    Returns:
+      A tuple of updated `ServerState` and `tf.Tensor` of average loss.
+    """
+    server_message_at_client = shrink(server_state, federated_client_id)
+
+    client_outputs = tff.federated_map(
+        client_update_fn, (federated_client_id, server_message_at_client))
+
+    server_state = unshrink(server_state, client_outputs)
+
+    # the following code is not amenable with KerasModelWrapper
+    aggregated_outputs = whimsy_server_model.federated_output_computation(
+        client_outputs.model_output)
+    if aggregated_outputs.type_signature.is_struct():
+      aggregated_outputs = tff.federated_zip(aggregated_outputs)
+
+    return server_state, aggregated_outputs
+
+  @tff.federated_computation
+  def server_init_tff():
+    """Orchestration logic for server model initialization."""
+    return tff.federated_value(server_init_tf(), tff.SERVER)
+
+  if debugging:
+    return tff.templates.IterativeProcess(
+        initialize_fn=server_init_tff,
+        next_fn=run_one_round), shrink, unshrink, server_init_tf
+
+  return tff.templates.IterativeProcess(
+      initialize_fn=server_init_tff, next_fn=run_one_round)
