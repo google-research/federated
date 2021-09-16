@@ -34,12 +34,12 @@ import attr
 import tensorflow as tf
 import tensorflow_federated as tff
 
-ModelOutputs = collections.namedtuple('ModelOutputs', 'loss')
+ModelOutputs = collections.namedtuple("ModelOutputs", "loss")
 WEIGHT_DENOM_TYPE = tf.float32
 
 
 def get_model_weights(
-    model: Union[tff.learning.Model, 'KerasModelWrapper']
+    model: Union[tff.learning.Model, "KerasModelWrapper"]
 ) -> tff.learning.ModelWeights:
   """Gets the appropriate ModelWeights object based on the model type."""
   if isinstance(model, tff.learning.Model):
@@ -78,8 +78,8 @@ class KerasModelWrapper(object):
       A scalar tf.float32 `tf.Tensor` loss for current batch input.
     """
     if isinstance(batch_input, dict):
-      x = batch_input['x']
-      y = batch_input['y']
+      x = batch_input["x"]
+      y = batch_input["y"]
     else:
       x, y = batch_input
     preds = self.keras_model(x, training=training)
@@ -115,8 +115,8 @@ def keras_evaluate(model, test_data, metric):
   metric.reset_states()
   for batch in test_data:
     if isinstance(batch, dict):
-      x = batch['x']
-      y = batch['y']
+      x = batch["x"]
+      y = batch["y"]
     else:
       x, y = batch
     preds = model(x, training=False)
@@ -156,6 +156,7 @@ class ServerState(object):
   model_weights = attr.ib()
   optimizer_state = attr.ib()
   round_num = attr.ib()
+  shrink_unshrink_server_info = attr.ib()
 
 
 @attr.s(eq=False, frozen=True, slots=True)
@@ -216,14 +217,13 @@ def server_update(model, server_optimizer, server_state, weights_delta):
   # Apply the update to the model.
   neg_weights_delta = [-1.0 * x for x in weights_delta]
   server_optimizer.apply_gradients(
-      zip(neg_weights_delta, model_weights.trainable), name='server_update')
+      zip(neg_weights_delta, model_weights.trainable), name="server_update")
 
-  # Create a new state based on the updated model.
-  return tff.structure.update_struct(
-      server_state,
+  return ServerState(
       model_weights=model_weights,
       optimizer_state=server_optimizer.variables(),
-      round_num=server_state.round_num + 1)
+      round_num=server_state.round_num + 1,
+      shrink_unshrink_server_info=server_state.shrink_unshrink_server_info)
 
 
 @tf.function
@@ -281,7 +281,7 @@ def reshape_flattened_tensor(
   """
   if len(tf.shape(concatenated)) != 1:
     raise ValueError(
-        f'rank of input tensor is {tf.shape(concatenated)}, expected 1.')
+        f"rank of input tensor is {tf.shape(concatenated)}, expected 1.")
   return [
       tf.reshape(flat_tensor, shape=shape) for flat_tensor, shape in zip(
           tf.split(concatenated, list_of_sizes), list_of_shapes)
@@ -339,8 +339,8 @@ def client_update(model,
     grads = tape.gradient(outputs.loss, model_weights.trainable)
     client_optimizer.apply_gradients(zip(grads, model_weights.trainable))
     if isinstance(batch, dict):
-      x = batch['x']
-      y = batch['y']
+      x = batch["x"]
+      y = batch["y"]
     else:
       x, y = batch
     del y
@@ -389,28 +389,28 @@ def left_right_multiply(left_matrix, mid_matrix, right_matrix, is_left_scalar,
   if is_left_scalar == -1:
     return_val = left_matrix * mid_matrix
   elif is_left_scalar % 1000 == 0 and is_left_scalar > 0:
-    logging.info('SPECIAL: convolutional condition triggerred')
+    logging.info("SPECIAL: convolutional condition triggerred")
     desired_shape = (-1, tf.shape(left_matrix)[1], tf.shape(mid_matrix)[1])
     new_mid_matrix = tf.reshape(mid_matrix, shape=desired_shape)
-    temp_return_val = tf.einsum('ij,bjk->bik', left_matrix, new_mid_matrix)
+    temp_return_val = tf.einsum("ij,bjk->bik", left_matrix, new_mid_matrix)
     return_val = tf.reshape(
         temp_return_val, shape=(-1, tf.shape(mid_matrix)[1]))
   else:
     try:
       return_val = left_matrix @ mid_matrix
     except ValueError:
-      return_val = tf.einsum('ij,abjk->abik', left_matrix, mid_matrix)
+      return_val = tf.einsum("ij,abjk->abik", left_matrix, mid_matrix)
 
   if is_right_scalar == -1:
     return_val = return_val * right_matrix
   elif is_right_scalar % 1000 == 0 and is_right_scalar > 0:
     raise ValueError(
-        'special convolational support is only used in left multiplies.')
+        "special convolational support is only used in left multiplies.")
   else:
     try:
       return_val = return_val @ right_matrix
     except ValueError:
-      return_val = tf.einsum('ij,abjk->abik', left_matrix, mid_matrix)
+      return_val = tf.einsum("ij,abjk->abik", left_matrix, mid_matrix)
 
   return return_val
 
@@ -426,10 +426,12 @@ def project_server_weights(server_state, left_maskval_to_projmat_dict,
       `left_mask` and `right_mask` to matrices.
     left_mask: A list of equal length as the weight matrices in `server_state`.
       The value `k` in the list at index `i` indicates that the weight at
-      index`i` should be left multiplied by `left_maskval_to_projmat_dict[k]`
+      index`i` should be left multiplied by
+      `left_maskval_to_projmat_dict[str(k)]`
     right_mask: A list of equal length as the weight matrices in `server_state`.
       The value `k` in the list at index `i` indicates that the weight at
-      index`i` should be right multiplied by `left_maskval_to_projmat_dict[k]`
+      index`i` should be right multiplied by
+      `left_maskval_to_projmat_dict[str(k)]`
 
   Returns:
     A `ServerState`.
@@ -437,9 +439,9 @@ def project_server_weights(server_state, left_maskval_to_projmat_dict,
 
   def helper(val):
     if val % 1000 == 0 and val > 0:
-      logging.info('SPECIAL1: convolutional condition triggerred')
-      return left_maskval_to_projmat_dict[val // 1000]
-    return left_maskval_to_projmat_dict[val]
+      logging.info("SPECIAL1: convolutional condition triggerred")
+      return left_maskval_to_projmat_dict[str(val // 1000)]
+    return left_maskval_to_projmat_dict[str(val)]
 
   left_projection_mat_lst = [helper(val) for val in left_mask]
   right_projection_mat_lst = [tf.transpose(helper(val)) for val in right_mask]
@@ -452,7 +454,7 @@ def project_server_weights(server_state, left_maskval_to_projmat_dict,
                                             reshaped_model_weights,
                                             right_projection_mat_lst, left_mask,
                                             right_mask)
-  logging.info('starting reflatten')
+  logging.info("starting reflatten")
   flattened_new_model_weights = flatten_reshaped_weights(
       new_model_weights, flat_mask)
   new_model_weights = tff.structure.update_struct(
@@ -477,11 +479,12 @@ def unproject_client_weights(client_output, left_maskval_to_projmat_dict,
       `left_mask` and `right_mask` to matrices.
     left_mask: A list of equal length as the weight matrices in `client_output`.
       The value `k` in the list at index `i` indicates that the weight at
-      index`i` should be left multiplied by `left_maskval_to_projmat_dict[k]`
+      index`i` should be left multiplied by
+      `left_maskval_to_projmat_dict[str(k)]`
     right_mask: A list of equal length as the weight matrices in
       `client_output`. The value `k` in the list at index `i` indicates that the
       weight at index`i` should be right multiplied by
-      `left_maskval_to_projmat_dict[k]`
+      `left_maskval_to_projmat_dict[str(k)]`
 
   Returns:
     A `ClientOutput`.
@@ -489,9 +492,9 @@ def unproject_client_weights(client_output, left_maskval_to_projmat_dict,
 
   def helper(val):
     if val % 1000 == 0 and val > 0:
-      logging.info('SPECIAL2: convolutional condition triggerred')
-      return left_maskval_to_projmat_dict[val // 1000]
-    return left_maskval_to_projmat_dict[val]
+      logging.info("SPECIAL2: convolutional condition triggerred")
+      return left_maskval_to_projmat_dict[str(val // 1000)]
+    return left_maskval_to_projmat_dict[str(val)]
 
   left_projection_mat_lst = [tf.transpose(helper(val)) for val in left_mask]
   right_projection_mat_lst = [helper(val) for val in right_mask]
@@ -603,6 +606,41 @@ def build_dropout_projection_matrix(seed, desired_shape, is_left_multiply=True):
 
 
 @tf.function
+def build_learned_sparse_projection_matrix(samp_cov_mat,
+                                           desired_shape,
+                                           is_left_multiply=True):
+  """Builds a dropout matrix corresponding to keeping the indices of samp_cov_mat with largest row nrom.
+
+  Args:
+    samp_cov_mat: A sample covariance matrix
+    desired_shape: desired shape of the random projection matrix
+    is_left_multiply: a boolean specifying whether the projection matrix is
+      being left or right multiplied
+
+  Returns:
+    A dropout projection matrix in the shape of desired_shape
+  """
+  if is_left_multiply:
+    num_to_select = desired_shape[0]
+    num_cand_indices = desired_shape[1]
+    tf.debugging.assert_equal(tf.shape(samp_cov_mat)[0], num_cand_indices)
+    tf.debugging.assert_equal(tf.shape(samp_cov_mat)[1], num_cand_indices)
+    row_norms = tf.norm(samp_cov_mat, axis=1)
+    one_indices = tf.argsort(
+        row_norms, direction="DESCENDING", stable=True)[:num_to_select]
+    return tf.one_hot(one_indices, depth=num_cand_indices)
+  else:
+    num_to_select = desired_shape[1]
+    num_cand_indices = desired_shape[0]
+    tf.debugging.assert_equal(tf.shape(samp_cov_mat)[0], num_cand_indices)
+    tf.debugging.assert_equal(tf.shape(samp_cov_mat)[1], num_cand_indices)
+    row_norms = tf.norm(samp_cov_mat, axis=1)
+    one_indices = tf.argsort(
+        row_norms, direction="DESCENDING", stable=True)[:num_to_select]
+    return tf.transpose(tf.one_hot(one_indices, depth=num_cand_indices))
+
+
+@tf.function
 def build_normal_projection_matrix(seed, desired_shape, is_left_multiply=True):
   """Builds an random (approximate) projection matrix using a Gaussian sketch.
 
@@ -621,6 +659,53 @@ def build_normal_projection_matrix(seed, desired_shape, is_left_multiply=True):
     latent_dim = tf.cast(desired_shape[1], tf.float32)
   return tf.random.stateless_normal(
       shape=desired_shape, seed=seed, stddev=1 / tf.sqrt(latent_dim))
+
+
+@tf.function
+def build_sparse_projection_matrix(seed, desired_shape, is_left_multiply=True):
+  """Builds an random (approximate) projection matrix using a sparse sketch.
+
+  See
+  https://scikit-learn.org/stable/modules/random_projection.html#sparse-random-matrix
+  for details on the method
+
+  Args:
+    seed: a tuple of two integers which is the seed
+    desired_shape: desired shape of the random projection matrix
+    is_left_multiply: a boolean specifying whether the projection matrix is
+      being left or right multiplied
+
+  Returns:
+    A real valued projection matrix in the shape of desired_shape
+  """
+  if is_left_multiply:
+    num_components = tf.cast(desired_shape[0],
+                             tf.float32)  # target dimension i.e., latent_dim
+    num_features = tf.cast(desired_shape[1],
+                           tf.float32)  # input dimension i.e., latent_dim
+  else:
+    num_components = tf.cast(desired_shape[1], tf.float32)
+    num_features = tf.cast(desired_shape[0], tf.float32)
+  s_inv = 1 / tf.sqrt(num_features)
+  s = tf.sqrt(num_features)
+  logits = tf.math.log([[0.5 * s_inv, 1 - s_inv, 0.5 * s_inv]])
+  index_matrix = tf.reshape(
+      tf.random.stateless_categorical(
+          logits=logits, num_samples=tf.reduce_prod(desired_shape), seed=seed),
+      desired_shape)
+
+  zero_mat = tf.zeros(desired_shape, dtype=tf.float32)
+  pos_mat = tf.sqrt(s / num_components) * tf.ones(
+      desired_shape, dtype=tf.float32)
+  neg_mat = -tf.sqrt(s / num_components) * tf.ones(
+      desired_shape, dtype=tf.float32)
+
+  neg_condition = tf.equal(index_matrix, 0)
+  intermediate_mat = tf.where(neg_condition, neg_mat, zero_mat)
+
+  pos_condition = tf.equal(index_matrix, 2)
+  final_mat = tf.where(pos_condition, pos_mat, intermediate_mat)
+  return final_mat
 
 
 @tf.function
@@ -674,11 +759,12 @@ def create_left_maskval_to_projmat_dict(seed, whimsy_server_weights,
     whimsy_client_weights: A list of weight matrices
     left_mask: A list of equal length as the weight matrices in `client_output`.
       The value `k` in the list at index `i` indicates that the weight at
-      index`i` should be left multiplied by `left_maskval_to_projmat_dict[k]`
+      index`i` should be left multiplied by
+      `left_maskval_to_projmat_dict[str(k)]`
     right_mask: A list of equal length as the weight matrices in
       `client_output`. The value `k` in the list at index `i` indicates that the
       weight at index`i` should be right multiplied by
-      `left_maskval_to_projmat_dict[k]`
+      `left_maskval_to_projmat_dict[str(k)]`
     build_projection_matrix: A function which builds the projection_matrix
       matrix used in this function
 
@@ -686,7 +772,7 @@ def create_left_maskval_to_projmat_dict(seed, whimsy_server_weights,
     A dictionary mapping the values of `left_mask` and `right_mask` to
     projection matrices.
   """
-  logging.info('starting create_left_maskval_projmat_dict')
+  logging.info("starting create_left_maskval_projmat_dict")
   server_flat_mask = get_flat_mask(whimsy_server_weights)
   whimsy_server_trainable_variables = reshape_flattened_weights(
       whimsy_server_weights, server_flat_mask)
@@ -697,10 +783,9 @@ def create_left_maskval_to_projmat_dict(seed, whimsy_server_weights,
       whimsy_client_weights, client_flat_mask)
   tf.debugging.assert_equal(
       server_flat_mask, client_flat_mask,
-      'there should be a one-to-one correspondence between the flat tensors in server and client models.'
+      "there should be a one-to-one correspondence between the flat tensors in server and client models."
   )
-  tf.random.set_seed(seed)
-  left_maskval_to_projmat_dict = dict()
+  left_maskval_to_projmat_dict = collections.OrderedDict()
 
   for idx, val in enumerate(left_mask):
     server_weight_mat_shape = tf.shape(whimsy_server_trainable_variables[idx])
@@ -710,23 +795,23 @@ def create_left_maskval_to_projmat_dict(seed, whimsy_server_weights,
     if len(client_weight_mat_shape) == 2:
       old_desired_shape = (client_weight_mat_shape[0],
                            server_weight_mat_shape[0])
-      tf.debugging.assert_equal(desired_shape, old_desired_shape, 'yoho1')
+      tf.debugging.assert_equal(desired_shape, old_desired_shape, "yoho1")
 
     if val < 0:
-      left_maskval_to_projmat_dict[val] = tf.ones([1], dtype=tf.float32)
+      left_maskval_to_projmat_dict[str(val)] = tf.ones([1], dtype=tf.float32)
       tf.debugging.assert_equal(server_weight_mat_shape[0],
-                                client_weight_mat_shape[0], 'yoho2')
+                                client_weight_mat_shape[0], "yoho2")
     elif val not in left_maskval_to_projmat_dict:
       projection_matrix = build_projection_matrix(
           seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=True)
 
-      left_maskval_to_projmat_dict[val] = projection_matrix
-      actual_shape = tf.shape(left_maskval_to_projmat_dict[val])
-      tf.debugging.assert_equal(actual_shape, desired_shape, 'yoho3')
+      left_maskval_to_projmat_dict[str(val)] = projection_matrix
+      actual_shape = tf.shape(left_maskval_to_projmat_dict[str(val)])
+      tf.debugging.assert_equal(actual_shape, desired_shape, "yoho3")
     else:
-      actual_mat = left_maskval_to_projmat_dict[val]
+      actual_mat = left_maskval_to_projmat_dict[str(val)]
       actual_shape = tf.shape(actual_mat)
-      tf.debugging.assert_equal(actual_shape, desired_shape, f'yoho4{val}')
+      tf.debugging.assert_equal(actual_shape, desired_shape, f"yoho4{val}")
 
   for idx, val in enumerate(right_mask):
     server_weight_mat_shape = tf.shape(whimsy_server_trainable_variables[idx])
@@ -737,23 +822,136 @@ def create_left_maskval_to_projmat_dict(seed, whimsy_server_weights,
     if len(client_weight_mat_shape) == 2:
       old_desired_shape = (server_weight_mat_shape[1],
                            client_weight_mat_shape[1])
-      tf.debugging.assert_equal(desired_shape, old_desired_shape, 'yoho5')
+      tf.debugging.assert_equal(desired_shape, old_desired_shape, "yoho5")
 
     if val < 0:
-      left_maskval_to_projmat_dict[val] = tf.ones([1], dtype=tf.float32)
+      left_maskval_to_projmat_dict[str(val)] = tf.ones([1], dtype=tf.float32)
       tf.debugging.assert_equal(server_weight_mat_shape[1],
-                                client_weight_mat_shape[1], 'yoho6')
+                                client_weight_mat_shape[1], "yoho6")
     elif val not in left_maskval_to_projmat_dict:
       projection_matrix = build_projection_matrix(
           seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=False)
 
-      left_maskval_to_projmat_dict[val] = tf.transpose(projection_matrix)
-      actual_shape = tf.shape(tf.transpose(left_maskval_to_projmat_dict[val]))
-      tf.debugging.assert_equal(actual_shape, desired_shape, 'yoho7')
+      left_maskval_to_projmat_dict[str(val)] = tf.transpose(projection_matrix)
+      actual_shape = tf.shape(
+          tf.transpose(left_maskval_to_projmat_dict[str(val)]))
+      tf.debugging.assert_equal(actual_shape, desired_shape, "yoho7")
     else:
-      actual_mat = tf.transpose(left_maskval_to_projmat_dict[val]
-                               )  # transposed because of right multiply
+      actual_mat = tf.transpose(left_maskval_to_projmat_dict[str(
+          val)])  # transposed because of right multiply
       actual_shape = tf.shape(actual_mat)
-      tf.debugging.assert_equal(actual_shape, desired_shape, 'yoho8')
-  logging.info('finished create_left_maskval_projmat_dict')
+      tf.debugging.assert_equal(actual_shape, desired_shape, "yoho8")
+  logging.info("finished create_left_maskval_projmat_dict")
   return left_maskval_to_projmat_dict
+
+
+@attr.s(eq=False, frozen=True, slots=True)
+class ShrinkUnshrinkServerInfo(object):
+  """Structure for ___."""
+  lmbda = attr.ib()
+  oja_left_maskval_to_projmat_dict = attr.ib()
+  # oja maps mask_keys to projection matrices
+  # initialized by initialize_oja_left_maskval_to_projmat_dict.
+  memory_dict = attr.ib()
+
+
+def initialize_oja_left_maskval_to_projmat_dict(lmbda, seed,
+                                                whimsy_server_weights,
+                                                whimsy_client_weights,
+                                                left_mask, right_mask):
+  """Initializes a left_maskval_to_projmat_dict randomly using QR decomposition.
+
+  Args:
+    lmbda: Hyperparameter associated with oja algorithm
+    seed: used for initialization
+    whimsy_server_weights: list of weight matrices from server_model
+    whimsy_client_weights: list of weight matrices from client_model
+    left_mask: list of left mask values
+    right_mask: list of right mask values
+
+  Returns:
+    a ShrinkUnshrinkServerInfo object
+  """
+  oja_left_maskval_to_projmat_dict = create_left_maskval_to_projmat_dict(
+      seed,
+      whimsy_server_weights,
+      whimsy_client_weights,
+      left_mask,
+      right_mask,
+      build_projection_matrix=build_qr_projection_matrix)
+  memory_dict = initialize_server_learning_memory_dict(
+      oja_left_maskval_to_projmat_dict)
+  return ShrinkUnshrinkServerInfo(
+      lmbda=lmbda,
+      oja_left_maskval_to_projmat_dict=oja_left_maskval_to_projmat_dict,
+      memory_dict=memory_dict)
+
+
+def initialize_server_learning_memory_dict(left_maskval_to_projemat_dict):
+  memory_dict = collections.OrderedDict()
+  for k, v in left_maskval_to_projemat_dict.items():
+    if k != "-1":
+      v_shape = tf.shape(v)
+      memory_dict[str(k)] = tf.eye(num_rows=v_shape[1], dtype=tf.float32)
+  return memory_dict
+
+
+@tf.function
+def left_sample_covariance_helper(oja_dict, mask_val, weight_tensor):
+  """Helper function to compute sample covariance functions for learned shrink and unshrink.
+
+  Args:
+    oja_dict: a dictionary mapping mask val to projection matrices used for
+      getting the latent dimension of vecotrs
+    mask_val: mask_val of the weight tensor of interest
+    weight_tensor: weight matrix we are interested in computing the outer
+      product of
+
+  Returns:
+    a sample covariance type matrix computed from weight_tensor.
+  """
+  if mask_val % 1000 == 0 and mask_val > 0:
+    actual_mask_val = mask_val // 1000
+    latent_dim = tf.shape(oja_dict[str(actual_mask_val)])[1]
+    temp_tensor = tf.reshape(weight_tensor,
+                             (-1, latent_dim, tf.shape(weight_tensor)[1]))
+    my_shape = tf.cast(tf.shape(temp_tensor), dtype=tf.float32)
+    result = tf.einsum("aij,akj->ik", temp_tensor, temp_tensor) / (
+        my_shape[0] * my_shape[2])
+    return result
+  else:
+    try:
+      my_shape = tf.cast(tf.shape(weight_tensor), dtype=tf.float32)
+      result = tf.einsum("abij,abkj->ik", weight_tensor, weight_tensor) / (
+          my_shape[0] * my_shape[1] * my_shape[3])
+      return result
+    except ValueError:
+      my_shape = tf.cast(tf.shape(weight_tensor), dtype=tf.float32)
+      result = weight_tensor @ tf.transpose(weight_tensor) / my_shape[1]
+      return result
+
+
+@tf.function
+def right_sample_covariance_helper(weight_tensor):
+  """Helper function to compute sample covariance functions for learned shrink and unshrink.
+
+  Args:
+    weight_tensor: weight matrix we are interested in computing the outer
+      product of
+
+  Returns:
+    a sample covariance type matrix computed from weight_tensor.
+  """
+  try:
+    my_shape = tf.cast(tf.shape(weight_tensor), dtype=tf.float32)
+    result = tf.einsum("abji,abjk->ik", weight_tensor, weight_tensor) / (
+        my_shape[0] * my_shape[1] * my_shape[2])
+    return result
+  except ValueError:
+    try:
+      my_shape = tf.cast(tf.shape(weight_tensor), dtype=tf.float32)
+      result = tf.transpose(weight_tensor) @ weight_tensor / my_shape[0]
+      return result
+    except ValueError:
+      result = tf.tensordot(weight_tensor, weight_tensor, axes=0)
+      return result

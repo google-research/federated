@@ -92,6 +92,158 @@ def _big_dense_model_fn() -> tff.learning.Model:
 
 class SimpleFedavgTfTest(tf.test.TestCase):
 
+  def test_sample_covariance_helper(self):
+    train_client_spec = tff.simulation.baselines.ClientSpec(
+        num_epochs=3, batch_size=32, max_elements=1000)
+    my_task = tff.simulation.baselines.emnist.create_character_recognition_task(
+        train_client_spec, use_synthetic_data=True, model_id="cnn")
+    big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_model_fn(
+        my_task,
+        big_conv1_filters=32,
+        big_conv2_filters=64,
+        big_dense_size=512,
+        small_conv1_filters=24,
+        small_conv2_filters=48,
+        small_dense_size=384)
+
+    whimsy_server_weights = simple_fedavg_tf.get_model_weights(
+        big_model_fn()).trainable
+    whimsy_client_weights = simple_fedavg_tf.get_model_weights(
+        small_model_fn()).trainable
+
+    # left_mask = [-1, -1, 0, -1, 2, -1, 3, -1]
+    left_mask = [-1, -1, 0, -1, 1000, -1, 3, -1]
+    right_mask = [0, 0, 1, 1, 3, 3, -1, -1]
+
+    left_maskval_to_projmat_dict = simple_fedavg_tf.create_left_maskval_to_projmat_dict(
+        seed=1,
+        whimsy_server_weights=whimsy_server_weights,
+        whimsy_client_weights=whimsy_client_weights,
+        left_mask=left_mask,
+        right_mask=right_mask,
+        build_projection_matrix=simple_fedavg_tf.build_qr_projection_matrix)
+
+    random_server_weights = [
+        tf.random.stateless_normal(tf.shape(w), (1, 11))
+        for w in whimsy_server_weights
+    ]
+    ones_server_weights = [
+        tf.ones(tf.shape(w), dtype=tf.float32) for w in whimsy_server_weights
+    ]
+
+    output = simple_fedavg_tf.left_sample_covariance_helper(
+        left_maskval_to_projmat_dict, left_mask[2], ones_server_weights[2])
+    self.assertAllEqual(output, tf.ones([32, 32], dtype=tf.float32))
+    output = simple_fedavg_tf.left_sample_covariance_helper(
+        left_maskval_to_projmat_dict, left_mask[4], ones_server_weights[4])
+    self.assertAllEqual(output, tf.ones([64, 64], dtype=tf.float32))
+    output = simple_fedavg_tf.left_sample_covariance_helper(
+        left_maskval_to_projmat_dict, left_mask[6], ones_server_weights[6])
+    self.assertAllEqual(output, tf.ones([512, 512], dtype=tf.float32))
+
+    output = simple_fedavg_tf.left_sample_covariance_helper(
+        left_maskval_to_projmat_dict, left_mask[2], random_server_weights[2])
+    desired_output = tf.einsum("abij,abkj->abik", random_server_weights[2],
+                               random_server_weights[2])
+    desired_output = tf.reduce_sum(tf.reduce_sum(desired_output, 0),
+                                   0) / (5 * 5 * 64)
+    self.assertAllClose(output, desired_output)
+
+    output = simple_fedavg_tf.left_sample_covariance_helper(
+        left_maskval_to_projmat_dict, left_mask[4], random_server_weights[4])
+    desired_weight = tf.reshape(random_server_weights[4], (49, 64, 512))
+    desired_output = tf.einsum("aij,akj->aik", desired_weight, desired_weight)
+    desired_output = tf.reduce_sum(desired_output, 0) / (49 * 512)
+    self.assertAllClose(output, desired_output)
+
+    output = simple_fedavg_tf.left_sample_covariance_helper(
+        left_maskval_to_projmat_dict, left_mask[6], random_server_weights[6])
+    desired_output = random_server_weights[6] @ tf.transpose(
+        random_server_weights[6]) / 62
+    self.assertAllClose(output, desired_output)
+
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        ones_server_weights[0])
+    self.assertAllEqual(output, tf.ones([32, 32], dtype=tf.float32))
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        ones_server_weights[1])
+    self.assertAllEqual(output, tf.ones([32, 32], dtype=tf.float32))
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        ones_server_weights[2])
+    self.assertAllEqual(output, tf.ones([64, 64], dtype=tf.float32))
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        ones_server_weights[3])
+    self.assertAllEqual(output, tf.ones([64, 64], dtype=tf.float32))
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        ones_server_weights[4])
+    self.assertAllEqual(output, tf.ones([512, 512], dtype=tf.float32))
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        ones_server_weights[5])
+    self.assertAllEqual(output, tf.ones([512, 512], dtype=tf.float32))
+
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        random_server_weights[0])
+    desired_output = tf.einsum("abji,abjk->abik", random_server_weights[0],
+                               random_server_weights[0])
+    desired_output = tf.reduce_sum(tf.reduce_sum(desired_output, 0),
+                                   0) / (5 * 5 * 1)
+    self.assertAllClose(output, desired_output)
+
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        random_server_weights[1])
+    desired_output = tf.convert_to_tensor(
+        np.outer(random_server_weights[1].numpy().flatten(),
+                 random_server_weights[1].numpy().flatten()))
+    self.assertAllClose(output, desired_output)
+
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        random_server_weights[2])
+    desired_output = tf.einsum("abji,abjk->abik", random_server_weights[2],
+                               random_server_weights[2])
+    desired_output = tf.reduce_sum(tf.reduce_sum(desired_output, 0),
+                                   0) / (5 * 5 * 32)
+    self.assertAllClose(output, desired_output)
+
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        random_server_weights[3])
+    desired_output = tf.convert_to_tensor(
+        np.outer(random_server_weights[3].numpy().flatten(),
+                 random_server_weights[3].numpy().flatten()))
+    self.assertAllClose(output, desired_output)
+
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        random_server_weights[4])
+    desired_output = tf.transpose(
+        random_server_weights[4]) @ random_server_weights[4] / 3136
+    self.assertAllClose(output, desired_output)
+
+    output = simple_fedavg_tf.right_sample_covariance_helper(
+        random_server_weights[5])
+    desired_output = tf.convert_to_tensor(
+        np.outer(random_server_weights[5].numpy().flatten(),
+                 random_server_weights[5].numpy().flatten()))
+    self.assertAllClose(output, desired_output)
+
+  def test_build_sparse_projection_matrix(self):
+    seed = 1
+    idx = 2
+
+    desired_shape = tf.shape(tf.ones(shape=(3, 5)))
+    projection_matrix = simple_fedavg_tf.build_sparse_projection_matrix(
+        seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=True)
+    unique_vals, _ = tf.unique(tf.reshape(projection_matrix, [-1]))
+    self.assertEqual(len(unique_vals), 3)
+    self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
+    self.assertDTypeEqual(projection_matrix, np.float32)
+
+    desired_shape = tf.shape(tf.ones(shape=(5, 3)))
+    projection_matrix = simple_fedavg_tf.build_sparse_projection_matrix(
+        seed=(seed, idx), desired_shape=desired_shape, is_left_multiply=False)
+    unique_vals, _ = tf.unique(tf.reshape(projection_matrix, [-1]))
+    self.assertEqual(len(unique_vals), 3)
+    self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
+    self.assertDTypeEqual(projection_matrix, np.float32)
+
   def test_build_qr_projection_matrix(self):
     seed = 1
     idx = 2
@@ -162,6 +314,47 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     self.assertDTypeEqual(projection_matrix, np.float32)
     self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
 
+  def test_build_learned_sparse_projection_matrix(self):
+    desired_shape = tf.shape(tf.ones(shape=(3, 100)))
+    samp_cov_mat = tf.tile(
+        tf.reshape(tf.range(100, dtype=tf.float32), (-1, 1)), (1, 100))
+    self.assertEqual(tf.shape(samp_cov_mat)[0], 100)
+    self.assertEqual(tf.shape(samp_cov_mat)[1], 100)
+    self.assertAllEqual(
+        tf.math.reduce_std(samp_cov_mat, axis=1),
+        tf.zeros(100, dtype=tf.float32))
+    self.assertEqual(samp_cov_mat[0, 0], 0)
+    self.assertEqual(samp_cov_mat[-1, 0], 99)
+    # samp_cov_mat = tf.random.stateless_normal((5, 5), seed=(6, 5))
+    projection_matrix = simple_fedavg_tf.build_learned_sparse_projection_matrix(
+        samp_cov_mat, desired_shape=desired_shape, is_left_multiply=True)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=0)[-3:], 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=0)[-3:], 1)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=0)[:-3], 0)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=0)[:-3], 0)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=1), 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=1), 1)
+    self.assertEqual(tf.reduce_sum(projection_matrix), 3)
+    self.assertDTypeEqual(projection_matrix, np.float32)
+    self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
+
+    desired_shape = tf.shape(tf.ones(shape=(100, 3)))
+    old_projection_matrix = projection_matrix
+    projection_matrix = simple_fedavg_tf.build_learned_sparse_projection_matrix(
+        samp_cov_mat, desired_shape=desired_shape, is_left_multiply=False)
+
+    self.assertAllEqual(tf.transpose(old_projection_matrix), projection_matrix)
+
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=0), 1)
+    self.assertAllGreaterEqual(tf.reduce_sum(projection_matrix, axis=0), 1)
+    self.assertAllLessEqual(tf.reduce_sum(projection_matrix, axis=1), 1)
+    self.assertEqual(tf.reduce_sum(projection_matrix), 3)
+    self.assertDTypeEqual(projection_matrix, np.float32)
+    self.assertAllEqual(tf.shape(projection_matrix), desired_shape)
+
   def test_make_big_and_small_emnist_cnn_model(self):
     train_client_spec = tff.simulation.baselines.ClientSpec(
         num_epochs=3, batch_size=32, max_elements=1000)
@@ -183,7 +376,9 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     server_state = simple_fedavg_tf.ServerState(
         model_weights=model_weights,
         optimizer_state=server_optimizer.variables(),
-        round_num=0)
+        round_num=0,
+        shrink_unshrink_server_info=simple_fedavg_tf.ShrinkUnshrinkServerInfo(
+            lmbda=0.0, oja_left_maskval_to_projmat_dict=[], memory_dict=[]))
 
     whimsy_server_weights = simple_fedavg_tf.get_model_weights(
         big_model_fn()).trainable
@@ -231,7 +426,9 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     server_state = simple_fedavg_tf.ServerState(
         model_weights=model_weights,
         optimizer_state=server_optimizer.variables(),
-        round_num=0)
+        round_num=0,
+        shrink_unshrink_server_info=simple_fedavg_tf.ShrinkUnshrinkServerInfo(
+            lmbda=0.0, oja_left_maskval_to_projmat_dict=[], memory_dict=[]))
 
     whimsy_server_weights = simple_fedavg_tf.get_model_weights(
         big_rnn_model()).trainable
@@ -289,7 +486,9 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     server_state = simple_fedavg_tf.ServerState(
         model_weights=model_weights,
         optimizer_state=server_optimizer.variables(),
-        round_num=0)
+        round_num=0,
+        shrink_unshrink_server_info=simple_fedavg_tf.ShrinkUnshrinkServerInfo(
+            lmbda=0.0, oja_left_maskval_to_projmat_dict=[], memory_dict=[]))
 
     whimsy_server_weights = simple_fedavg_tf.get_model_weights(
         big_rnn_model()).trainable
@@ -397,7 +596,9 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     server_state = simple_fedavg_tf.ServerState(
         model_weights=model_weights,
         optimizer_state=server_optimizer.variables(),
-        round_num=0)
+        round_num=0,
+        shrink_unshrink_server_info=simple_fedavg_tf.ShrinkUnshrinkServerInfo(
+            lmbda=0.0, oja_left_maskval_to_projmat_dict=[], memory_dict=[]))
 
     whimsy_server_weights = simple_fedavg_tf.get_model_weights(
         _big_dense_model_fn()).trainable
@@ -466,7 +667,9 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     server_state = simple_fedavg_tf.ServerState(
         model_weights=model_weights,
         optimizer_state=server_optimizer.variables(),
-        round_num=0)
+        round_num=0,
+        shrink_unshrink_server_info=simple_fedavg_tf.ShrinkUnshrinkServerInfo(
+            lmbda=0.0, oja_left_maskval_to_projmat_dict=[], memory_dict=[]))
 
     whimsy_server_weights = simple_fedavg_tf.get_model_weights(
         big_model).trainable
@@ -564,13 +767,13 @@ class SimpleFedavgTfTest(tf.test.TestCase):
         right_mask=right_mask,
         build_projection_matrix=simple_fedavg_tf.build_normal_projection_matrix)
     logging.info("retreived left_maskval_to_projmat_dict")
-    self.assertEqual(left_maskval_to_projmat_dict[-1], 1)
+    self.assertEqual(left_maskval_to_projmat_dict[str(-1)], 1)
     self.assertAllEqual(
-        tf.shape(left_maskval_to_projmat_dict[0]), tf.convert_to_tensor([3,
-                                                                         30]))
+        tf.shape(left_maskval_to_projmat_dict[str(0)]),
+        tf.convert_to_tensor([3, 30]))
     self.assertAllEqual(
-        tf.shape(left_maskval_to_projmat_dict[1]), tf.convert_to_tensor([4,
-                                                                         40]))
+        tf.shape(left_maskval_to_projmat_dict[str(1)]),
+        tf.convert_to_tensor([4, 40]))
 
     left_mask = [-1, -1, 3, -1, 6, -1]
     right_mask = [1, 2, 4, 5, -1, -1]
@@ -581,38 +784,38 @@ class SimpleFedavgTfTest(tf.test.TestCase):
         left_mask=left_mask,
         right_mask=right_mask,
         build_projection_matrix=simple_fedavg_tf.build_normal_projection_matrix)
-    assert left_maskval_to_projmat_dict[-1] == 1
+    assert left_maskval_to_projmat_dict[str(-1)] == 1
     self.assertAllEqual(
-        tf.shape(left_maskval_to_projmat_dict[1]), tf.convert_to_tensor([3,
-                                                                         30]))
+        tf.shape(left_maskval_to_projmat_dict[str(1)]),
+        tf.convert_to_tensor([3, 30]))
     self.assertAllEqual(
-        tf.shape(left_maskval_to_projmat_dict[2]), tf.convert_to_tensor([3,
-                                                                         30]))
+        tf.shape(left_maskval_to_projmat_dict[str(2)]),
+        tf.convert_to_tensor([3, 30]))
     self.assertAllEqual(
-        tf.shape(left_maskval_to_projmat_dict[3]), tf.convert_to_tensor([3,
-                                                                         30]))
-    self.assertNotAllClose(left_maskval_to_projmat_dict[1],
-                           left_maskval_to_projmat_dict[2])
-    self.assertNotAllClose(left_maskval_to_projmat_dict[1],
-                           left_maskval_to_projmat_dict[3])
-    self.assertNotAllClose(left_maskval_to_projmat_dict[2],
-                           left_maskval_to_projmat_dict[3])
+        tf.shape(left_maskval_to_projmat_dict[str(3)]),
+        tf.convert_to_tensor([3, 30]))
+    self.assertNotAllClose(left_maskval_to_projmat_dict[str(1)],
+                           left_maskval_to_projmat_dict[str(2)])
+    self.assertNotAllClose(left_maskval_to_projmat_dict[str(1)],
+                           left_maskval_to_projmat_dict[str(3)])
+    self.assertNotAllClose(left_maskval_to_projmat_dict[str(2)],
+                           left_maskval_to_projmat_dict[str(3)])
 
     self.assertAllEqual(
-        tf.shape(left_maskval_to_projmat_dict[4]), tf.convert_to_tensor([4,
-                                                                         40]))
+        tf.shape(left_maskval_to_projmat_dict[str(4)]),
+        tf.convert_to_tensor([4, 40]))
     self.assertAllEqual(
-        tf.shape(left_maskval_to_projmat_dict[5]), tf.convert_to_tensor([4,
-                                                                         40]))
+        tf.shape(left_maskval_to_projmat_dict[str(5)]),
+        tf.convert_to_tensor([4, 40]))
     self.assertAllEqual(
-        tf.shape(left_maskval_to_projmat_dict[6]), tf.convert_to_tensor([4,
-                                                                         40]))
-    self.assertNotAllClose(left_maskval_to_projmat_dict[4],
-                           left_maskval_to_projmat_dict[5])
-    self.assertNotAllClose(left_maskval_to_projmat_dict[4],
-                           left_maskval_to_projmat_dict[6])
-    self.assertNotAllClose(left_maskval_to_projmat_dict[5],
-                           left_maskval_to_projmat_dict[6])
+        tf.shape(left_maskval_to_projmat_dict[str(6)]),
+        tf.convert_to_tensor([4, 40]))
+    self.assertNotAllClose(left_maskval_to_projmat_dict[str(4)],
+                           left_maskval_to_projmat_dict[str(5)])
+    self.assertNotAllClose(left_maskval_to_projmat_dict[str(4)],
+                           left_maskval_to_projmat_dict[str(6)])
+    self.assertNotAllClose(left_maskval_to_projmat_dict[str(5)],
+                           left_maskval_to_projmat_dict[str(6)])
 
 
 if __name__ == "__main__":

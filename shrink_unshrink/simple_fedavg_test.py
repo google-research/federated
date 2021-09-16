@@ -216,7 +216,9 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
       ('tff.learning.Model_wrapper', _tff_learning_model_fn))
   def test_data_type_signature(self, model_fn):
     it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
-        server_model_fn=model_fn, client_model_fn=model_fn)
+        server_model_fn=model_fn,
+        client_model_fn=model_fn,
+        shrink_unshrink_info=make_whimsty_shrink_unshrink_info())
     self.assertIsInstance(it_process, tff.templates.IterativeProcess)
     federated_data_type = it_process.next.type_signature.parameter[1]
     self.assertEqual(
@@ -227,7 +229,9 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
       ('tff.learning.Model_wrapper', _tff_learning_model_fn))
   def test_simple_training(self, model_fn):
     it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
-        server_model_fn=model_fn, client_model_fn=model_fn)
+        server_model_fn=model_fn,
+        client_model_fn=model_fn,
+        shrink_unshrink_info=make_whimsty_shrink_unshrink_info())
     server_state = it_process.initialize()
 
     def deterministic_batch():
@@ -251,7 +255,9 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
     train_data = [client_data()]
 
     trainer = simple_fedavg_tff.build_federated_shrink_unshrink_process(
-        server_model_fn=MnistModel, client_model_fn=MnistModel)
+        server_model_fn=MnistModel,
+        client_model_fn=MnistModel,
+        shrink_unshrink_info=make_whimsty_shrink_unshrink_info())
     state = trainer.initialize()
     losses = []
     for _ in range(2):
@@ -274,7 +280,8 @@ class SimpleFedAvgTest(tf.test.TestCase, parameterized.TestCase):
   def test_tff_learning_evaluate(self):
     it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=_tff_learning_model_fn,
-        client_model_fn=_tff_learning_model_fn)
+        client_model_fn=_tff_learning_model_fn,
+        shrink_unshrink_info=make_whimsty_shrink_unshrink_info())
     server_state = it_process.initialize()
     sample_data = [
         collections.OrderedDict(
@@ -309,7 +316,9 @@ def _server_init(model, optimizer):
   return simple_fedavg_tf.ServerState(
       model_weights=model.weights,
       optimizer_state=optimizer.variables(),
-      round_num=0)
+      round_num=0,
+      shrink_unshrink_server_info=simple_fedavg_tf.ShrinkUnshrinkServerInfo(
+          lmbda=0.0, oja_left_maskval_to_projmat_dict=[], memory_dict=[]))
 
 
 class ServerTest(tf.test.TestCase):
@@ -391,17 +400,27 @@ def _rnn_model_fn() -> tff.learning.Model:
       keras_model=keras_model, input_spec=input_spec, loss=loss)
 
 
+def make_whimsty_shrink_unshrink_info():
+  return simple_fedavg_tf.LayerwiseProjectionShrinkUnshrinkInfoV2(
+      left_mask=[0],
+      right_mask=[0],
+      build_projection_matrix=simple_fedavg_tf.build_normal_projection_matrix,
+      new_projection_dict_decimate=1)
+
+
 class RNNTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_build_fedavg_process(self):
     it_process = simple_fedavg_tff.build_federated_shrink_unshrink_process(
-        server_model_fn=_rnn_model_fn, client_model_fn=_rnn_model_fn)
+        server_model_fn=_rnn_model_fn,
+        client_model_fn=_rnn_model_fn,
+        shrink_unshrink_info=make_whimsty_shrink_unshrink_info())
     self.assertIsInstance(it_process, tff.templates.IterativeProcess)
     federated_type = it_process.next.type_signature.parameter
     model_type = tff.learning.framework.weights_type_from_model(_rnn_model_fn)
     self.assertEqual(
         str(federated_type[0]),
-        '<model_weights={},optimizer_state=<int64>,round_num=int32>@SERVER'
+        '<model_weights=<trainable=<float32[6,8],float32[8,64],float32[16,64],float32[64],float32[16,6],float32[6]>,non_trainable=<>>,optimizer_state=<int64>,round_num=int32,shrink_unshrink_server_info=<lmbda=float32,oja_left_maskval_to_projmat_dict=<0=float32[?,?]>,memory_dict=<0=float32[?,?]>>>@SERVER'  # pylint:disable=too-many-format-args
         .format(model_type))
     self.assertEqual(
         str(federated_type[1]), '{<x=int32[?,5],y=int32[?,5]>*}@CLIENTS')
@@ -411,7 +430,8 @@ class RNNTest(tf.test.TestCase, parameterized.TestCase):
         server_model_fn=_rnn_model_fn,
         client_model_fn=_rnn_model_fn,
         client_optimizer_fn=functools.partial(
-            tf.keras.optimizers.Adagrad, learning_rate=0.01))
+            tf.keras.optimizers.Adagrad, learning_rate=0.01),
+        shrink_unshrink_info=make_whimsty_shrink_unshrink_info())
     server_state = it_process.initialize()
 
     def deterministic_batch():

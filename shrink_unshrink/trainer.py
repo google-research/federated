@@ -22,6 +22,7 @@ iterative process, see `shared/fed_avg_schedule.py`.
 import functools
 import pprint
 
+from typing import Any, Callable, Optional
 from absl import app
 from absl import flags
 from absl import logging
@@ -69,7 +70,7 @@ with utils_impl.record_hparam_flags() as shared_flags:
       'rounds_per_eval', 100,
       'How often to evaluate the global model on the validation dataset.')
   flags.DEFINE_integer(
-      'num_validation_examples', 4, 'The number of validation'
+      'num_validation_examples', 10000, 'The number of validation'
       'examples to use. If set to -1, all available examples '
       'are used.')
   flags.DEFINE_integer('rounds_per_checkpoint', 50,
@@ -77,6 +78,8 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_integer('small_embedding_size', 72,
                        'The embedding size of the lstm.')
   flags.DEFINE_integer('small_lstm_size', 503, 'The size of the lstm layer.')
+  flags.DEFINE_float('oja_hyperparameter', 1.0,
+                     'The hyperparameter used in learned_layerwise.')
 
   flags.DEFINE_integer('small_conv1_filters', 24,
                        'The filter size of the conv.')
@@ -92,12 +95,22 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_enum(
       name='shrink_unshrink_type',
       default='identity',
-      enum_values=['identity', 'layerwise', 'client_layerwise'],
+      enum_values=[
+          'identity', 'layerwise', 'client_layerwise', 'learned_layerwise',
+          'learned_layerwise_v2', 'learned_sparse_layerwise_v2'
+      ],
       help='what type of shrink_unshrink to do')
+
+  flags.DEFINE_enum(  # originally only used to be cnn_dropout
+      name='my_emnist_model_id',
+      default='cnn_dropout',
+      enum_values=['cnn_dropout', 'cnn'],
+      help='what type of cnn to use')
+
   flags.DEFINE_enum(
       name='build_projection_matrix_type',
       default='normal',
-      enum_values=['normal', 'dropout', 'qr'],
+      enum_values=['normal', 'dropout', 'qr', 'sparse'],
       help='what type of shrink_unshrink to do')
 
 with utils_impl.record_hparam_flags() as task_flags:
@@ -139,7 +152,6 @@ def main(argv):
   task = task_utils.create_task_from_flags(train_client_spec)
 
   if FLAGS.task == 'stackoverflow_word':
-
     big_model_fn, small_model_fn = models.make_big_and_small_stackoverflow_model_fn(
         task,
         big_embedding_size=96,
@@ -147,21 +159,34 @@ def main(argv):
         small_embedding_size=FLAGS.small_embedding_size,
         small_lstm_size=FLAGS.small_lstm_size)
     # allows for modifications to lstm layers
-    # left_mask = [-1, 0, 2, -1, 2, -1, 0, -1]
-    # right_mask = [0, 1, 1, 1, 0, 0, -1, -1]
+    left_mask = [-1, 0, 2, -1, 2, -1, 0, -1]
+    right_mask = [0, 1, 1, 1, 0, 0, -1, -1]
 
     # does not allow for modifications to lstm layers
-    left_mask = [-1, 0, -1, -1, 2, -1, 0, -1]
-    right_mask = [0, -1, -1, -1, 0, 0, -1, -1]
+    # left_mask = [-1, 0, -1, -1, 2, -1, 0, -1]
+    # right_mask = [0, -1, -1, -1, 0, 0, -1, -1]
   elif FLAGS.task == 'emnist_character':
-    big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_dropout_model_fn(
-        task,
-        big_conv1_filters=32,
-        big_conv2_filters=64,
-        big_dense_size=128,
-        small_conv1_filters=FLAGS.small_conv1_filters,
-        small_conv2_filters=FLAGS.small_conv2_filters,
-        small_dense_size=FLAGS.small_dense_size)
+    if FLAGS.my_emnist_model_id == 'cnn_dropout':
+      # originally only used to be cnn_dropout
+      logging.info('using cnn dropout')
+      big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_dropout_model_fn(
+          task,
+          big_conv1_filters=32,
+          big_conv2_filters=64,
+          big_dense_size=128,
+          small_conv1_filters=FLAGS.small_conv1_filters,
+          small_conv2_filters=FLAGS.small_conv2_filters,
+          small_dense_size=FLAGS.small_dense_size)
+    elif FLAGS.my_emnist_model_id == 'cnn':
+      logging.info('using original cnn')
+      big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_model_fn(
+          task,
+          big_conv1_filters=32,
+          big_conv2_filters=64,
+          big_dense_size=512,
+          small_conv1_filters=FLAGS.small_conv1_filters,
+          small_conv2_filters=FLAGS.small_conv2_filters,
+          small_dense_size=FLAGS.small_dense_size)
     left_mask = [-1, -1, 0, -1, 1000, -1, 3, -1]
     right_mask = [0, 0, 1, 1, 3, 3, -1, -1]
   else:
@@ -171,8 +196,8 @@ def main(argv):
     logging.info('using identity shrink')
     make_shrink = shrink_unshrink_tff.make_identity_shrink
     make_unshrink = shrink_unshrink_tff.make_identity_unshrink
-    server_model_fn = big_model_fn
-    client_model_fn = big_model_fn
+    server_model_fn = small_model_fn
+    client_model_fn = small_model_fn
   elif FLAGS.shrink_unshrink_type == 'layerwise':
     logging.info('using layerwise shrink')
     make_shrink = shrink_unshrink_tff.make_layerwise_projection_shrink
@@ -183,6 +208,24 @@ def main(argv):
     logging.info('using client_layerwise shrink')
     make_shrink = shrink_unshrink_tff.make_client_specific_layerwise_projection_shrink
     make_unshrink = shrink_unshrink_tff.make_client_specific_layerwise_projection_unshrink
+    server_model_fn = big_model_fn
+    client_model_fn = small_model_fn
+  elif FLAGS.shrink_unshrink_type == 'learned_layerwise':
+    logging.info('using learned_layerwise shrink')
+    make_shrink = shrink_unshrink_tff.make_learned_layerwise_projection_shrink
+    make_unshrink = shrink_unshrink_tff.make_learned_layerwise_projection_unshrink
+    server_model_fn = big_model_fn
+    client_model_fn = small_model_fn
+  elif FLAGS.shrink_unshrink_type == 'learned_layerwise_v2':
+    logging.info('using learned_layerwise_v2 shrink')
+    make_shrink = shrink_unshrink_tff.make_learnedv2_layerwise_projection_shrink
+    make_unshrink = shrink_unshrink_tff.make_learned_layerwise_projection_unshrink
+    server_model_fn = big_model_fn
+    client_model_fn = small_model_fn
+  elif FLAGS.shrink_unshrink_type == 'learned_sparse_layerwise_v2':
+    logging.info('using learned_sparse_layerwise_v2 shrink')
+    make_shrink = shrink_unshrink_tff.make_learnedv2_layerwise_projection_shrink
+    make_unshrink = shrink_unshrink_tff.make_learned_sparse_layerwise_projection_unshrink
     server_model_fn = big_model_fn
     client_model_fn = small_model_fn
   else:
@@ -199,6 +242,9 @@ def main(argv):
   elif FLAGS.build_projection_matrix_type == 'qr':
     logging.info('using qr projection matrix')
     build_projection_matrix = simple_fedavg_tf.build_qr_projection_matrix
+  elif FLAGS.build_projection_matrix_type == 'sparse':
+    logging.info('using sparse projection matrix')
+    build_projection_matrix = simple_fedavg_tf.build_sparse_projection_matrix
   else:
     raise ValueError('invalid build_projection_matrix_type passed')
   shrink_unshrink_info = simple_fedavg_tf.LayerwiseProjectionShrinkUnshrinkInfoV2(
@@ -214,7 +260,8 @@ def main(argv):
       make_unshrink=make_unshrink,
       shrink_unshrink_info=shrink_unshrink_info,
       client_optimizer_fn=client_optimizer_fn,
-      server_optimizer_fn=server_optimizer_fn)
+      server_optimizer_fn=server_optimizer_fn,
+      oja_hyperparameter=FLAGS.oja_hyperparameter)
 
   train_data = task.datasets.train_data.preprocess(
       task.datasets.train_preprocess_fn)
@@ -226,8 +273,42 @@ def main(argv):
       tff.simulation.build_uniform_sampling_fn(
           train_data.client_ids, random_seed=FLAGS.client_datasets_random_seed),
       size=FLAGS.clients_per_round)
-  validation_fn = training_utils.create_validation_fn(
-      task,
+
+  def create_validation_fn(
+      validation_frequency: int,
+      num_validation_examples: Optional[int] = None
+  ) -> Callable[[tff.learning.ModelWeights, int], Any]:
+    """Creates a function for validating performance of a `tff.learning.Model`."""
+    if task.datasets.validation_data is not None:
+      validation_set = task.datasets.validation_data
+    else:
+      validation_set = task.datasets.test_data
+    validation_set = validation_set.create_tf_dataset_from_all_clients()
+    if num_validation_examples is not None:
+      validation_set = validation_set.take(num_validation_examples)
+    validation_set = task.datasets.eval_preprocess_fn(validation_set)
+
+    evaluate_fn = tff.learning.build_federated_evaluation(server_model_fn)
+
+    def validation_fn(model_weights, round_num):
+      if round_num % validation_frequency == 0:
+        return evaluate_fn(model_weights, [validation_set])
+      else:
+        return {}
+
+    return validation_fn
+
+  def create_test_fn() -> Callable[[tff.learning.ModelWeights], Any]:
+    """Creates a function for testing performance of a `tff.learning.Model`."""
+    test_set = task.datasets.get_centralized_test_data()
+    evaluate_fn = tff.learning.build_federated_evaluation(server_model_fn)
+
+    def test_fn(model_weights):
+      return evaluate_fn(model_weights, [test_set])
+
+    return test_fn
+
+  validation_fn = create_validation_fn(
       validation_frequency=FLAGS.rounds_per_eval,
       num_validation_examples=FLAGS.num_validation_examples)
 
@@ -248,7 +329,7 @@ def main(argv):
       validation_fn=validation_fn_from_state,
       file_checkpoint_manager=checkpoint_manager,
       metrics_managers=metrics_managers)
-  test_fn = training_utils.create_test_fn(task)
+  test_fn = create_test_fn()
   # test_metrics = test_fn(state.model)
   test_metrics = test_fn(state.model_weights)
   logging.info('Test metrics:\n %s', pprint.pformat(test_metrics))

@@ -37,6 +37,7 @@ from shrink_unshrink.shrink_unshrink_tff import make_identity_unshrink
 from shrink_unshrink.simple_fedavg_tf import build_server_broadcast_message
 from shrink_unshrink.simple_fedavg_tf import client_update
 from shrink_unshrink.simple_fedavg_tf import get_model_weights
+from shrink_unshrink.simple_fedavg_tf import initialize_oja_left_maskval_to_projmat_dict
 from shrink_unshrink.simple_fedavg_tf import KerasModelWrapper
 from shrink_unshrink.simple_fedavg_tf import server_update
 from shrink_unshrink.simple_fedavg_tf import ServerState
@@ -66,6 +67,7 @@ def build_federated_shrink_unshrink_process(
     shrink_unshrink_info=None,
     server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
     client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
+    oja_hyperparameter=1.0,
     debugging=False):
   """Builds the TFF computations for optimization using federated averaging.
 
@@ -84,14 +86,26 @@ def build_federated_shrink_unshrink_process(
       `tf.keras.optimizers.Optimizer` for server update.
     client_optimizer_fn: A no-arg function that returns a
       `tf.keras.optimizers.Optimizer` for client update.
+    oja_hyperparameter: Hyperparameter used for learned shrink unshrink
+      algorithms.
     debugging: A boolean which if True returns the shrink and unshrink functions
-      for testing/debugging purposes
+      for testing/debugging purposes.
 
   Returns:
     A `tff.templates.IterativeProcess`.
   """
   whimsy_client_model = client_model_fn()
   whimsy_server_model = server_model_fn()
+
+  @tff.tf_computation
+  def shrink_unshrink_server_info_init():
+    return initialize_oja_left_maskval_to_projmat_dict(
+        lmbda=oja_hyperparameter,
+        seed=-1,
+        whimsy_server_weights=get_model_weights(server_model_fn()).trainable,
+        whimsy_client_weights=get_model_weights(client_model_fn()).trainable,
+        left_mask=shrink_unshrink_info.left_mask,
+        right_mask=shrink_unshrink_info.right_mask)
 
   @tff.tf_computation
   def server_init_tf():
@@ -102,11 +116,10 @@ def build_federated_shrink_unshrink_process(
     return ServerState(
         model_weights=model_weights,
         optimizer_state=server_optimizer.variables(),
-        round_num=0)
+        round_num=0,
+        shrink_unshrink_server_info=shrink_unshrink_server_info_init())
 
   server_state_type = server_init_tf.type_signature.result
-
-  # model_weights_type = server_state_type.model_weights
 
   @tff.tf_computation
   def server_update_fn(
@@ -193,7 +206,8 @@ def build_federated_shrink_unshrink_process(
 
   if debugging:
     return tff.templates.IterativeProcess(
-        initialize_fn=server_init_tff, next_fn=run_one_round), shrink, unshrink
+        initialize_fn=server_init_tff,
+        next_fn=run_one_round), shrink, unshrink, server_init_tf
 
   return tff.templates.IterativeProcess(
       initialize_fn=server_init_tff, next_fn=run_one_round)
