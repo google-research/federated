@@ -821,8 +821,6 @@ def create_left_maskval_to_projmat_dict(seed, whimsy_server_weights,
   server_flat_mask = get_flat_mask(whimsy_server_weights)
   whimsy_server_trainable_variables = reshape_flattened_weights(
       whimsy_server_weights, server_flat_mask)
-  # gTODO change whimsy_server_weights
-  # to whimsy_server_model.trainable_variables?
   client_flat_mask = get_flat_mask(whimsy_client_weights)
   whimsy_client_trainable_variables = reshape_flattened_weights(
       whimsy_client_weights, client_flat_mask)

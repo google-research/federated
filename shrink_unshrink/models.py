@@ -132,7 +132,6 @@ def make_big_and_small_stackoverflow_model_fn(my_task,
             lstm_size=big_lstm_size),
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         input_spec=my_task.datasets.element_type_structure,
-        # metrics=metrics_builder()
     )
 
   # the standard size corresponding the stackoverflow baseline task
@@ -145,7 +144,6 @@ def make_big_and_small_stackoverflow_model_fn(my_task,
             lstm_size=small_lstm_size),
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         input_spec=my_task.datasets.element_type_structure,
-        # metrics=metrics_builder()
     )
 
   return big_stackoverflownwp_rnn_model_fn, small_stackoverflownwp_rnn_model_fn

@@ -357,7 +357,6 @@ def main(argv):
       file_checkpoint_manager=checkpoint_manager,
       metrics_managers=metrics_managers)
   test_fn = create_test_fn()
-  # test_metrics = test_fn(state.model)
   test_metrics = test_fn(state.model_weights)
   logging.info('Test metrics:\n %s', pprint.pformat(test_metrics))
   for metrics_manager in metrics_managers:

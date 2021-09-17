@@ -213,7 +213,6 @@ def make_layerwise_projection_unshrink(*, server_state_type,
   @tff.tf_computation(client_update_output_type)
   def unproject_client_weights_fn(client_output):
     whimsy_server_weights = get_model_weights(server_model_fn()).trainable
-    # gTODO should this be get_model_weights(...).trainable_variables?
     whimsy_client_weights = get_model_weights(client_model_fn()).trainable
     left_maskval_to_projmat_dict = create_left_maskval_to_projmat_dict(
         client_output.round_num //
@@ -870,7 +869,6 @@ def make_client_specific_layerwise_projection_unshrink(
   @tff.tf_computation(client_update_output_type)
   def unproject_client_weights_fn(client_output):
     whimsy_server_weights = get_model_weights(server_model_fn()).trainable
-    # gTODO should be get_model_weights(...).trainable_variables?
     whimsy_client_weights = get_model_weights(client_model_fn()).trainable
     # left_maskval_to_projmat_dict = client_output.shrink_unshrink_dynamic_info
     # could try to pass the whole dictionary
