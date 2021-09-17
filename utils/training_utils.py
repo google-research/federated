@@ -92,12 +92,12 @@ def configure_output_managers(
       CSVMetricsManager.
 
   Returns:
-    A `tff.simulation.FileProgramStateManager`, and a list of
+    A `tff.program.FileProgramStateManager`, and a list of
     `tff.simulation.MetricsManager` instances.
   """
   program_state_dir = os.path.join(root_output_dir, 'program_states',
                                    experiment_name)
-  program_state_manager = tff.simulation.FileProgramStateManager(
+  program_state_manager = tff.program.FileProgramStateManager(
       root_dir=program_state_dir)
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')

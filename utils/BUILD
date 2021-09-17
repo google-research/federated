@@ -60,6 +60,7 @@ py_test(
     srcs = ["training_utils_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
+    tags = ["nokokoro"],
     deps = [":training_utils"],
 )
 

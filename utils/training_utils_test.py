@@ -59,7 +59,7 @@ class TrainingUtilsTest(tf.test.TestCase):
     program_state_manager, _ = training_utils.configure_output_managers(
         root_output_dir, experiment_name)
     self.assertIsInstance(program_state_manager,
-                          tff.simulation.FileProgramStateManager)
+                          tff.program.FileProgramStateManager)
 
     program_state_dir = os.path.join(root_output_dir, 'program_states',
                                      experiment_name)
