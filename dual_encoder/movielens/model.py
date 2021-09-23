@@ -320,7 +320,7 @@ def build_keras_model(
       normalization_fn=utils.NORMALIZATION_FN_MAP[normalization_fn],
       output_embeddings=output_embeddings,
       use_global_similarity=use_global_similarity,
-      item_vocab_size=item_vocab_size)
+      item_vocab_size=item_vocab_size)  # pytype: disable=wrong-arg-types  # typed-keras
 
   return model
 

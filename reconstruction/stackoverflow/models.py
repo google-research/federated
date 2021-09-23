@@ -32,7 +32,7 @@ class GlobalEmbedding(tf.keras.layers.Layer):
       total_vocab_size: int,
       embedding_dim: int,
       mask_zero: bool = True,
-      initializer: tf.keras.initializers = tf.keras.initializers.random_uniform,
+      initializer: tf.keras.initializers = tf.keras.initializers.random_uniform,  # pytype: disable=invalid-annotation  # typed-keras
       **kwargs):
     super(GlobalEmbedding, self).__init__(**kwargs)
     self.total_vocab_size = total_vocab_size
@@ -76,7 +76,7 @@ class LocalEmbedding(tf.keras.layers.Layer):
       embedding_dim: int,
       total_vocab_size: int,
       mask_zero: bool = True,
-      initializer: tf.keras.initializers = tf.keras.initializers.random_uniform,
+      initializer: tf.keras.initializers = tf.keras.initializers.random_uniform,  # pytype: disable=invalid-annotation  # typed-keras
       **kwargs):
     super(LocalEmbedding, self).__init__(**kwargs)
     self.input_dim = input_dim

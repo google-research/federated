@@ -425,7 +425,7 @@ def main(argv):
                                                           client_learning_rate),
           dataset_split_fn=fake_dataset_split_fn,
           client_weight_fn=client_weighting,
-          aggregation_factory=aggregation_factory)
+          aggregation_factory=aggregation_factory)  # pytype: disable=wrong-arg-types  # typed-keras
 
     return training_process.build_federated_reconstruction_process(
         model_fn=model_fn,
@@ -447,7 +447,7 @@ def main(argv):
         evaluate_reconstruction=FLAGS.evaluate_reconstruction,
         jointly_train_variables=FLAGS.jointly_train_variables,
         client_weight_fn=client_weighting,
-        aggregation_factory=aggregation_factory)
+        aggregation_factory=aggregation_factory)  # pytype: disable=wrong-arg-types  # typed-keras
 
   def evaluation_computation_builder(
       model_fn: Callable[[], reconstruction_model.ReconstructionModel],
