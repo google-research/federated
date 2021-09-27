@@ -42,22 +42,18 @@ We have the following tasks that can be set via the `--task` flag:
 
 | Task Name | Flag | Dataset | Model | Task Summary |
 | --------- | ---- | ------- | ----  | ------------ |
-| CIFAR-100 | cifar100 | [CIFAR-100](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/cifar100/load_data) | ResNet-18 (with GroupNorm) | Image classification  |
-| EMNIST | emnist | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data) | CNN (dropout) | Alpha-numeric character recognition |
-| EMNIST-Lite | emnist-lite | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data) |CNN (no dropout) | Numeric character recognition |
-| EMNIST Autoencoder | emnist_ae | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data) | Bottleneck network | Image autoencoder |
-| Shakespeare | shakespeare | [Shakespeare](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/shakespeare/load_data) | RNN (2 LSTM layers) | Next-character prediction  |
+| CIFAR-100 | cifar100_image | [CIFAR-100](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/cifar100/load_data) | ResNet-18 (with GroupNorm) | Image classification  |
+| EMNIST | emnist_character | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data) | CNN (dropout) | Alpha-numeric character recognition |
+| EMNIST Autoencoder | emnist_autoencoder | [EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data) | Bottleneck network | Image autoencoder |
+| Shakespeare | shakespeare_character | [Shakespeare](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/shakespeare/load_data) | RNN (2 LSTM layers) | Next-character prediction  |
 | Stack Overflow Word Prediction | stackoverflow_word | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | RNN (1 LSTM layer) | Next-word prediction  |
 | Stack Overflow Tag Prediction | stackoverflow_tag | [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data) | Logistic regression classifier | Tag prediction |
 
 <!-- mdformat on -->
 
-Here, `EMNIST-Lite` is a lightweight simulation that can be used for basic
-experimentation. It only uses the first 10 classes of EMNIST (the digits 0-9),
-and a smaller model. For more moderate experimentation, we recommend the full
-`EMNIST` task, which uses all 62 alpha-numeric labels of EMNIST and a slightly
-larger model. For more realistic cross-device simulations, we recommend the
-Stack Overflow word prediction and tag prediction tasks.
+For simple experimentation, we recommend the `EMNIST` task. For more realistic
+cross-device simulations, we recommend the Stack Overflow word prediction and
+tag prediction tasks.
 
 ### Basic flag usage
 
