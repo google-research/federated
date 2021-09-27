@@ -25,6 +25,7 @@ class GetParametersTest(absltest.TestCase):
   def test_unbiased_miracle_is_unbiased(self):
     """Test if unbiased miracle is unbiased."""
     number_of_budget_intervals = 99
+    budget = 0.5
     epsilon = 1
     d = 50
     coding_cost = 6
@@ -36,7 +37,7 @@ class GetParametersTest(absltest.TestCase):
 
     x_unbiased_miracle = np.zeros((d, n))
     c1, c2, m, gamma = get_parameters.get_parameters_unbiased_miracle(
-        epsilon / 2, d, 2**coding_cost, number_of_budget_intervals)
+        epsilon / 2, d, 2**coding_cost, number_of_budget_intervals, budget)
     for i in range(n):
       k, _, _ = miracle.encoder(i, x[:, i], 2**coding_cost, c1, c2, gamma)
       z_k = miracle.decoder(i, k, d, 2**coding_cost)
@@ -76,6 +77,7 @@ class GetParametersTest(absltest.TestCase):
   def test_unbiased_modified_miracle_is_unbiased(self):
     """Test if unbiased modified miracle is unbiased."""
     number_of_budget_intervals = 99
+    budget = 0.5
     epsilon = 1
     d = 50
     coding_cost = 6
@@ -87,7 +89,8 @@ class GetParametersTest(absltest.TestCase):
 
     x_unbiased_modified_miracle = np.zeros((d, n))
     c1, c2, m, gamma = get_parameters.get_parameters_unbiased_modified_miracle(
-        epsilon, d, 2**coding_cost, epsilon / 2, number_of_budget_intervals)
+        epsilon, d, 2**coding_cost, epsilon / 2, number_of_budget_intervals,
+        budget)
     for i in range(n):
       _, _, pi = miracle.encoder(i, x[:, i], 2**coding_cost, c1, c2, gamma)
       pi_all = modify_pi.modify_pi(pi, epsilon / 2)

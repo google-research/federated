@@ -58,7 +58,7 @@ def get_unbiased_p_hat(number_candidates, c1, c2, p):
   return p_hat
 
 
-def get_unbiased_p_tilde(number_candidates, c1, c2, p, eta):
+def get_unbiased_p_tilde(number_candidates, c1, c2, p, eta, epsilon):
   """Get the p_tilde to unbias modified miracle.
 
   Args:
@@ -84,7 +84,7 @@ def get_unbiased_p_tilde(number_candidates, c1, c2, p, eta):
     pi_in = 1/number_candidates*(c1/(beta*c1+(1-beta)*c2))
     pi_out = 1/number_candidates*(c2/(beta*c1+(1-beta)*c2))
     pi = np.concatenate((np.ones(k)*pi_in, np.ones(number_candidates-k)*pi_out))
-    tilde_pi = modify_pi.modify_pi(pi, eta)[-1]
+    tilde_pi = modify_pi.modify_pi(pi, eta, c1/(np.exp(epsilon/2)))[-1]
     # Compute the probability of a candidate that lies inside the cap.
     tilde_pi_in = np.max(tilde_pi)
     p_tilde = p_tilde + stats.binom.pmf(k, number_candidates,
@@ -117,7 +117,7 @@ def get_optimized_budget_unbiased_modified_miracle(epsilon, d,
     gamma, _ = privunit.find_best_gamma(d, budget*epsilon)
     p = np.exp((1-budget)*epsilon)/(1+np.exp((1-budget)*epsilon))
     c1, c2 = privunit.get_privunit_densities(d, gamma, p)
-    p_tilde = get_unbiased_p_tilde(number_candidates, c1, c2, p, eta)
+    p_tilde = get_unbiased_p_tilde(number_candidates, c1, c2, p, eta, epsilon)
     m_tilde[step] = privunit.getm(d, gamma, p_tilde)
   return budget_space[np.argmax(m_tilde)]
 

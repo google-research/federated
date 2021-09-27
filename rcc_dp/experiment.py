@@ -75,15 +75,15 @@ def evaluate(work_path, config, file_open=open):
     print("epsilon target = " + str(epsilon_target))
     print("n = " + str(n))
     print("d = %d" % d)
-    print("coding cost = %d" % coding_cost)
+    print("coding cost = %d" % coding_cost)  
 
     if config.run_unbiased_approx_miracle:
       print("budget = " + str(budget))
 
     if config.run_modified_miracle or config.run_unbiased_modified_miracle:
-      eta = epsilon_target / 2
+      eta = epsilon_target / 2.0
       print("eta = " + str(eta))
-      print("alpha = " + str(alpha))
+      print("alpha = " + str(alpha)) 
 
     for itr in range(config.num_itr):
       print("itr = %d" % itr)
@@ -118,7 +118,8 @@ def evaluate(work_path, config, file_open=open):
       if config.run_unbiased_miracle:
         x_unbiased_miracle = np.zeros((d, n))
         c1, c2, m, gamma = get_parameters.get_parameters_unbiased_miracle(
-            epsilon_target / 2, d, 2**coding_cost, number_of_budget_intervals)
+            epsilon_target / 2, d, 2**coding_cost, number_of_budget_intervals,
+            budget)
         for i in range(n):
           k, _, _ = miracle.encoder(i + itr * n, x[:, i], 2**coding_cost, c1,
                                     c2, gamma)
@@ -136,7 +137,7 @@ def evaluate(work_path, config, file_open=open):
         for i in range(n):
           _, _, pi = miracle.encoder(i + itr * n, x[:, i], 2**coding_cost, c1,
                                      c2, gamma)
-          pi_all = modify_pi.modify_pi(pi, eta)
+          pi_all = modify_pi.modify_pi(pi, eta, c1/(np.exp(epsilon_target/2)))
           k = np.random.choice(2**coding_cost, 1, p=pi_all[-1])[0]
           z_k = miracle.decoder(i + itr * n, k, d, 2**coding_cost)
           x_modified_miracle[:, i] = z_k / m
@@ -149,11 +150,11 @@ def evaluate(work_path, config, file_open=open):
         c1, c2, m, gamma = (
             get_parameters.get_parameters_unbiased_modified_miracle(
                 alpha * epsilon_target, d, 2**coding_cost, eta,
-                number_of_budget_intervals))
+                number_of_budget_intervals, budget))
         for i in range(n):
           _, _, pi = miracle.encoder(i + itr * n, x[:, i], 2**coding_cost, c1,
                                      c2, gamma)
-          pi_all = modify_pi.modify_pi(pi, eta)
+          pi_all = modify_pi.modify_pi(pi, eta, c1/(np.exp(epsilon_target/2)))
           k = np.random.choice(2**coding_cost, 1, p=pi_all[-1])[0]
           z_k = miracle.decoder(i + itr * n, k, d, 2**coding_cost)
           x_unbiased_modified_miracle[:, i] = z_k / m
@@ -178,7 +179,7 @@ def evaluate(work_path, config, file_open=open):
             np.mean(x, axis=1, keepdims=True) - x_unbiased_approx_miracle)**2
 
       if config.run_privunit:
-        x_privunit, _ = privunit.apply_privunit(x, epsilon_target)
+        x_privunit, _ = privunit.apply_privunit(x, epsilon_target, budget)
         x_privunit = np.mean(np.array(x_privunit), axis=1, keepdims=True)
         privunit_mse[itr, step] = np.linalg.norm(
             np.mean(x, axis=1, keepdims=True) - x_privunit)**2

@@ -82,11 +82,11 @@ def get_parameters_unbiased_approx_miracle(epsilon_target, d, number_candidates,
 
 
 def get_parameters_unbiased_miracle(epsilon, d, number_candidates,
-                                    number_of_budget_intervals):
+                                    number_of_budget_intervals, budget):
   """Get privunit parameters for unbiased miracle."""
   # Get the optimized budget.
-  budget = optimize_unbias.get_optimized_budget_unbiased_miracle(
-      epsilon, d, number_candidates, number_of_budget_intervals)
+  # budget = optimize_unbias.get_optimized_budget_unbiased_miracle(
+  #     epsilon, d, number_candidates, number_of_budget_intervals)
   gamma, _ = privunit.find_best_gamma(d, budget * epsilon)
   p = np.exp((1 - budget) * epsilon) / (1 + np.exp((1 - budget) * epsilon))
   c1, c2 = privunit.get_privunit_densities(d, gamma, p)
@@ -97,16 +97,17 @@ def get_parameters_unbiased_miracle(epsilon, d, number_candidates,
 
 
 def get_parameters_unbiased_modified_miracle(epsilon, d, number_candidates,
-                                             eta, number_of_budget_intervals):
+                                             eta, number_of_budget_intervals,
+                                             budget):
   """Get privunit parameters for unbiased modified miracle."""
   # Get the optimized budget.
-  budget = optimize_unbias.get_optimized_budget_unbiased_modified_miracle(
-      epsilon, d, number_candidates, eta, number_of_budget_intervals)
+  # budget = optimize_unbias.get_optimized_budget_unbiased_modified_miracle(
+  #     epsilon, d, number_candidates, eta, number_of_budget_intervals)
   gamma, _ = privunit.find_best_gamma(d, budget * epsilon)
   p = np.exp((1 - budget) * epsilon) / (1 + np.exp((1 - budget) * epsilon))
   c1, c2 = privunit.get_privunit_densities(d, gamma, p)
   p_tilde = optimize_unbias.get_unbiased_p_tilde(number_candidates, c1, c2, p,
-                                                 eta)
+                                                 eta, epsilon)
   m_tilde = privunit.getm(d, gamma, p_tilde)
 
   return c1, c2, m_tilde, gamma

@@ -19,7 +19,7 @@ The distribution tilde_pi (which is equal to pi_all[-1]) is 2 * eta-DP.
 import numpy as np
 
 
-def modify_pi(pi, eta):
+def modify_pi(pi, eta, multiplicative_factor):
   """This function modifies the distribution pi to make it 2eta-LDP.
 
   The function essentially ensure that the new distribution lies between the
@@ -45,6 +45,7 @@ def modify_pi(pi, eta):
 
   number_candidates = len(pi)
   p = np.zeros(number_candidates) + 1.0 / number_candidates
+  p = p*multiplicative_factor
   # The container used to track changes in the distribution.
   pi_all = [pi]
 

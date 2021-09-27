@@ -35,7 +35,7 @@ class ModifyPiTest(absltest.TestCase):
           _, _, pi = miracle.encoder(0, x[:, 0], number_candidates, c1, c2,
                                      gamma)
           eta = epsilon / 2
-          pi_all = modify_pi.modify_pi(pi, eta)
+          pi_all = modify_pi.modify_pi(pi, eta, c1/(np.exp(epsilon/2)))
           self.assertLessEqual(len(pi_all), 3)
           for distribution in pi_all:
             self.assertLessEqual(np.abs(np.sum(distribution)-1), 0.0001)
@@ -53,7 +53,7 @@ class ModifyPiTest(absltest.TestCase):
           _, _, pi = miracle.encoder(0, x[:, 0], number_candidates, c1, c2,
                                      gamma)
           eta = epsilon / 2
-          pi_all = modify_pi.modify_pi(pi, eta)
+          pi_all = modify_pi.modify_pi(pi, eta, c1/(np.exp(epsilon/2)))
           self.assertLessEqual(
               np.max(pi_all[-1]),
               np.exp(eta) / number_candidates)
@@ -73,7 +73,7 @@ class ModifyPiTest(absltest.TestCase):
           _, _, pi = miracle.encoder(0, x[:, 0], number_candidates, c1, c2,
                                      gamma)
           eta = epsilon / 2
-          pi_all = modify_pi.modify_pi(pi, eta)
+          pi_all = modify_pi.modify_pi(pi, eta, c1/(np.exp(epsilon/2)))
           self.assertLessEqual(len(pi_all), 3)
 
   def test_edge_case(self):
@@ -89,7 +89,7 @@ class ModifyPiTest(absltest.TestCase):
               epsilon, d, budget)
           _, _, pi = miracle.encoder(0, x[:, 0], number_candidates, c1, c2,
                                      gamma)
-          pi_all = modify_pi.modify_pi(pi, eta)
+          pi_all = modify_pi.modify_pi(pi, eta, c1/(np.exp(epsilon/2)))
           self.assertListEqual(
               list(pi_all[-1]),
               list(1 / number_candidates * np.ones(number_candidates)))
