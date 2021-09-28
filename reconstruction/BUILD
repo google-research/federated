@@ -42,7 +42,11 @@ py_test(
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
-    tags = ["nokokoro"],  # TODO(b/199435517): Remove this tag when the test succeeds in a non-flaky manner.
+    tags = [
+        "manual",
+        "nokokoro",  # TODO(b/199435517): Remove this tag when the test succeeds in a non-flaky manner.
+        "notap",  #TODO(b/201413656): Remove this tag once the test succeeds again.
+    ],
     deps = [
         ":keras_utils",
         ":reconstruction_model",
