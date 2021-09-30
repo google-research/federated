@@ -265,7 +265,7 @@ def main(argv):
     def round_end_evaluation_fn(state, round_num):
 
       if round_num % FLAGS.rounds_per_validation == 0:
-        model_weights = training_process.get_model_weights(state)
+        model_weights = iterative_process.get_model_weights(state)
         round_ids = validation_client_sampling_fn(round_num)
         validation_metrics = validation_fn(model_weights, round_ids)
       else:
