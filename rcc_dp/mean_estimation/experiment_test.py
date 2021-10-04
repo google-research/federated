@@ -14,8 +14,8 @@
 """Tests for experiment definitions."""
 
 from absl.testing import absltest
-from rcc_dp import config as defaults
-from rcc_dp import experiment
+from mean_estimation import config as defaults
+from mean_estimation import experiment
 
 
 class ExperimentTest(absltest.TestCase):

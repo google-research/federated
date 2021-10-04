@@ -24,9 +24,7 @@ def get_config():
       # can take one of "biased_data", "unbiased_data", "same_data".
       data="biased_data",
       # Flags to indicate which methods to compare.
-      run_unbiased_approx_miracle=True,
-      run_unbiased_miracle=False,
-      run_unbiased_modified_miracle=True,
+      run_approx_miracle=True,
       run_miracle=False,
       run_modified_miracle=False,
       run_privunit=True,
@@ -34,20 +32,20 @@ def get_config():
       # Common parameters.
       num_itr=3,
       coding_cost=4,
+      coding_cost_multiplier=1,
       # Specific parameters (leave them as they are for now).
       delta=10**(-6),
       budget=0.5,
       alpha=1.0,
-      number_of_budget_intervals=99,
       # Variation.
       vary="eps",  # Can take one of "d", "n", "eps".
       d_space=[50, 100],
       n_space=[2500, 5000, 7500, 10000],
-      eps_space=[1, 2, 3, 4, 5, 6],
+      eps_space=[1],
       # Defaults.
-      n=500,
-      d=100,
-      t=4,
+      n=1000,
+      d=500,
+      t=8,
       epsilon_target=2,
   )
   config = config_dict.ConfigDict(config)

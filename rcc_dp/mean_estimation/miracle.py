@@ -23,6 +23,7 @@ to the complete model compression pipeline of Havasi et al.
 """
 
 import numpy as np
+from mean_estimation import privunit
 
 
 def encoder(seed, x, number_candidates, c1, c2, gamma):

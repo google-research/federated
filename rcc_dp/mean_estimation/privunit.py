@@ -131,7 +131,6 @@ def apply_privunit(x, eps, budget):
     an unbiased estimator.
   """
   (d, n) = x.shape
-  # budget = get_optimized_budget(eps, d)
   gamma, _ = find_best_gamma(d, budget * eps)
   p = np.exp((1 - budget) * eps) / (1 + np.exp((1 - budget) * eps))
   m = getm(d, gamma, p)

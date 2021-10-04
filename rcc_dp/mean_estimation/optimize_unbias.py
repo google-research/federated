@@ -28,8 +28,7 @@ minimizing the variance or maximizing the corresponding m in this range.
 
 import numpy as np
 from scipy import stats
-from rcc_dp import modify_pi
-from rcc_dp import privunit
+from mean_estimation import privunit
 
 
 def get_unbiased_p_hat(number_candidates, c1, c2, p):
@@ -48,17 +47,16 @@ def get_unbiased_p_hat(number_candidates, c1, c2, p):
     p_hat: The probability with which unbiased miracle will sample an unit
     vector from the shaded spherical cap associated with input.
   """
-  p_hat = 0
-  for k in range(number_candidates + 1):
-    # Compute the fraction of candidates that lie inside the cap.
-    beta = k/number_candidates
-    # Compute the probability of a candidate that lies inside the cap.
-    pi_in = 1/number_candidates*(c1/(beta*c1+(1-beta)*c2))
-    p_hat = p_hat + stats.binom.pmf(k, number_candidates, p/c1)* k * pi_in
+  # Compute the fraction of candidates that lie inside the cap.
+  beta = np.array(range(number_candidates+1))/number_candidates
+  pi_in = 1/number_candidates*(c1/(beta*c1+(1-beta)*c2))
+  p_hat = np.sum(stats.binom.pmf(range(number_candidates+1), 
+    number_candidates, p/c1)*range(number_candidates+1)*pi_in)
+
   return p_hat
 
 
-def get_unbiased_p_tilde(number_candidates, c1, c2, p, eta, epsilon):
+def get_unbiased_p_tilde(number_candidates, c1, c2, p, epsilon):
   """Get the p_tilde to unbias modified miracle.
 
   Args:
@@ -69,26 +67,27 @@ def get_unbiased_p_tilde(number_candidates, c1, c2, p, eta, epsilon):
     if the inner product between x and z is less than gamma.
     p: The probability with which privunit samples an unit vector from the
     shaded spherical cap associated with input (see original privunit paper).
-    eta: The deletion-DP guarantee associated with the modified pi
-    (i.e., pi_all[-1]).
+    epsilon: The privacy parameter.
 
   Returns:
     p_tilde: The probability with which unbiased modified miracle will sample
     an unit vector from the shaded spherical cap associated with input.
   """
-  p_tilde = 0
-  for k in range(number_candidates + 1):
-    # Compute the fraction of candidates that lie inside the cap.
-    beta = k/number_candidates
+  expected_beta = p/c1
+  # The fraction of candidates that lie inside the cap.
+  beta = np.array(range(number_candidates+1))/number_candidates
 
-    pi_in = 1/number_candidates*(c1/(beta*c1+(1-beta)*c2))
-    pi_out = 1/number_candidates*(c2/(beta*c1+(1-beta)*c2))
-    pi = np.concatenate((np.ones(k)*pi_in, np.ones(number_candidates-k)*pi_out))
-    tilde_pi = modify_pi.modify_pi(pi, eta, c1/(np.exp(epsilon/2)))[-1]
-    # Compute the probability of a candidate that lies inside the cap.
-    tilde_pi_in = np.max(tilde_pi)
-    p_tilde = p_tilde + stats.binom.pmf(k, number_candidates,
-                                        p / c1) * k * tilde_pi_in
+  beta = np.array(range(number_candidates+1))/number_candidates
+  pi_in = 1/number_candidates*(c1/(beta*c1+(1-beta)*c2))
+  tilde_pi_in_1 = pi_in*(1+beta*(np.exp(epsilon)-1))/((1+expected_beta*(np.exp(epsilon)-1)))
+  tilde_pi_in_2 = tilde_pi_in_1*(beta+expected_beta*(np.exp(epsilon)-1))/(beta*np.exp(epsilon))
+  tilde_pi_in_2[0,] = 0
+  indicator = beta <= expected_beta
+  # The probability with which you choose a candidate inside the cap.
+  tilde_pi_in = indicator*tilde_pi_in_1+(1-indicator)*tilde_pi_in_2
+  p_tilde = np.sum(stats.binom.pmf(range(number_candidates+1), 
+    number_candidates, p/c1)*range(number_candidates+1)*tilde_pi_in)
+
   return p_tilde
 
 

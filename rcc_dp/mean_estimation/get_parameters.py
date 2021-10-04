@@ -14,19 +14,8 @@
 """Code to obtain parameters of various miracle methods."""
 
 import numpy as np
-from rcc_dp import optimize_unbias
-from rcc_dp import privunit
-
-
-def get_parameters_miracle(epsilon, d, budget):
-  """Get privunit parameters for miracle and modified miracle."""
-  # The budget for the biased miracle and the biased modified miracle are not
-  # yet optimized. The default budget is used to calculate the parameters.
-  gamma, _ = privunit.find_best_gamma(d, budget * epsilon)
-  p = np.exp((1 - budget) * epsilon) / (1 + np.exp((1 - budget) * epsilon))
-  c1, c2 = privunit.get_privunit_densities(d, gamma, p)
-  m = privunit.getm(d, gamma, p)
-  return c1, c2, m, gamma
+from mean_estimation import optimize_unbias
+from mean_estimation import privunit
 
 
 def get_parameters_unbiased_approx_miracle(epsilon_target, d, number_candidates,
@@ -81,12 +70,9 @@ def get_parameters_unbiased_approx_miracle(epsilon_target, d, number_candidates,
   return c1, c2, m_hat, gamma, epsilon_approx
 
 
-def get_parameters_unbiased_miracle(epsilon, d, number_candidates,
-                                    number_of_budget_intervals, budget):
+def get_parameters_unbiased_miracle(epsilon, d, number_candidates, budget):
   """Get privunit parameters for unbiased miracle."""
   # Get the optimized budget.
-  # budget = optimize_unbias.get_optimized_budget_unbiased_miracle(
-  #     epsilon, d, number_candidates, number_of_budget_intervals)
   gamma, _ = privunit.find_best_gamma(d, budget * epsilon)
   p = np.exp((1 - budget) * epsilon) / (1 + np.exp((1 - budget) * epsilon))
   c1, c2 = privunit.get_privunit_densities(d, gamma, p)
@@ -97,17 +83,14 @@ def get_parameters_unbiased_miracle(epsilon, d, number_candidates,
 
 
 def get_parameters_unbiased_modified_miracle(epsilon, d, number_candidates,
-                                             eta, number_of_budget_intervals,
-                                             budget):
+                                             eta, budget):
   """Get privunit parameters for unbiased modified miracle."""
   # Get the optimized budget.
-  # budget = optimize_unbias.get_optimized_budget_unbiased_modified_miracle(
-  #     epsilon, d, number_candidates, eta, number_of_budget_intervals)
   gamma, _ = privunit.find_best_gamma(d, budget * epsilon)
   p = np.exp((1 - budget) * epsilon) / (1 + np.exp((1 - budget) * epsilon))
   c1, c2 = privunit.get_privunit_densities(d, gamma, p)
   p_tilde = optimize_unbias.get_unbiased_p_tilde(number_candidates, c1, c2, p,
-                                                 eta, epsilon)
+                                                 epsilon)
   m_tilde = privunit.getm(d, gamma, p_tilde)
 
   return c1, c2, m_tilde, gamma

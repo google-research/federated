@@ -15,7 +15,7 @@
 
 from absl.testing import absltest
 import numpy as np
-from rcc_dp import privunit
+from mean_estimation import privunit
 
 
 class PrivunitTest(absltest.TestCase):

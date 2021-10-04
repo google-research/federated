@@ -15,16 +15,15 @@
 
 from absl.testing import absltest
 import numpy as np
-from rcc_dp import get_parameters
-from rcc_dp import miracle
-from rcc_dp import modify_pi
+from mean_estimation import get_parameters
+from mean_estimation import miracle
+from mean_estimation import modify_pi
 
 
 class GetParametersTest(absltest.TestCase):
 
   def test_unbiased_miracle_is_unbiased(self):
     """Test if unbiased miracle is unbiased."""
-    number_of_budget_intervals = 99
     budget = 0.5
     epsilon = 1
     d = 50
@@ -35,17 +34,17 @@ class GetParametersTest(absltest.TestCase):
     x /= np.linalg.norm(x, axis=0)
     x = np.repeat(x, n, axis=1)
 
-    x_unbiased_miracle = np.zeros((d, n))
+    x_miracle = np.zeros((d, n))
     c1, c2, m, gamma = get_parameters.get_parameters_unbiased_miracle(
-        epsilon / 2, d, 2**coding_cost, number_of_budget_intervals, budget)
+        epsilon / 2, d, 2**coding_cost, budget)
     for i in range(n):
       k, _, _ = miracle.encoder(i, x[:, i], 2**coding_cost, c1, c2, gamma)
       z_k = miracle.decoder(i, k, d, 2**coding_cost)
-      x_unbiased_miracle[:, i] = z_k / m
+      x_miracle[:, i] = z_k / m
 
-    x_unbiased_miracle = np.mean(x_unbiased_miracle, axis=1, keepdims=True)
+    x_miracle = np.mean(x_miracle, axis=1, keepdims=True)
     x_mse = np.linalg.norm(
-        np.mean(x, axis=1, keepdims=True) - x_unbiased_miracle)**2
+        np.mean(x, axis=1, keepdims=True) - x_miracle)**2
     self.assertLessEqual(x_mse, 0.05)
 
   def test_unbiased_approx_miracle_is_unbiased(self):
@@ -61,22 +60,21 @@ class GetParametersTest(absltest.TestCase):
     x /= np.linalg.norm(x, axis=0)
     x = np.repeat(x, n, axis=1)
 
-    x_unbiased_approx_miracle = np.zeros((d, n))
+    x_approx_miracle = np.zeros((d, n))
     c1, c2, m, gamma, _ = get_parameters.get_parameters_unbiased_approx_miracle(
         epsilon, d, 2**coding_cost, budget, delta)
     for i in range(n):
       k, _, _ = miracle.encoder(i, x[:, i], 2**coding_cost, c1, c2, gamma)
       z_k = miracle.decoder(i, k, d, 2**coding_cost)
-      x_unbiased_approx_miracle[:, i] = z_k / m
-    x_unbiased_approx_miracle = np.mean(
-        x_unbiased_approx_miracle, axis=1, keepdims=True)
+      x_approx_miracle[:, i] = z_k / m
+    x_approx_miracle = np.mean(
+        x_approx_miracle, axis=1, keepdims=True)
     x_mse = np.linalg.norm(
-        np.mean(x, axis=1, keepdims=True) - x_unbiased_approx_miracle)**2
+        np.mean(x, axis=1, keepdims=True) - x_approx_miracle)**2
     self.assertLessEqual(x_mse, 0.05)
 
   def test_unbiased_modified_miracle_is_unbiased(self):
     """Test if unbiased modified miracle is unbiased."""
-    number_of_budget_intervals = 99
     budget = 0.5
     epsilon = 1
     d = 50
@@ -87,20 +85,19 @@ class GetParametersTest(absltest.TestCase):
     x /= np.linalg.norm(x, axis=0)
     x = np.repeat(x, n, axis=1)
 
-    x_unbiased_modified_miracle = np.zeros((d, n))
+    x_modified_miracle = np.zeros((d, n))
     c1, c2, m, gamma = get_parameters.get_parameters_unbiased_modified_miracle(
-        epsilon, d, 2**coding_cost, epsilon / 2, number_of_budget_intervals,
-        budget)
+        epsilon, d, 2**coding_cost, epsilon / 2, budget)
     for i in range(n):
       _, _, pi = miracle.encoder(i, x[:, i], 2**coding_cost, c1, c2, gamma)
       pi_all = modify_pi.modify_pi(pi, epsilon / 2)
       k = np.random.choice(2**coding_cost, 1, p=pi_all[-1])[0]
       z_k = miracle.decoder(i, k, d, 2**coding_cost)
-      x_unbiased_modified_miracle[:, i] = z_k / m
-    x_unbiased_modified_miracle = np.mean(
-        x_unbiased_modified_miracle, axis=1, keepdims=True)
+      x_modified_miracle[:, i] = z_k / m
+    x_modified_miracle = np.mean(
+        x_modified_miracle, axis=1, keepdims=True)
     x_mse = np.linalg.norm(
-        np.mean(x, axis=1, keepdims=True) - x_unbiased_modified_miracle)**2
+        np.mean(x, axis=1, keepdims=True) - x_modified_miracle)**2
     self.assertLessEqual(x_mse, 0.05)
 
 
