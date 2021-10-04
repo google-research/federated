@@ -26,11 +26,11 @@ def get_config():
       # Flags to indicate which methods to compare.
       run_approx_miracle=True,
       run_miracle=False,
-      run_modified_miracle=False,
+      run_modified_miracle=True,
       run_privunit=True,
       run_sqkr=True,
       # Common parameters.
-      num_itr=3,
+      num_itr=5,
       coding_cost=4,
       coding_cost_multiplier=1,
       # Specific parameters (leave them as they are for now).
@@ -45,7 +45,7 @@ def get_config():
       # Defaults.
       n=1000,
       d=500,
-      t=8,
+      t=6,
       epsilon_target=2,
   )
   config = config_dict.ConfigDict(config)

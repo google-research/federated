@@ -243,6 +243,9 @@ def evaluate(work_path, config, file_open=open):
   with file_open(work_path + "/rcc_dp_comparison.png", "wb") as f:
     plt.savefig(f, format="png")
 
+  with file_open(work_path + "/time.txt", "w") as f:
+    np.savetxt(f, np.array(time.time()-start_time).reshape(-1,1))
+
   if config.run_approx_miracle:
     with file_open(work_path + "/approx_miracle_mse.csv", "w") as f:
       np.savetxt(f, approx_miracle_mse, delimiter=",")
