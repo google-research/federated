@@ -19,6 +19,8 @@ exception is some handling for conversion from Struct, which should go
 away when b/130724878 is fixed.
 """
 
+import collections
+
 import attr
 import tensorflow as tf
 
@@ -154,7 +156,8 @@ def client_computation(
   return ClientOutput(
       discriminator_weights_delta=weights_delta,
       update_weight=update_weight,
-      counters={'num_discriminator_train_examples': num_examples})
+      counters=collections.OrderedDict(
+          num_discriminator_train_examples=num_examples))
 
 
 def server_initial_state(generator, discriminator):
@@ -162,11 +165,10 @@ def server_initial_state(generator, discriminator):
   return ServerState(
       generator_weights=_weights(generator),
       discriminator_weights=_weights(discriminator),
-      counters={
-          'num_rounds': tf.constant(0),
-          'num_generator_train_examples': tf.constant(0),
-          'num_discriminator_train_examples': tf.constant(0)
-      },
+      counters=collections.OrderedDict(
+          num_discriminator_train_examples=tf.constant(0),
+          num_generator_train_examples=tf.constant(0),
+          num_rounds=tf.constant(0)),
       aggregation_state=())
 
 
@@ -202,7 +204,8 @@ def server_computation(
   """
   # A tf.function can't modify the structure of its input arguments,
   # so we make a semi-shallow copy:
-  server_state = attr.evolve(server_state, counters=dict(server_state.counters))
+  server_state = attr.evolve(
+      server_state, counters=collections.OrderedDict(server_state.counters))
 
   tf.nest.map_structure(lambda a, b: a.assign(b), generator.weights,
                         server_state.generator_weights)
@@ -231,9 +234,9 @@ def server_computation(
 
   server_state.counters[
       'num_generator_train_examples'] += gen_examples_this_round
+  server_state.counters['num_rounds'] += 1
   server_state.generator_weights = _weights(generator)
   server_state.discriminator_weights = _weights(discriminator)
-  server_state.counters['num_rounds'] += 1
   return server_state
 
 

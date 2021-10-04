@@ -265,7 +265,8 @@ def federated_training_loop(gan: tff_gans.GanFnsAndTypes,
 
     client_gen_inputs, client_real_inputs = zip(*client_datasets_fn(round_num))
     server_state = process.next(server_state, server_gen_inputs_fn(round_num),
-                                client_gen_inputs, client_real_inputs)
+                                list(client_gen_inputs),
+                                list(client_real_inputs))
 
     round_num += 1
     if round_num % rounds_per_checkpoint == 0:
