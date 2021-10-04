@@ -232,21 +232,17 @@ def _filter_by_example(raw_ds, client_ids_example_indices_map, client_id):
   example_indices = [int(s) for s in example_indices[1:-1].split(',')]
 
   # Get the elements (OrderedDicts) in the raw data which are at the indices
-  # indicated by the list above.
-  elements = []
+  # indicated by the list above. This creates a dictionary of lists such that
+  # the i-th element in each list corresponds to the i-th example. This allows
+  # us to use the serializable Dataset.from_tensor_slices.
+  elements = tf.nest.map_structure(lambda spec: [], raw_ds.element_spec)
   index = 0
   for element in raw_ds:
     if index in example_indices:
-      elements.append(element)
+      tf.nest.map_strucutre(lambda es, e: es.append(e), elements, element)
     index += 1
 
-  # Bind the elements (via a generator fn) into a new tf.data.Dataset.
-  def _generator():
-    for element in elements:
-      yield element
-
-  return tf.data.Dataset.from_generator(_generator, raw_ds.output_types,
-                                        raw_ds.output_shapes)
+  return tf.data.Dataset.from_tensor_slices(elements)
 
 
 def _get_client_ids_inversion_and_example_indices_maps(
