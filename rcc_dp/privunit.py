@@ -113,7 +113,7 @@ def get_optimized_budget(epsilon, d):
   return budget_space[np.argmax(m)]
 
 
-def apply_privunit(x, eps):
+def apply_privunit(x, eps, budget):
   """This function applies the privunit mechanism.
 
   The privunit mechanism produces an unbiased estimator of x that has
@@ -123,6 +123,7 @@ def apply_privunit(x, eps):
   Args:
     x: The 2-dimensional array to be privatized.
     eps: The privacy factor epsilon.
+    budget: The default budget splitting between the gamma and p parameters.
 
   Returns:
     x_perturbed: The x privatized using privunit. This has the same dimensions
@@ -131,7 +132,6 @@ def apply_privunit(x, eps):
     an unbiased estimator.
   """
   (d, n) = x.shape
-  budget = get_optimized_budget(eps, d)
   gamma, _ = find_best_gamma(d, budget * eps)
   p = np.exp((1 - budget) * eps) / (1 + np.exp((1 - budget) * eps))
   m = getm(d, gamma, p)

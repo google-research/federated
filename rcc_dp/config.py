@@ -24,31 +24,29 @@ def get_config():
       # can take one of "biased_data", "unbiased_data", "same_data".
       data="biased_data",
       # Flags to indicate which methods to compare.
-      run_unbiased_approx_miracle=True,
-      run_unbiased_miracle=False,
-      run_unbiased_modified_miracle=True,
-      run_miracle=False,
-      run_modified_miracle=False,
+      run_approx_miracle=False,
+      run_miracle=True,
+      run_modified_miracle=True,
       run_privunit=True,
       run_sqkr=True,
       # Common parameters.
       num_itr=1,
-      coding_cost=4,
+      coding_cost=8,
+      coding_cost_multiplier=1,
       # Specific parameters (leave them as they are for now).
       delta=10**(-6),
       budget=0.5,
       alpha=1.0,
-      number_of_budget_intervals=99,
       # Variation.
-      vary="d",  # Can take one of "d", "n", "eps".
-      d_space=[50, 100],
-      n_space=[2500, 5000, 7500, 10000],
-      eps_space=[1, 2, 3, 4, 5, 6, 7],
+      vary="eps",  # Can take one of "d", "n", "eps".
+      d_space=[200, 400, 600, 800, 1000],
+      n_space=[2000, 4000, 6000, 8000, 10000],
+      eps_space=list(range(1, 9)),
       # Defaults.
-      n=500,
-      d=100,
+      n=5000,
+      d=500,
       t=2,
-      epsilon_target=2,
+      epsilon_target=4,
   )
   config = config_dict.ConfigDict(config)
   config.lock()  # Prevent addition of new fields.

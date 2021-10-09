@@ -23,6 +23,11 @@ class ExperimentTest(absltest.TestCase):
   def test_evaluate_does_not_fail(self):
     work_path = self.create_tempdir().full_path
     config = defaults.get_config()
+    config.num_itr = 1
+    config.eps_space = [1]
+    config.t = 2
+    config.d = 100
+    config.n = 200
     experiment.evaluate(work_path, config)
 
 

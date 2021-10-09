@@ -70,12 +70,13 @@ class PrivunitTest(absltest.TestCase):
     eps_space = [4, 5]
     d_space = [100]
     n = 50000
+    budget = 0.5
     for eps in eps_space:
       for d in d_space:
         x = np.random.normal(0, 1, (d, 1))
         x = np.divide(x, np.linalg.norm(x, axis=0).reshape(1, -1))
         x = np.repeat(x, n, axis=1)
-        x_privunit, m = privunit.apply_privunit(x, eps)
+        x_privunit, m = privunit.apply_privunit(x, eps, budget)
         x_avg_privunit = np.mean(x_privunit, axis=1).reshape(-1, 1)
         x_mse = np.linalg.norm(
             np.mean(x, axis=1).reshape(-1, 1) - x_avg_privunit)**2

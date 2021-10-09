@@ -19,32 +19,37 @@ The distribution tilde_pi (which is equal to pi_all[-1]) is 2 * eta-DP.
 import numpy as np
 
 
-def modify_pi(pi, eta):
+def modify_pi(pi, eta, epsilon, multiplicative_factor):
   """This function modifies the distribution pi to make it 2eta-LDP.
 
-  The function essentially ensure that the new distribution lies between the
-  upper threshold (exp(eta) * p) and the lower threshold (exp(-eta) * p). It
-  first checks if the distribution already lies inside the thresholds. If not,
-  it trades as mass beyond the upper threshold with mass beyond the lower
-  threshold. In other words, it ensures that at least one of the constraint is
-  satisfied (the one which is violated less severely). This is done with the
-  help of the helper function 'trade_mass'. Next, it iteratively enforces the
-  constraint that is still violated and renormalizes the distribution. This is
-  done with the help of the helper function 'normalize'.
+  The function essentially ensures that the new distribution lies between the
+  upper threshold `exp(eta) * multiplicative_factor * p` and the lower threshold
+  `exp(-eta) * multiplicative_factor * p`. It first checks if the distribution
+  already lies inside the thresholds. If not, it trades as mass beyond the upper
+  threshold with mass beyond the lower threshold. In other words, it ensures
+  that at least one of the constraint is satisfied (the one which is violated
+  less severely). This is done with the help of the helper function
+  `trade_mass`. Next, it iteratively enforces the constraint that is still
+  violated and renormalizes the distribution. This is done with the help of the
+  helper function `normalize`.
 
   Args:
     pi: The input distribution to be modified
     eta: The privacy parameter that is half times the desired privacy guarantee.
+    epsilon: The privacy parameter epsilon.
+    multiplicative_factor: The factor by which the uniform distribution over the
+      candidates is scaled with.
 
   Returns:
     pi_all: The container containing how the distrbution pi evolved from pi to
       tilde_pi (which is equal to pi_all[-1]). Further, tilde_pi is 2eta-LDP.
   """
-  if eta < 0:
-    raise ValueError('eta should be non-negative.')
+  if eta < epsilon / 2:
+    raise ValueError('eta should be larger than epsilon/2.')
 
   number_candidates = len(pi)
   p = np.zeros(number_candidates) + 1.0 / number_candidates
+  p = p * multiplicative_factor
   # The container used to track changes in the distribution.
   pi_all = [pi]
 

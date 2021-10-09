@@ -32,8 +32,8 @@ class MiracleTest(absltest.TestCase):
       for number_candidates in number_candidates_space:
         x = np.random.normal(0, 1, (d, n))
         x /= np.linalg.norm(x, axis=0)
-        c1, c2, _, gamma = get_parameters.get_parameters_miracle(
-            eps, d, budget)
+        c1, c2, _, gamma = get_parameters.get_parameters_unbiased_miracle(
+            eps, d, number_candidates, budget)
         for i in range(n):
           k, z, _ = miracle.encoder(0, x[:, i], number_candidates, c1, c2,
                                     gamma)

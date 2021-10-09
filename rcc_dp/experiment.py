@@ -36,7 +36,6 @@ def evaluate(work_path, config, file_open=open):
   delta = config.delta
   budget = config.budget
   alpha = config.alpha
-  number_of_budget_intervals = config.number_of_budget_intervals
   # Get default values.
   d = config.d
   n = config.n
@@ -54,9 +53,7 @@ def evaluate(work_path, config, file_open=open):
   else:
     raise ValueError("vary should be either be d, n or eps.")
 
-  unbiased_approx_miracle_mse = np.zeros((config.num_itr, len(vary_space)))
-  unbiased_miracle_mse = np.zeros((config.num_itr, len(vary_space)))
-  unbiased_modified_miracle_mse = np.zeros((config.num_itr, len(vary_space)))
+  approx_miracle_mse = np.zeros((config.num_itr, len(vary_space)))
   miracle_mse = np.zeros((config.num_itr, len(vary_space)))
   modified_miracle_mse = np.zeros((config.num_itr, len(vary_space)))
   sqkr_mse = np.zeros((config.num_itr, len(vary_space)))
@@ -71,17 +68,19 @@ def evaluate(work_path, config, file_open=open):
       coding_cost = config.coding_cost
     elif config.vary == "eps":
       epsilon_target = vary_parameter
-      coding_cost = config.t + epsilon_target
+      coding_cost = config.coding_cost_multiplier * epsilon_target / np.log(2)
+      coding_cost += config.t
+      coding_cost = max(int(np.ceil(coding_cost)), 8)
     print("epsilon target = " + str(epsilon_target))
     print("n = " + str(n))
     print("d = %d" % d)
     print("coding cost = %d" % coding_cost)
 
-    if config.run_unbiased_approx_miracle:
+    if config.run_approx_miracle:
       print("budget = " + str(budget))
 
-    if config.run_modified_miracle or config.run_unbiased_modified_miracle:
-      eta = epsilon_target / 2
+    if config.run_modified_miracle:
+      eta = epsilon_target / 2.0
       print("eta = " + str(eta))
       print("alpha = " + str(alpha))
 
@@ -91,7 +90,9 @@ def evaluate(work_path, config, file_open=open):
         x = np.random.normal(0, 1, (d, n))
         x /= np.linalg.norm(x, axis=0)
       elif config.data == "biased_data":
-        x = np.random.normal(1, 1, (d, n))
+        x = np.zeros((d, n))
+        x[:, 0::2] = np.random.normal(10, 1, (d, (n + 1) // 2))
+        x[:, 1::2] = np.random.normal(1, 1, (d, n // 2))
         x /= np.linalg.norm(x, axis=0)
       elif config.data == "same_data":
         x = np.random.normal(0, 1, (d, 1))
@@ -103,9 +104,8 @@ def evaluate(work_path, config, file_open=open):
 
       if config.run_miracle:
         x_miracle = np.zeros((d, n))
-        # miracle and modified miracle use the default budget for now
-        c1, c2, m, gamma = get_parameters.get_parameters_miracle(
-            epsilon_target / 2, d, budget)
+        c1, c2, m, gamma = get_parameters.get_parameters_unbiased_miracle(
+            epsilon_target / 2, d, 2**coding_cost, budget)
         for i in range(n):
           k, _, _ = miracle.encoder(i + itr * n, x[:, i], 2**coding_cost, c1,
                                     c2, gamma)
@@ -115,28 +115,16 @@ def evaluate(work_path, config, file_open=open):
         miracle_mse[itr, step] = np.linalg.norm(
             np.mean(x, axis=1, keepdims=True) - x_miracle)**2
 
-      if config.run_unbiased_miracle:
-        x_unbiased_miracle = np.zeros((d, n))
-        c1, c2, m, gamma = get_parameters.get_parameters_unbiased_miracle(
-            epsilon_target / 2, d, 2**coding_cost, number_of_budget_intervals)
-        for i in range(n):
-          k, _, _ = miracle.encoder(i + itr * n, x[:, i], 2**coding_cost, c1,
-                                    c2, gamma)
-          z_k = miracle.decoder(i + itr * n, k, d, 2**coding_cost)
-          x_unbiased_miracle[:, i] = z_k / m
-        x_unbiased_miracle = np.mean(x_unbiased_miracle, axis=1, keepdims=True)
-        unbiased_miracle_mse[itr, step] = np.linalg.norm(
-            np.mean(x, axis=1, keepdims=True) - x_unbiased_miracle)**2
-
       if config.run_modified_miracle:
         x_modified_miracle = np.zeros((d, n))
-        # miracle and modified miracle use the default budget for now
-        c1, c2, m, gamma = get_parameters.get_parameters_miracle(
-            alpha * epsilon_target, d, budget)
+        c1, c2, m, gamma = (
+            get_parameters.get_parameters_unbiased_modified_miracle(
+                alpha * epsilon_target, d, 2**coding_cost, budget))
         for i in range(n):
           _, _, pi = miracle.encoder(i + itr * n, x[:, i], 2**coding_cost, c1,
                                      c2, gamma)
-          pi_all = modify_pi.modify_pi(pi, eta)
+          pi_all = modify_pi.modify_pi(pi, eta, epsilon_target,
+                                       c1 / (np.exp(epsilon_target / 2)))
           k = np.random.choice(2**coding_cost, 1, p=pi_all[-1])[0]
           z_k = miracle.decoder(i + itr * n, k, d, 2**coding_cost)
           x_modified_miracle[:, i] = z_k / m
@@ -144,41 +132,22 @@ def evaluate(work_path, config, file_open=open):
         modified_miracle_mse[itr, step] = np.linalg.norm(
             np.mean(x, axis=1, keepdims=True) - x_modified_miracle)**2
 
-      if config.run_unbiased_modified_miracle:
-        x_unbiased_modified_miracle = np.zeros((d, n))
-        c1, c2, m, gamma = (
-            get_parameters.get_parameters_unbiased_modified_miracle(
-                alpha * epsilon_target, d, 2**coding_cost, eta,
-                number_of_budget_intervals))
-        for i in range(n):
-          _, _, pi = miracle.encoder(i + itr * n, x[:, i], 2**coding_cost, c1,
-                                     c2, gamma)
-          pi_all = modify_pi.modify_pi(pi, eta)
-          k = np.random.choice(2**coding_cost, 1, p=pi_all[-1])[0]
-          z_k = miracle.decoder(i + itr * n, k, d, 2**coding_cost)
-          x_unbiased_modified_miracle[:, i] = z_k / m
-        x_unbiased_modified_miracle = np.mean(
-            x_unbiased_modified_miracle, axis=1, keepdims=True)
-        unbiased_modified_miracle_mse[itr, step] = np.linalg.norm(
-            np.mean(x, axis=1, keepdims=True) - x_unbiased_modified_miracle)**2
-
-      if config.run_unbiased_approx_miracle:
-        x_unbiased_approx_miracle = np.zeros((d, n))
-        c1, c2, m, gamma, _ = (
+      if config.run_approx_miracle:
+        x_approx_miracle = np.zeros((d, n))
+        c1, c2, m, gamma, epsilon_approx = (
             get_parameters.get_parameters_unbiased_approx_miracle(
                 epsilon_target, d, 2**coding_cost, budget, delta))
         for i in range(n):
           k, _, _ = miracle.encoder(i + itr * n, x[:, i], 2**coding_cost, c1,
                                     c2, gamma)
           z_k = miracle.decoder(i + itr * n, k, d, 2**coding_cost)
-          x_unbiased_approx_miracle[:, i] = z_k / m
-        x_unbiased_approx_miracle = np.mean(
-            x_unbiased_approx_miracle, axis=1, keepdims=True)
-        unbiased_approx_miracle_mse[itr, step] = np.linalg.norm(
-            np.mean(x, axis=1, keepdims=True) - x_unbiased_approx_miracle)**2
+          x_approx_miracle[:, i] = z_k / m
+        x_approx_miracle = np.mean(x_approx_miracle, axis=1, keepdims=True)
+        approx_miracle_mse[itr, step] = np.linalg.norm(
+            np.mean(x, axis=1, keepdims=True) - x_approx_miracle)**2
 
       if config.run_privunit:
-        x_privunit, _ = privunit.apply_privunit(x, epsilon_target)
+        x_privunit, _ = privunit.apply_privunit(x, epsilon_target, budget)
         x_privunit = np.mean(np.array(x_privunit), axis=1, keepdims=True)
         privunit_mse[itr, step] = np.linalg.norm(
             np.mean(x, axis=1, keepdims=True) - x_privunit)**2
@@ -194,14 +163,8 @@ def evaluate(work_path, config, file_open=open):
         sqkr_mse[itr, step] = np.linalg.norm(
             np.mean(x, axis=1, keepdims=True) - x_kashin)**2
 
-    if config.run_unbiased_approx_miracle:
-      print("unbiased approx miracle mse: " +
-            str(unbiased_approx_miracle_mse[:, step]))
-    if config.run_unbiased_miracle:
-      print("unbiased miracle mse: " + str(unbiased_miracle_mse[:, step]))
-    if config.run_unbiased_modified_miracle:
-      print("unbiased modified miracle mse: " +
-            str(unbiased_modified_miracle_mse[:, step]))
+    if config.run_approx_miracle:
+      print("approx miracle mse: " + str(approx_miracle_mse[:, step]))
     if config.run_miracle:
       print("miracle mse: " + str(miracle_mse[:, step]))
     if config.run_modified_miracle:
@@ -213,15 +176,9 @@ def evaluate(work_path, config, file_open=open):
     print(time.time() - start_time)
 
   print("--------------")
-  if config.run_unbiased_approx_miracle:
-    print("unbiased approx miracle mse:")
-    print(np.mean(unbiased_approx_miracle_mse, axis=0))
-  if config.run_unbiased_miracle:
-    print("unbiased miracle mse:")
-    print(np.mean(unbiased_miracle_mse, axis=0))
-  if config.run_unbiased_modified_miracle:
-    print("unbiased modified miracle mse:")
-    print(np.mean(unbiased_modified_miracle_mse, axis=0))
+  if config.run_approx_miracle:
+    print("approx miracle mse:")
+    print(np.mean(approx_miracle_mse, axis=0))
   if config.run_miracle:
     print("miracle mse:")
     print(np.mean(miracle_mse, axis=0))
@@ -236,47 +193,35 @@ def evaluate(work_path, config, file_open=open):
     print(np.mean(sqkr_mse, axis=0))
 
   plt.figure(figsize=(10, 8), dpi=80)
-  if config.run_unbiased_approx_miracle:
+  if config.run_approx_miracle:
     plt.errorbar(
         vary_space,
-        np.mean(unbiased_approx_miracle_mse, axis=0),
-        yerr=np.std(unbiased_approx_miracle_mse, axis=0),
-        label="Unbiased Approx-DP Miracle")
-  if config.run_unbiased_miracle:
-    plt.errorbar(
-        vary_space,
-        np.mean(unbiased_miracle_mse, axis=0),
-        yerr=np.std(unbiased_miracle_mse, axis=0),
-        label="Unbiased Miracle")
-  if config.run_unbiased_modified_miracle:
-    plt.errorbar(
-        vary_space,
-        np.mean(unbiased_modified_miracle_mse, axis=0),
-        yerr=np.std(unbiased_modified_miracle_mse, axis=0),
-        label="Unbiased Modified Miracle")
+        np.mean(approx_miracle_mse, axis=0),
+        yerr=np.std(approx_miracle_mse, axis=0) / np.sqrt(config.num_itr),
+        label="Approx-DP Miracle")
   if config.run_miracle:
     plt.errorbar(
         vary_space,
         np.mean(miracle_mse, axis=0),
-        yerr=np.std(miracle_mse, axis=0),
+        yerr=np.std(miracle_mse, axis=0) / np.sqrt(config.num_itr),
         label="Miracle")
   if config.run_modified_miracle:
     plt.errorbar(
         vary_space,
         np.mean(modified_miracle_mse, axis=0),
-        yerr=np.std(modified_miracle_mse, axis=0),
+        yerr=np.std(modified_miracle_mse, axis=0) / np.sqrt(config.num_itr),
         label="Modified Miracle")
   if config.run_privunit:
     plt.errorbar(
         vary_space,
         np.mean(privunit_mse, axis=0),
-        yerr=np.std(privunit_mse, axis=0),
+        yerr=np.std(privunit_mse, axis=0) / np.sqrt(config.num_itr),
         label="PrivUnit")
   if config.run_sqkr:
     plt.errorbar(
         vary_space,
         np.mean(sqkr_mse, axis=0),
-        yerr=np.std(sqkr_mse, axis=0),
+        yerr=np.std(sqkr_mse, axis=0) / np.sqrt(config.num_itr),
         label="SQKR")
   plt.legend(fontsize=18)
   plt.xticks(fontsize=18)
@@ -299,17 +244,12 @@ def evaluate(work_path, config, file_open=open):
   with file_open(work_path + "/rcc_dp_comparison.png", "wb") as f:
     plt.savefig(f, format="png")
 
-  if config.run_unbiased_approx_miracle:
-    with file_open(work_path + "/unbiased_approx_miracle_mse.csv", "w") as f:
-      np.savetxt(f, unbiased_approx_miracle_mse, delimiter=",")
+  with file_open(work_path + "/time.txt", "w") as f:
+    np.savetxt(f, np.array(time.time() - start_time).reshape(-1, 1))
 
-  if config.run_unbiased_miracle:
-    with file_open(work_path + "/unbiased_miracle_mse.csv", "w") as f:
-      np.savetxt(f, unbiased_miracle_mse, delimiter=",")
-
-  if config.run_unbiased_modified_miracle:
-    with file_open(work_path + "/unbiased_modified_miracle_mse.csv", "w") as f:
-      np.savetxt(f, unbiased_modified_miracle_mse, delimiter=",")
+  if config.run_approx_miracle:
+    with file_open(work_path + "/approx_miracle_mse.csv", "w") as f:
+      np.savetxt(f, approx_miracle_mse, delimiter=",")
 
   if config.run_miracle:
     with file_open(work_path + "/miracle_mse.csv", "w") as f:

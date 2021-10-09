@@ -30,12 +30,13 @@ class ModifyPiTest(absltest.TestCase):
         for epsilon in [2, 3]:
           x = np.random.normal(0, 1, (d, 1))
           x = np.divide(x, np.linalg.norm(x, axis=0).reshape(1, -1))
-          c1, c2, _, gamma = get_parameters.get_parameters_miracle(
-              epsilon, d, budget)
+          c1, c2, _, gamma = get_parameters.get_parameters_unbiased_miracle(
+              epsilon, d, number_candidates, budget)
           _, _, pi = miracle.encoder(0, x[:, 0], number_candidates, c1, c2,
                                      gamma)
           eta = epsilon / 2
-          pi_all = modify_pi.modify_pi(pi, eta)
+          pi_all = modify_pi.modify_pi(pi, eta, epsilon,
+                                       c1 / (np.exp(epsilon / 2)))
           self.assertLessEqual(len(pi_all), 3)
           for distribution in pi_all:
             self.assertLessEqual(np.abs(np.sum(distribution)-1), 0.0001)
@@ -48,17 +49,16 @@ class ModifyPiTest(absltest.TestCase):
         for epsilon in [2, 3]:
           x = np.random.normal(0, 1, (d, 1))
           x = np.divide(x, np.linalg.norm(x, axis=0).reshape(1, -1))
-          c1, c2, _, gamma = get_parameters.get_parameters_miracle(
-              epsilon, d, budget)
+          c1, c2, _, gamma = get_parameters.get_parameters_unbiased_miracle(
+              epsilon, d, number_candidates, budget)
           _, _, pi = miracle.encoder(0, x[:, 0], number_candidates, c1, c2,
                                      gamma)
           eta = epsilon / 2
-          pi_all = modify_pi.modify_pi(pi, eta)
-          self.assertLessEqual(
-              np.max(pi_all[-1]),
-              np.exp(eta) / number_candidates)
-          self.assertLessEqual(
-              np.exp(-eta) / number_candidates, np.min(pi_all[-1]))
+          pi_all = modify_pi.modify_pi(pi, eta, epsilon,
+                                       c1 / (np.exp(epsilon / 2)))
+          self.assertLessEqual(np.max(pi_all[-1]), c1 / number_candidates)
+          self.assertLessEqual(c1 * np.exp(-epsilon) / number_candidates,
+                               np.min(pi_all[-1]) + 1e-6)
 
   def test_convergence(self):
     """Test whether modify_pi converges in at-most 3 iterations as expected."""
@@ -68,31 +68,14 @@ class ModifyPiTest(absltest.TestCase):
         for epsilon in [2, 3]:
           x = np.random.normal(0, 1, (d, 1))
           x = np.divide(x, np.linalg.norm(x, axis=0).reshape(1, -1))
-          c1, c2, _, gamma = get_parameters.get_parameters_miracle(
-              epsilon, d, budget)
+          c1, c2, _, gamma = get_parameters.get_parameters_unbiased_miracle(
+              epsilon, d, number_candidates, budget)
           _, _, pi = miracle.encoder(0, x[:, 0], number_candidates, c1, c2,
                                      gamma)
           eta = epsilon / 2
-          pi_all = modify_pi.modify_pi(pi, eta)
+          pi_all = modify_pi.modify_pi(pi, eta, epsilon,
+                                       c1 / (np.exp(epsilon / 2)))
           self.assertLessEqual(len(pi_all), 3)
-
-  def test_edge_case(self):
-    """Test if the edge case where eta = 0 is handled properly."""
-    eta = 0
-    budget = 0.5
-    for d in [10, 20]:
-      for number_candidates in [2**4, 2**5]:
-        for epsilon in [2, 3]:
-          x = np.random.normal(0, 1, (d, 1))
-          x = np.divide(x, np.linalg.norm(x, axis=0).reshape(1, -1))
-          c1, c2, _, gamma = get_parameters.get_parameters_miracle(
-              epsilon, d, budget)
-          _, _, pi = miracle.encoder(0, x[:, 0], number_candidates, c1, c2,
-                                     gamma)
-          pi_all = modify_pi.modify_pi(pi, eta)
-          self.assertListEqual(
-              list(pi_all[-1]),
-              list(1 / number_candidates * np.ones(number_candidates)))
 
 
 if __name__ == "__main__":

@@ -49,10 +49,7 @@ py_library(
     name = "optimize_unbias",
     srcs = ["optimize_unbias.py"],
     srcs_version = "PY3",
-    deps = [
-        ":modify_pi",
-        ":privunit",
-    ],
+    deps = [":privunit"],
 )
 
 py_library(
@@ -82,7 +79,7 @@ py_test(
     srcs = ["get_parameters_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["nokokoro"],  # Test takes quite long and times out.
+    tags = ["nokokoro"],  # Runtime too high for continuous integration.
     deps = [
         ":get_parameters",
         ":miracle",
