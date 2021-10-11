@@ -127,7 +127,7 @@ def _preprocess_stackoverflow(vocab_size, num_oov_buckets, sequence_length,
       tff.simulation.datasets.stackoverflow.load_data())
   dataset_vocab = stackoverflow_dataset.create_vocab(vocab_size)
 
-  base_test_dataset = test_clientdata.create_tf_dataset_from_all_clients()
+  base_test_dataset = test_clientdata.create_tf_dataset_from_all_clients(seed=0)
   preprocess_val_and_test = stackoverflow_dataset.create_preprocess_fn(
       vocab=dataset_vocab,
       num_oov_buckets=num_oov_buckets,
