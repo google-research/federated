@@ -14,7 +14,7 @@
 """End-to-end example testing targeted attacks against the MNIST model."""
 
 import collections
-
+from typing import Callable, List, OrderedDict
 import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -148,6 +148,23 @@ class MnistModel(tff.learning.Model):
   @property
   def federated_output_computation(self):
     return aggregate_mnist_metrics_across_clients
+
+  @tf.function
+  def report_local_unfinalized_metrics(
+      self) -> OrderedDict[str, List[tf.Tensor]]:
+    """Creates an `OrderedDict` of metric names to unfinalized values."""
+    return collections.OrderedDict(
+        num_examples=[self._variables.num_examples],
+        loss=[self._variables.loss_sum, self._variables.num_examples],
+        accuracy=[self._variables.accuracy_sum, self._variables.num_examples])
+
+  def metric_finalizers(
+      self) -> OrderedDict[str, Callable[[List[tf.Tensor]], tf.Tensor]]:
+    """Creates an `OrderedDict` of metric names to finalizers."""
+    return collections.OrderedDict(
+        num_examples=tf.function(func=lambda x: x[0]),
+        loss=tf.function(func=lambda x: x[0] / x[1]),
+        accuracy=tf.function(func=lambda x: x[0] / x[1]))
 
 
 def create_client_data():
