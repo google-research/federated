@@ -4,8 +4,6 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
-
 py_library(
     name = "movielens_data_gen_lib",
     srcs = ["movielens_data_gen.py"],
