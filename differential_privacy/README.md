@@ -33,7 +33,7 @@ bazel run run_federated -- \
   --target_unclipped_quantile=0.5 \
   --adaptive_clip_learning_rate=0.2 \
   --noise_multiplier=0.1 \
-  --task=stackoverflow_nwp \
+  --task=stackoverflow_word \
   --client_learning_rate=0.3 \
   --server_learning_rate=3 \
   --total_rounds=1500 \

@@ -117,7 +117,7 @@ def main(argv):
   task = task_utils.create_task_from_flags(train_client_spec)
 
   logging.info('Trainable weights:')
-  for weight in task.model_fn().weights.trainable:
+  for weight in task.model_fn().trainable_variables:
     logging.info('name: %s  shape: %s', weight.name, weight.shape)
 
   if FLAGS.uniform_weighting:
