@@ -28,7 +28,7 @@ _Batch = collections.namedtuple('Batch', ['x', 'y'])
 def _build_federated_averaging_process():
   return tff.learning.build_federated_averaging_process(
       _uncompiled_model_fn,
-      client_optimizer_fn=tf.keras.optimizers.SGD,
+      client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
       server_optimizer_fn=tf.keras.optimizers.SGD)
 
 
@@ -163,7 +163,7 @@ class ExperimentRunnerTest(tf.test.TestCase):
         client_datasets_fn=client_datasets_fn,
         validation_fn=validation_fn,
         total_epochs=1,
-        total_rounds=1,
+        total_rounds=10,
         experiment_name='fedavg_decreases_loss',
         root_output_dir=root_output_dir)
     self.assertLess(
