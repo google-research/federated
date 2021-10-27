@@ -15,7 +15,6 @@
 
 import os.path
 from typing import Any, Callable, Dict, List, Optional, Tuple
-import warnings
 
 from absl import logging
 import tensorflow as tf
@@ -34,10 +33,6 @@ def configure_managers(
            List[tff.simulation.MetricsManager]]:
   """Configures checkpoint and metrics managers.
 
-  DEPRECATED: This is deprecated due to its usage of the deprecated
-  `tff.simulation.FileCheckpointManager`. Please use `configure_output_managers`
-  instead.
-
   Args:
     root_output_dir: A string representing the root output directory for the
       training simulation. All metrics and checkpoints will be logged to
@@ -52,8 +47,6 @@ def configure_managers(
     A `tff.simulation.FileCheckpointManager`, and a list of
     `tff.simulation.MetricsManager` instances.
   """
-  warnings.warn('`configure_managers` is deprecated, please use '
-                '`configure_output_managers` instead.')
   checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
   checkpoint_manager = tff.simulation.FileCheckpointManager(
       checkpoint_dir, step=rounds_per_checkpoint)
