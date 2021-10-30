@@ -268,6 +268,12 @@ def create_conv_dropout_model_mfactor(conv1_filters=32,
     conv2_filters: The number of convolutional filters in the 2nd convolutional
       layer
     dense_size: The number of neurons in the last dense layer
+    mfactor1: The multiplicative scaling applied after the first convolutional
+      layer
+    mfactor2: The multiplicative scaling applied after the second convolutional
+      layer
+    mfactordense: The multiplicative scaling applied after the first dense
+      layer
     only_digits: If `True`, uses a final layer with 10 outputs, for use with the
       digits only EMNIST dataset. If `False`, uses 62 outputs for the larger
       dataset.
