@@ -223,6 +223,86 @@ def create_conv_dropout_model(conv1_filters=32,
   return model
 
 
+def create_conv_dropout_model_mfactor(conv1_filters=32,
+                              conv2_filters=64,
+                              dense_size=128,
+                              mfactor1=1.0,
+                              mfactor2=1.0,
+                              mfactor_dense=1.0,
+                              only_digits: bool = True) -> tf.keras.Model:
+  """Create a convolutional network with dropout.
+
+  When `only_digits=True`, the summary of returned model is
+  ```
+  Model: "sequential"
+  _________________________________________________________________
+  Layer (type)                 Output Shape              Param #
+  =================================================================
+  reshape (Reshape)            (None, 28, 28, 1)         0
+  _________________________________________________________________
+  conv2d (Conv2D)              (None, 26, 26, 32)        320
+  _________________________________________________________________
+  conv2d_1 (Conv2D)            (None, 24, 24, 64)        18496
+  _________________________________________________________________
+  max_pooling2d (MaxPooling2D) (None, 12, 12, 64)        0
+  _________________________________________________________________
+  dropout (Dropout)            (None, 12, 12, 64)        0
+  _________________________________________________________________
+  flatten (Flatten)            (None, 9216)              0
+  _________________________________________________________________
+  dense (Dense)                (None, 128)               1179776
+  _________________________________________________________________
+  dropout_1 (Dropout)          (None, 128)               0
+  _________________________________________________________________
+  dense_1 (Dense)              (None, 10)                1290
+  =================================================================
+  Total params: 1,199,882
+  Trainable params: 1,199,882
+  Non-trainable params: 0
+  ```
+  For `only_digits=False`, the last dense layer is slightly larger.
+
+  Args:
+    conv1_filters: The number of convolutional filters in the 1st convolutional
+      layer
+    conv2_filters: The number of convolutional filters in the 2nd convolutional
+      layer
+    dense_size: The number of neurons in the last dense layer
+    only_digits: If `True`, uses a final layer with 10 outputs, for use with the
+      digits only EMNIST dataset. If `False`, uses 62 outputs for the larger
+      dataset.
+
+  Returns:
+    An uncompiled `tf.keras.Model`.
+  """
+  data_format = 'channels_last'
+  model = tf.keras.models.Sequential([
+      tf.keras.layers.Conv2D(
+          conv1_filters,
+          kernel_size=(3, 3),
+          activation='relu',
+          data_format=data_format,
+          input_shape=(28, 28, 1)),
+      tf.keras.layers.Lambda(lambda x: mfactor1 * x),
+      tf.keras.layers.Conv2D(
+          conv2_filters,
+          kernel_size=(3, 3),
+          activation='relu',
+          data_format=data_format),
+      tf.keras.layers.Lambda(lambda x: mfactor2 * x),
+      tf.keras.layers.MaxPool2D(pool_size=(2, 2), data_format=data_format),
+      tf.keras.layers.Dropout(0.25),
+      tf.keras.layers.Flatten(),
+      tf.keras.layers.Dense(dense_size, activation='relu'),
+      tf.keras.layers.Lambda(lambda x: mfactor_dense * x),
+      tf.keras.layers.Dropout(0.5),
+      tf.keras.layers.Dense(
+          10 if only_digits else 62, activation=tf.nn.softmax),
+  ])
+
+  return model
+
+
 def create_original_fedavg_cnn_model(
     conv1_filters=32,
     conv2_filters=64,
@@ -398,6 +478,65 @@ def make_big_and_small_emnist_cnn_dropout_model_fn(my_task,
             conv1_filters=small_conv1_filters,
             conv2_filters=small_conv2_filters,
             dense_size=small_dense_size),
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+        input_spec=my_task.datasets.element_type_structure,
+        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+
+  return big_model_fn, small_model_fn
+
+
+def make_big_and_small_emnist_cnn_dropout_mfactor_model_fn(my_task,
+                                                   big_conv1_filters=32,
+                                                   big_conv2_filters=64,
+                                                   big_dense_size=128,
+                                                   small_conv1_filters=24,
+                                                   small_conv2_filters=48,
+                                                   small_dense_size=96):
+  """Generates two model functions for a given task.
+
+  Args:
+    my_task: a tff.simulation.baselines.BaselineTask object
+    big_conv1_filters: The number of convolutional filters in the 1st
+      convolutional layer of the big model
+    big_conv2_filters: The number of convolutional filters in the 2nd
+      convolutional layer of the big model
+    big_dense_size: The number of neurons in the last dense layer of the big
+      model
+    small_conv1_filters: The number of convolutional filters in the 1st
+      convolutional layer of the small model
+    small_conv2_filters: The number of convolutional filters in the 2nd
+      convolutional layer of the small model
+    small_dense_size: The number of neurons in the last dense layer of the small
+      model
+
+  Returns:
+    Two model_fn functions.
+  """
+
+  def big_model_fn():
+    return tff.learning.from_keras_model(
+        keras_model=create_conv_dropout_model_mfactor(
+            only_digits=False,
+            conv1_filters=big_conv1_filters,
+            conv2_filters=big_conv2_filters,
+            dense_size=big_dense_size,
+            mfactor1=1.0,
+            mfactor2=1.0,
+            mfactor_dense=1.0),
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+        input_spec=my_task.datasets.element_type_structure,
+        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+
+  def small_model_fn():
+    return tff.learning.from_keras_model(
+        keras_model=create_conv_dropout_model_mfactor(
+            only_digits=False,
+            conv1_filters=small_conv1_filters,
+            conv2_filters=small_conv2_filters,
+            dense_size=small_dense_size,
+            mfactor1=tf.cast(big_conv1_filters/small_conv1_filters, tf.float32), # TODO should cast this as a float since these could be integers; not sure if this is necessary
+            mfactor2=tf.cast(big_conv2_filters/small_conv2_filters, tf.float32),
+            mfactor_dense=tf.cast(big_dense_size/small_dense_size, tf.float32)),
         loss=tf.keras.losses.SparseCategoricalCrossentropy(),
         input_spec=my_task.datasets.element_type_structure,
         metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
