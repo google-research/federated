@@ -114,7 +114,7 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_enum(  # originally only used to be cnn_dropout
       name='my_emnist_model_id',
       default='cnn_dropout',
-      enum_values=['cnn_dropout', 'cnn'],
+      enum_values=['cnn_dropout', 'cnn', 'cnn_dropout_mfactor'],
       help='what type of cnn to use')
 
   flags.DEFINE_enum(
@@ -176,8 +176,17 @@ def main(argv):
     # left_mask = [-1, 0, -1, -1, 2, -1, 0, -1]
     # right_mask = [0, -1, -1, -1, 0, 0, -1, -1]
   elif FLAGS.task == 'emnist_character':
-    if FLAGS.my_emnist_model_id == 'cnn_dropout':
+    if FLAGS.my_emnist_model_id == 'cnn_dropout_mfactor':
       # originally only used to be cnn_dropout
+      big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_dropout_mfactor_model_fn(
+          task,
+          big_conv1_filters=FLAGS.big_conv1_filters,
+          big_conv2_filters=FLAGS.big_conv2_filters,
+          big_dense_size=FLAGS.big_dense_size,
+          small_conv1_filters=FLAGS.small_conv1_filters,
+          small_conv2_filters=FLAGS.small_conv2_filters,
+          small_dense_size=FLAGS.small_dense_size)
+    elif FLAGS.my_emnist_model_id == 'cnn_dropout':
       big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_dropout_model_fn(
           task,
           big_conv1_filters=FLAGS.big_conv1_filters,

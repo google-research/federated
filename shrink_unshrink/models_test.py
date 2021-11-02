@@ -115,6 +115,40 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     self.assertEqual(big_model.input_spec, og_model.input_spec)
     self.assertEqual(small_model.input_spec, og_model.input_spec)
 
+  def test_make_big_and_small_emnist_cnn_dropout_mfactor_model_equality(self):
+    train_client_spec = tff.simulation.baselines.ClientSpec(
+        num_epochs=3, batch_size=32, max_elements=1000)
+    my_task = tff.simulation.baselines.emnist.create_character_recognition_task(
+        train_client_spec, use_synthetic_data=True, model_id='cnn_dropout')
+    big_model_fn, small_model_fn = models.make_big_and_small_emnist_cnn_dropout_mfactor_model_fn(
+        my_task,
+        big_conv1_filters=32,
+        big_conv2_filters=64,
+        big_dense_size=128,
+        small_conv1_filters=16,
+        small_conv2_filters=48,
+        small_dense_size=64)
+
+    tf.random.set_seed(1)
+    og_model = my_task.model_fn()
+    tf.random.set_seed(1)
+    big_model = big_model_fn()
+    tf.random.set_seed(1)
+    small_model = small_model_fn()
+
+    for x, y in zip(big_model.trainable_variables,
+                    og_model.trainable_variables):
+      self.assertAllEqual(tf.shape(x), tf.shape(y))
+      self.assertAllEqual(x, y)
+
+    for x, y in zip(big_model.non_trainable_variables,
+                    og_model.non_trainable_variables):
+      self.assertAllEqual(tf.shape(x), tf.shape(y))
+      self.assertAllEqual(x, y)
+
+    self.assertEqual(big_model.input_spec, og_model.input_spec)
+    self.assertEqual(small_model.input_spec, og_model.input_spec)
+
 
 if __name__ == '__main__':
   tf.test.main()
