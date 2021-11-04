@@ -136,6 +136,7 @@ py_test(
 py_test(
     name = "resnet_models_test",
     srcs = ["resnet_models_test.py"],
+    tags = ["nokokoro"],
     deps = [":resnet_models"],
 )
 
