@@ -2,10 +2,7 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])
 
-package(default_visibility = [
-    "//generalization:__subpackages__",
-    "//google/generalization:__subpackages__",
-])
+package(default_visibility = ["//generalization:__subpackages__"])
 
 py_library(
     name = "dirichlet",
