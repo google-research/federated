@@ -1,10 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
-package(default_visibility = [
-    "//intelligence/federated/research/experiments/stackoverflow_with_secrets:__subpackages__",
-    "//google/dp_opt:__subpackages__",
-])
-
 licenses(["notice"])
 
 py_binary(
