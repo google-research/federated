@@ -1,6 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
-package(default_visibility = ["//visibility:public"])
+# TODO(b/204238718): cleanup dependencies after upstream to TFF.
+package(default_visibility = ["//lens/prime/federated/models:__pkg__"])
 
 licenses(["notice"])
 
