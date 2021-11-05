@@ -4,7 +4,7 @@ load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = ["//reconstruction:__subpackages__"])
 
 py_library(
     name = "models",

@@ -3,7 +3,7 @@
 
 licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = ["//reconstruction/shared:__pkg__"])
 
 filegroup(
     name = "movielens_small",

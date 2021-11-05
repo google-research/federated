@@ -2,7 +2,7 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = ["//reconstruction:__subpackages__"])
 
 py_binary(
     name = "federated_trainer",
