@@ -73,6 +73,6 @@ def create_sampling_fn(
       # Return the entire population if we've doubled past the entire population
       # size.
       return client_ids
-    return client_sampling_fn(round_num, size=clients_to_sample)
+    return client_sampling_fn(round_num, size=clients_to_sample)  # pytype: disable=wrong-keyword-args  # gen-stub-imports
 
   return doubling_train_client_sampling_fn

@@ -167,4 +167,4 @@ def create_aggregator(
         multiplier=2.0,
         increment=1.0)
     factory = tff.aggregators.zeroing_factory(zeroing_norm, factory)
-  return factory
+  return factory  # pytype: disable=bad-return-type  # gen-stub-imports

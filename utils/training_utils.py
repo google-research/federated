@@ -104,7 +104,7 @@ def configure_output_managers(
   logging.info('    program states to: %s', program_state_dir)
   logging.info('    CSV metrics to: %s', csv_file)
   logging.info('    TensorBoard summaries to: %s', summary_dir)
-  return program_state_manager, [csv_manager, tensorboard_manager]
+  return program_state_manager, [csv_manager, tensorboard_manager]  # pytype: disable=bad-return-type  # gen-stub-imports
 
 
 def write_hparams_to_csv(hparam_dict: Dict[str, Any], root_output_dir: str,

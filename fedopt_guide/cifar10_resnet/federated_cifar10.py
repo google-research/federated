@@ -118,7 +118,7 @@ def run_federated(
   client_datasets_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
           dataset=cifar_train.client_ids,
-          random_seed=client_datasets_random_seed),
+          random_seed=client_datasets_random_seed),  # pytype: disable=wrong-keyword-args  # gen-stub-imports
       size=clients_per_round)
 
   evaluate_fn = tff.learning.build_federated_evaluation(

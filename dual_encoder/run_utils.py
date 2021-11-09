@@ -151,7 +151,7 @@ def train_and_eval(
   val_fn = build_eval_fn(
       evaluation_computation=evaluator,
       client_datasets_fn=val_client_datasets_fn,
-      get_model=trainer.get_model_weights)
+      get_model=trainer.get_model_weights)  # pytype: disable=attribute-error  # gen-stub-imports
 
   checkpoint_manager, metrics_managers = _configure_managers(
       root_output_dir, experiment_name, rounds_per_checkpoint)

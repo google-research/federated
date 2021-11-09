@@ -506,7 +506,7 @@ def _instantiate_aggregation_process(
   if aggregation_factory is None:
     aggregation_factory = tff.aggregators.MeanFactory()
     aggregation_process = aggregation_factory.create(
-        model_weights_type.trainable, tff.TensorType(tf.float32))
+        model_weights_type.trainable, tff.TensorType(tf.float32))  # pytype: disable=attribute-error  # gen-stub-imports
   else:
     # We give precedence to unweighted aggregation.
     if isinstance(aggregation_factory,
@@ -517,11 +517,11 @@ def _instantiate_aggregation_process(
             '`client_weight_fn` should not be specified; found '
             '`client_weight_fn` %s', client_weight_fn)
       aggregation_process = aggregation_factory.create(
-          model_weights_type.trainable)
+          model_weights_type.trainable)  # pytype: disable=attribute-error  # gen-stub-imports
     elif isinstance(aggregation_factory,
                     tff.aggregators.WeightedAggregationFactory):
       aggregation_process = aggregation_factory.create(
-          model_weights_type.trainable, tff.TensorType(tf.float32))
+          model_weights_type.trainable, tff.TensorType(tf.float32))  # pytype: disable=attribute-error  # gen-stub-imports
     else:
       raise ValueError('Unknown type of aggregation factory: {}'.format(
           type(aggregation_factory)))

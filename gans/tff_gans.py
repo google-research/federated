@@ -142,11 +142,11 @@ class GanFnsAndTypes(object):
     if self.train_discriminator_dp_average_query is not None:
       self.aggregation_process = tff.aggregators.DifferentiallyPrivateFactory(
           query=self.train_discriminator_dp_average_query).create(
-              value_type=tff.to_type(self.discriminator_weights_type))
+              value_type=tff.to_type(self.discriminator_weights_type))  # pytype: disable=wrong-arg-types  # gen-stub-imports
     else:
       self.aggregation_process = tff.aggregators.MeanFactory().create(
           value_type=tff.to_type(self.discriminator_weights_type),
-          weight_type=tff.to_type(tf.float32))
+          weight_type=tff.to_type(tf.float32))  # pytype: disable=wrong-arg-types  # gen-stub-imports
 
 
 def build_server_initial_state_comp(gan: GanFnsAndTypes):
@@ -304,7 +304,7 @@ def build_gan_training_process(gan: GanFnsAndTypes):
 
     server_computation = build_server_computation(
         gan, server_state.type_signature.member, client_output_type,
-        gan.aggregation_process.state_type.member)
+        gan.aggregation_process.state_type.member)  # pytype: disable=attribute-error  # gen-stub-imports
     server_state = tff.federated_map(
         server_computation, (server_state, server_gen_inputs,
                              aggregated_client_output, new_aggregation_state))

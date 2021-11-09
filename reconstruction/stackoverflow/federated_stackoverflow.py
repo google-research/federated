@@ -211,7 +211,7 @@ def run_federated(
     training_process = (
         tff.simulation.compose_dataset_computation_with_iterative_process(
             train_clientdata.dataset_computation, training_process))
-    training_process.get_model_weights = iterative_process.get_model_weights
+    training_process.get_model_weights = iterative_process.get_model_weights  # pytype: disable=attribute-error  # gen-stub-imports
 
     base_eval_computation = (
         tff.simulation.compose_dataset_computation_with_computation(

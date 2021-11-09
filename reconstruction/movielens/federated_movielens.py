@@ -244,11 +244,11 @@ def run_federated(
   val_fn = federated_trainer_utils.build_eval_fn(
       evaluation_computation=evaluation_computation,
       client_datasets_fn=val_client_datasets_fn,
-      get_model=training_process.get_model_weights)
+      get_model=training_process.get_model_weights)  # pytype: disable=attribute-error  # gen-stub-imports
   test_fn = federated_trainer_utils.build_eval_fn(
       evaluation_computation=evaluation_computation,
       client_datasets_fn=test_client_datasets_fn,
-      get_model=training_process.get_model_weights)
+      get_model=training_process.get_model_weights)  # pytype: disable=attribute-error  # gen-stub-imports
   test_fn = functools.partial(test_fn, round_num=0)
 
   def round_end_evaluation_fn(state, round_num):

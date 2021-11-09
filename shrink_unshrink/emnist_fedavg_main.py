@@ -155,7 +155,7 @@ def main(argv):
       client_model_fn=tff_model_fn,
       server_optimizer_fn=server_optimizer_fn,
       client_optimizer_fn=client_optimizer_fn)
-  server_state = iterative_process.initialize()
+  server_state = iterative_process.initialize()  # pytype: disable=attribute-error  # gen-stub-imports
 
   metric = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
   model = tff_model_fn()
@@ -168,7 +168,7 @@ def main(argv):
         train_data.create_tf_dataset_for_client(client)
         for client in sampled_clients
     ]
-    server_state, train_metrics = iterative_process.next(
+    server_state, train_metrics = iterative_process.next(  # pytype: disable=attribute-error  # gen-stub-imports
         server_state, sampled_train_data)
     print(f'Round {round_num} training loss: {train_metrics}')
     if round_num % FLAGS.rounds_per_eval == 0:

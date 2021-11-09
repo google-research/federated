@@ -197,7 +197,7 @@ def run_federated(iterative_process_builder: Callable[
   # be used as input to the iterative process.
   client_sampling_fn = lambda x: list(client_ids_fn(x))
 
-  training_process.get_model_weights = iterative_process.get_model_weights
+  training_process.get_model_weights = iterative_process.get_model_weights  # pytype: disable=attribute-error  # gen-stub-imports
 
   evaluate_fn = tff.learning.build_federated_evaluation(
       tff_model_fn, use_experimental_simulation_loop=True)
