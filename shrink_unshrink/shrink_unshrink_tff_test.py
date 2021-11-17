@@ -293,14 +293,18 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
     # pylint:enable=g-complex-comprehension
     unshrink(server_state, client_ouputs)
 
-    self.assertEqual(
-        str(shrink.type_signature),
-        '(<server_state=<model_weights=<trainable=<float32[10004,192],float32[192,5360],float32[1340,5360],float32[5360],float32[1340,192],float32[192],float32[192,10004],float32[10004]>,non_trainable=<>>,optimizer_state=<int64>,round_num=int32,shrink_unshrink_server_info=<lmbda=float32,oja_left_maskval_to_projmat_dict=<-1=float32[1],0=float32[?,?],2=float32[?,?],1=float32[?,?]>,memory_dict=<0=float32[?,?],2=float32[?,?],1=float32[?,?]>>>@SERVER,federated_dataset={<int64[?,20],int64[?,20]>*}@CLIENTS> -> <model_weights=<trainable=<tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None]>,non_trainable=<>>,round_num=int32,shrink_unshrink_dynamic_info=<>>@CLIENTS)'
-    )
-    self.assertEqual(
-        str(unshrink.type_signature),
-        '(<server_state=<model_weights=<trainable=<float32[10004,192],float32[192,5360],float32[1340,5360],float32[5360],float32[1340,192],float32[192],float32[192,10004],float32[10004]>,non_trainable=<>>,optimizer_state=<int64>,round_num=int32,shrink_unshrink_server_info=<lmbda=float32,oja_left_maskval_to_projmat_dict=<-1=float32[1],0=float32[?,?],2=float32[?,?],1=float32[?,?]>,memory_dict=<0=float32[?,?],2=float32[?,?],1=float32[?,?]>>>@SERVER,client_outputs={<weights_delta=<tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None]>,client_weight=float32,model_output=<loss=<float32,float32>>,round_num=int32,shrink_unshrink_dynamic_info=<>>}@CLIENTS> -> <model_weights=<trainable=<float32[10004,192],float32[192,5360],float32[1340,5360],float32[5360],float32[1340,192],float32[192],float32[192,10004],float32[10004]>,non_trainable=<>>,optimizer_state=<int64>,round_num=int32,shrink_unshrink_server_info=<lmbda=float32,oja_left_maskval_to_projmat_dict=<-1=float32[1],0=float32[?,?],2=float32[?,?],1=float32[?,?]>,memory_dict=<0=float32[?,?],2=float32[?,?],1=float32[?,?]>>>@SERVER)'
-    )
+    # Assert types line up as expected.
+    shrink_server_state_param_type = shrink.type_signature.parameter.server_state
+    shrink_model_result_type = shrink.type_signature.result.member.model_weights.trainable
+
+    unshrink_model_param_type = unshrink.type_signature.parameter.client_outputs.member.weights_delta
+    unshrink_server_state_result_type = unshrink.type_signature.result
+
+    self.assertTrue(
+        unshrink_model_param_type.is_assignable_from(shrink_model_result_type))
+    self.assertTrue(
+        shrink_server_state_param_type.is_assignable_from(
+            unshrink_server_state_result_type))
 
   def test_make_client_specific_layerwise_projection_shrink_and_unshrink_typing(
       self):
@@ -320,7 +324,7 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
         right_mask=[0, 1, 1, 1, 0, 0, -1, -1],
         build_projection_matrix=simple_fedavg_tf.build_normal_projection_matrix,
         new_projection_dict_decimate=1)
-    _, shrink, unshrink, server_init_tf = simple_fedavg_tff.build_federated_shrink_unshrink_process(
+    _, shrink, unshrink, _ = simple_fedavg_tff.build_federated_shrink_unshrink_process(
         server_model_fn=server_model_fn,
         client_model_fn=client_model_fn,
         make_shrink=shrink_unshrink_tff
@@ -331,16 +335,19 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
         server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
         client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
         debugging=True)
-    del server_init_tf
 
-    self.assertEqual(
-        str(shrink.type_signature),
-        '(<server_state=<model_weights=<trainable=<float32[10004,192],float32[192,5360],float32[1340,5360],float32[5360],float32[1340,192],float32[192],float32[192,10004],float32[10004]>,non_trainable=<>>,optimizer_state=<int64>,round_num=int32,shrink_unshrink_server_info=<lmbda=float32,oja_left_maskval_to_projmat_dict=<-1=float32[1],0=float32[?,?],2=float32[?,?],1=float32[?,?]>,memory_dict=<0=float32[?,?],2=float32[?,?],1=float32[?,?]>>>@SERVER,federated_dataset={<int64[?,20],int64[?,20]>*}@CLIENTS> -> {<model_weights=<trainable=<tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None]>,non_trainable=<>>,round_num=int32,shrink_unshrink_dynamic_info=uint64>}@CLIENTS)'
-    )
-    self.assertEqual(
-        str(unshrink.type_signature),
-        '(<server_state=<model_weights=<trainable=<float32[10004,192],float32[192,5360],float32[1340,5360],float32[5360],float32[1340,192],float32[192],float32[192,10004],float32[10004]>,non_trainable=<>>,optimizer_state=<int64>,round_num=int32,shrink_unshrink_server_info=<lmbda=float32,oja_left_maskval_to_projmat_dict=<-1=float32[1],0=float32[?,?],2=float32[?,?],1=float32[?,?]>,memory_dict=<0=float32[?,?],2=float32[?,?],1=float32[?,?]>>>@SERVER,client_outputs={<weights_delta=<tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None],tf.float32[None]>,client_weight=float32,model_output=<loss=<float32,float32>>,round_num=int32,shrink_unshrink_dynamic_info=uint64>}@CLIENTS> -> <model_weights=<trainable=<float32[10004,192],float32[192,5360],float32[1340,5360],float32[5360],float32[1340,192],float32[192],float32[192,10004],float32[10004]>,non_trainable=<>>,optimizer_state=<int64>,round_num=int32,shrink_unshrink_server_info=<lmbda=float32,oja_left_maskval_to_projmat_dict=<-1=float32[1],0=float32[?,?],2=float32[?,?],1=float32[?,?]>,memory_dict=<0=float32[?,?],2=float32[?,?],1=float32[?,?]>>>@SERVER)'
-    )
+    # Assert types line up as expected.
+    shrink_server_state_param_type = shrink.type_signature.parameter.server_state
+    shrink_model_result_type = shrink.type_signature.result.member.model_weights.trainable
+
+    unshrink_model_param_type = unshrink.type_signature.parameter.client_outputs.member.weights_delta
+    unshrink_server_state_result_type = unshrink.type_signature.result
+
+    self.assertTrue(
+        unshrink_model_param_type.is_assignable_from(shrink_model_result_type))
+    self.assertTrue(
+        shrink_server_state_param_type.is_assignable_from(
+            unshrink_server_state_result_type))
 
 
 if __name__ == '__main__':
