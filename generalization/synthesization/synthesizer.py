@@ -36,6 +36,15 @@ flags.DEFINE_enum(
     ['mnist', 'fashion_mnist', 'emnist10', 'emnist62', 'cifar10', 'cifar100'],
     'Which dataset to synthesize clients from.')
 
+flags.DEFINE_boolean(
+    'include_train', True,
+    'A boolean representing whether to include training split of the original dataset.'
+)
+flags.DEFINE_boolean(
+    'include_test', True,
+    'A boolean representing whether to include test split of the original dataset. '
+    'At least one of the include_train and include_test should be True.')
+
 flags.DEFINE_enum('synthesization', None,
                   ['dirichlet', 'coarse_dirichlet', 'gmm_embedding'],
                   'Which synthesization scheme to use.')
@@ -91,6 +100,8 @@ def main(argv: Sequence[str]) -> None:
           num_clients=FLAGS.num_clients,
           concentration_factor=FLAGS.dirichlet_concentration_factor,
           use_rotate_draw=FLAGS.dirichlet_rotate_draw,
+          include_train=FLAGS.include_train,
+          include_test=FLAGS.include_test,
           seed=FLAGS.seed)
     elif FLAGS.synthesization == 'gmm_embedding':
       cd, cd_name = mnist_synthesis.synthesize_mnist_by_gmm_embedding(
@@ -101,6 +112,8 @@ def main(argv: Sequence[str]) -> None:
           use_progressive_matching=FLAGS.gmm_embedding_use_progressive_matching,
           kl_pairwise_batch_size=FLAGS.gmm_embedding_kl_pairwise_batch_size,
           gmm_init_params=FLAGS.gmm_embedding_init_params,
+          include_train=FLAGS.include_train,
+          include_test=FLAGS.include_test,
           seed=FLAGS.seed,
       )
     else:
@@ -114,6 +127,8 @@ def main(argv: Sequence[str]) -> None:
           num_clients=FLAGS.num_clients,
           concentration_factor=FLAGS.dirichlet_concentration_factor,
           use_rotate_draw=FLAGS.dirichlet_rotate_draw,
+          include_train=FLAGS.include_train,
+          include_test=FLAGS.include_test,
           seed=FLAGS.seed)
     elif FLAGS.synthesization == 'gmm_embedding':
       cd, cd_name = cifar_synthesis.synthesize_cifar_by_gmm_embedding(
@@ -124,6 +139,8 @@ def main(argv: Sequence[str]) -> None:
           use_progressive_matching=FLAGS.gmm_embedding_use_progressive_matching,
           kl_pairwise_batch_size=FLAGS.gmm_embedding_kl_pairwise_batch_size,
           gmm_init_params=FLAGS.gmm_embedding_init_params,
+          include_train=FLAGS.include_train,
+          include_test=FLAGS.include_test,
           seed=FLAGS.seed,
       )
     elif FLAGS.dataset == 'cifar100' and FLAGS.synthesization == 'coarse_dirichlet':
@@ -134,6 +151,8 @@ def main(argv: Sequence[str]) -> None:
           fine_concentration_factor=FLAGS
           .coarse_dirichlet_fine_concentration_factor,
           use_rotate_draw=FLAGS.coarse_dirichlet_rotate_draw,
+          include_train=FLAGS.include_train,
+          include_test=FLAGS.include_test,
           seed=FLAGS.seed)
     else:
       raise ValueError(

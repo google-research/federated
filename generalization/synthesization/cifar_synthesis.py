@@ -37,14 +37,20 @@ def _cifar_consistency_postprocesser(ds: tf.data.Dataset) -> tf.data.Dataset:
   return ds.map(elem_postprocesser)
 
 
-def _load_cifar_dataset(base_dataset_name: str,
-                        include_test: bool = True) -> tf.data.Dataset:
+def _load_cifar_dataset(base_dataset_name: str, include_train: bool,
+                        include_test: bool) -> tf.data.Dataset:
   """Load CIFAR dataset."""
   total_ds_dict = tfds.load(base_dataset_name)
-  if not include_test:
+
+  if include_train and not include_test:
     ds = total_ds_dict['train']
-  else:
+  elif include_test and (not include_train):
+    ds = total_ds_dict['test']
+  elif include_test and include_train:
     ds = total_ds_dict['train'].concatenate(total_ds_dict['test'])
+  else:
+    raise ValueError('At least one of the `include_train` and'
+                     '`include_test` must be True.')
 
   return ds
 
@@ -74,6 +80,8 @@ def synthesize_cifar_by_gmm_embedding(
     use_progressive_matching: bool,
     kl_pairwise_batch_size: int,
     gmm_init_params: str,
+    include_train: bool,
+    include_test: bool,
     seed: Optional[int],
 ) -> Tuple[tff.simulation.datasets.ClientData, str]:
   """Synthesize a federated dataset from a CIFAR-like dataset via GMM over embeddding.
@@ -97,6 +105,11 @@ def synthesize_cifar_by_gmm_embedding(
       computed in one batch. This could result in large memory cost.
     gmm_init_params: A str representing the initialization mode of GMM, can be
       either 'random' or 'kmeans'.
+    include_train: A boolean representing whether to include training split of
+      the original CIFAR dataset.
+    include_test: A boolean representing whether to include test split of the
+      original CIFAR dataset. At least one of the include_train and include_test
+      should be True.
     seed: An optional integer representing the random seed for all random
       procedures. If None, no random seed is used.
 
@@ -105,9 +118,17 @@ def synthesize_cifar_by_gmm_embedding(
       str representing the name of the synthesized dataset.
   """
 
-  dataset = _load_cifar_dataset(base_dataset_name)
+  dataset = _load_cifar_dataset(
+      base_dataset_name, include_train=include_train, include_test=include_test)
+
+  ds_name = base_dataset_name
+  if include_train and (not include_test):
+    ds_name = ds_name + '_train_only'
+  elif include_test and (not include_train):
+    ds_name = ds_name + '_test_only'
+
   name = ','.join([
-      base_dataset_name, 'gmm_embedding', f'clients={num_clients}',
+      ds_name, 'gmm_embedding', f'clients={num_clients}',
       f'model=b{efficient_net_b}', f'pca={pca_components}', 'matching=' +
       ('progressive_optimal' if use_progressive_matching else 'random'),
       f'gmm_init={gmm_init_params}', f'seed={seed}'
@@ -133,7 +154,7 @@ def synthesize_cifar_by_gmm_embedding(
 
 def synthesize_cifar_by_dirichlet_over_labels(
     base_dataset_name: str, num_clients: int, concentration_factor: float,
-    use_rotate_draw: bool,
+    use_rotate_draw: bool, include_train: bool, include_test: bool,
     seed: Optional[int]) -> Tuple[tff.simulation.datasets.ClientData, str]:
   """Synthesize a federated dataset from a CIFAR-like dataset via dirichlet over labels.
 
@@ -152,6 +173,11 @@ def synthesize_cifar_by_dirichlet_over_labels(
       client. This is intended to prevent the last clients from deviating from
       its desired distribution. If False, a client will draw all the samples at
       once before moving to the next client.
+    include_train: A boolean representing whether to include training split of
+      the original CIFAR dataset.
+    include_test: A boolean representing whether to include test split of the
+      original CIFAR dataset. At least one of the include_train and include_test
+      should be True.
     seed: An optional integer representing the random seed for all random
       procedures. If None, no random seed is used.
 
@@ -159,10 +185,17 @@ def synthesize_cifar_by_dirichlet_over_labels(
     A ClientData instance holding the resulting federated dataset, and a
       str representing the name of the synthesized dataset.
   """
-  dataset = _load_cifar_dataset(base_dataset_name)
+  dataset = _load_cifar_dataset(
+      base_dataset_name, include_train=include_train, include_test=include_test)
+
+  ds_name = base_dataset_name
+  if include_train and (not include_test):
+    ds_name = ds_name + '_train_only'
+  elif include_test and (not include_train):
+    ds_name = ds_name + '_test_only'
 
   name = ','.join([
-      base_dataset_name, 'dirichlet', f'clients={num_clients}',
+      ds_name, 'dirichlet', f'clients={num_clients}',
       f'concentration_factor={concentration_factor}',
       f'rotate={use_rotate_draw}', f'seed={seed}'
   ])
@@ -182,6 +215,7 @@ def synthesize_cifar_by_dirichlet_over_labels(
 def synthesize_cifar100_over_coarse_and_fine_labels(
     num_clients: int, coarse_concentration_factor: float,
     fine_concentration_factor: float, use_rotate_draw: bool,
+    include_train: bool, include_test: bool,
     seed: Optional[int]) -> Tuple[tff.simulation.datasets.ClientData, str]:
   """Synthesize a federated dataset from CIFAR100 via dirichlet over coarse and fine labels.
 
@@ -196,6 +230,11 @@ def synthesize_cifar100_over_coarse_and_fine_labels(
       client. This is intended to prevent the last clients from deviating from
       its desired distribution. If False, a client will draw all the samples at
       once before moving to the next client.
+    include_train: A boolean representing whether to include training split of
+      the original CIFAR dataset.
+    include_test: A boolean representing whether to include test split of the
+      original CIFAR dataset. At least one of the include_train and include_test
+      should be True.
     seed: An optional integer representing the random seed for all random
       procedures. If None, no random seed is used.
 
@@ -204,10 +243,17 @@ def synthesize_cifar100_over_coarse_and_fine_labels(
       str representing the name of the synthesized dataset.
   """
 
-  dataset = _load_cifar_dataset('cifar100')
+  dataset = _load_cifar_dataset(
+      'cifar100', include_train=include_train, include_test=include_test)
+
+  ds_name = 'cifar100'
+  if include_train and (not include_test):
+    ds_name = ds_name + '_train_only'
+  elif include_test and (not include_train):
+    ds_name = ds_name + '_test_only'
 
   name = ','.join([
-      'cifar100', 'coarse_dirichlet', f'clients={num_clients}',
+      ds_name, 'coarse_dirichlet', f'clients={num_clients}',
       f'coarse_factor={coarse_concentration_factor}',
       f'fine_factor={fine_concentration_factor}', f'rotate={use_rotate_draw}',
       f'seed={seed}'

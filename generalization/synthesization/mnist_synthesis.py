@@ -24,14 +24,21 @@ from generalization.synthesization import dirichlet
 from generalization.synthesization import gmm_embedding
 
 
-def load_mnist_dataset_by_name(base_dataset_name: str, include_test: bool):
+def load_mnist_dataset_by_name(base_dataset_name: str, include_train: bool,
+                               include_test: bool):
   """Load centralized dataset by name."""
+
+  if not include_train and not include_test:
+    raise ValueError('At least one of the `include_train` and'
+                     '`include_test` must be True.')
 
   if base_dataset_name in ['mnist', 'fashion_mnist']:
     total_ds_dict = tfds.load(base_dataset_name)
-    if not include_test:
+    if include_train and (not include_test):
       ds = total_ds_dict['train']
-    else:
+    elif include_test and (not include_train):
+      ds = total_ds_dict['test']
+    elif include_test and include_train:
       ds = total_ds_dict['train'].concatenate(total_ds_dict['test'])
 
     def emnist_consistency_preprocessor(
@@ -44,12 +51,19 @@ def load_mnist_dataset_by_name(base_dataset_name: str, include_test: bool):
   elif base_dataset_name in ('emnist10', 'emnist62'):
     train_cd, val_cd = tff.simulation.datasets.emnist.load_data(
         only_digits=True if base_dataset_name == 'emnist10' else False)
-    train_ds = train_cd.create_tf_dataset_from_all_clients()
-    if not include_test:
+
+    if include_train and (not include_test):
+      train_ds = train_cd.create_tf_dataset_from_all_clients()
       return train_ds
-    else:
+    elif include_test and (not include_train):
+      val_ds = val_cd.create_tf_dataset_from_all_clients()
+      return val_ds
+    elif include_train and include_test:
+      train_ds = train_cd.create_tf_dataset_from_all_clients()
       val_ds = val_cd.create_tf_dataset_from_all_clients()
       return train_ds.concatenate(val_ds)
+  else:
+    raise ValueError(f'Unknown base_dataset_name {base_dataset_name}.')
 
 
 def _load_mnist_pretrained_model(efficient_net_b: int = 7) -> tf.keras.Model:
@@ -77,7 +91,8 @@ def _load_mnist_pretrained_model(efficient_net_b: int = 7) -> tf.keras.Model:
 def synthesize_mnist_by_gmm_embedding(
     base_dataset_name: str, num_clients: int, efficient_net_b: int,
     pca_components: Optional[int], use_progressive_matching: bool,
-    kl_pairwise_batch_size: int, gmm_init_params: str,
+    kl_pairwise_batch_size: int, gmm_init_params: str, include_train: bool,
+    include_test: bool,
     seed: Optional[int]) -> Tuple[tff.simulation.datasets.ClientData, str]:
   """Synthesize a federated dataset from a MNIST-like dataset via GMM over embeddding.
 
@@ -100,6 +115,11 @@ def synthesize_mnist_by_gmm_embedding(
       computed in one batch. This could result in large memory cost.
     gmm_init_params: A str representing the initialization mode of GMM, can be
       either 'random' or 'kmeans'.
+    include_train: A boolean representing whether to include training split of
+      the original dataset.
+    include_test: A boolean representing whether to include test split of the
+      original dataset. At least one of the include_train and include_test
+      should be True.
     seed: An optional integer representing the random seed for all random
       procedures. If None, no random seed is used.
 
@@ -107,9 +127,17 @@ def synthesize_mnist_by_gmm_embedding(
     A ClientData instance holding the resulting federated dataset, and a
       str representing the name of the synthesized dataset.
   """
-  dataset = load_mnist_dataset_by_name(base_dataset_name, include_test=True)
+  dataset = load_mnist_dataset_by_name(
+      base_dataset_name, include_train=include_train, include_test=include_test)
+
+  ds_name = base_dataset_name
+  if include_train and (not include_test):
+    ds_name = ds_name + '_train_only'
+  elif include_test and (not include_train):
+    ds_name = ds_name + '_test_only'
+
   name = ','.join([
-      base_dataset_name, 'gmm_embedding', f'clients={num_clients}',
+      ds_name, 'gmm_embedding', f'clients={num_clients}',
       f'model=b{efficient_net_b}', f'pca={pca_components}', 'matching=' +
       ('progressive_optimal' if use_progressive_matching else 'random'),
       f'gmm_init={gmm_init_params}', f'seed={seed}'
@@ -136,12 +164,14 @@ def synthesize_mnist_by_dirichlet_over_labels(
     num_clients: int,
     concentration_factor: float,
     use_rotate_draw: bool,
+    include_train: bool,
+    include_test: bool,
     seed: Optional[int],
 ) -> Tuple[tff.simulation.datasets.ClientData, str]:
   """Synthesize a federated dataset from a MNIST-like dataset via dirichlet over labels.
 
   Args:
-    base_dataset_name: A str representing the name of the base CIFAR-like
+    base_dataset_name: A str representing the name of the base MNIST-like
       dataset, can be ['mnist', 'emnist10', 'emnist62', 'fashion_mnist'].
     num_clients: An integer representing the number of clients to construct.
     concentration_factor:  A float-typed parameter of Dirichlet distribution.
@@ -155,6 +185,11 @@ def synthesize_mnist_by_dirichlet_over_labels(
       client. This is intended to prevent the last clients from deviating from
       its desired distribution. If False, a client will draw all the samples at
       once before moving to the next client.
+    include_train: A boolean representing whether to include training split of
+      the original dataset.
+    include_test: A boolean representing whether to include test split of the
+      original dataset. At least one of the include_train and include_test
+      should be True.
     seed: An optional integer representing the random seed for all random
       procedures. If None, no random seed is used.
 
@@ -162,10 +197,17 @@ def synthesize_mnist_by_dirichlet_over_labels(
     A ClientData instance holding the resulting federated dataset, and a
       str representing the name of the synthesized dataset.
   """
-  dataset = load_mnist_dataset_by_name(base_dataset_name, include_test=True)
+  dataset = load_mnist_dataset_by_name(
+      base_dataset_name, include_train=include_train, include_test=include_test)
+
+  ds_name = base_dataset_name
+  if include_train and (not include_test):
+    ds_name = ds_name + '_train_only'
+  elif include_test and (not include_train):
+    ds_name = ds_name + '_test_only'
 
   name = ','.join([
-      base_dataset_name, 'dirichlet', f'clients={num_clients}',
+      ds_name, 'dirichlet', f'clients={num_clients}',
       f'concentration_factor={concentration_factor}',
       f'rotate={use_rotate_draw}', f'seed={seed}'
   ])
