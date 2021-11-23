@@ -1,7 +1,18 @@
 # FL Generalization
 
-This directory contains source code for evaluating generalization performance in
-federated learning with different optimizers on various models and tasks.
+This directory contains source code for reproducing results in paper
+"[What Do We Mean by Generalization in Federated Learning](https://arxiv.org/abs/2110.14216)".
+This includes evaluating generalization performance in federated learning with
+different optimizers on various models and tasks.
+
+```
+@article{yuan2021we,
+  title={What Do We Mean by Generalization in Federated Learning?},
+  author={Yuan, Honglin and Morningstar, Warren and Ning, Lin and Singhal, Karan},
+  journal={NeurIPS 2021 Workshop on New Frontiers in Federated Learning (NeurIPS NFFL 2021)},
+  year={2021}
+}
+```
 
 ## Using this directory
 
