@@ -280,6 +280,98 @@ def _record_test_metrics(
       metrics_manager.save_metrics(test_final_metrics, total_rounds + 1)
 
 
+def _run_simulation_with_callbacks(
+    process: tff.templates.IterativeProcess,
+    client_selection_fn: Callable[[int], Any],
+    total_rounds: int,
+    on_loop_start: Optional[Callable[[Any], Tuple[Any, int]]] = None,
+    on_round_end: Optional[Callable[[Any, int, MetricsType],
+                                    Tuple[Any, MetricsType]]] = None):
+  """Runs federated training for a given `tff.templates.IterativeProcess`.
+
+  We assume that the iterative process has the following functional type
+  signatures:
+
+    *   `initialize`: `( -> state)`.
+    *   `next`: `<state, client_data> -> <state, metrics>` where state matches
+        the output type of `initialize`, and `metrics` has member that is a
+        python mapping with string-valued keys.
+
+  This method performs up to `total_rounds` updates to the `state` of `process`.
+  At each `round_num`, this update occurs by applying `process.next` to
+  `state` and the output of ``client_selection_fn(round_num)`. We refer to this
+  as a single "training step".
+
+  This method also records how long it takes (in seconds) to call
+  `client_selection_fn` and `process.next` at each round and add this to the
+  round metrics with key `tff.simulation.ROUND_TIME_KEY`.
+
+  This method uses up to two callbacks. The first, `on_loop_start`, accepts the
+  initial state of `process`, and returns a starting `state` and `round_num` for
+  the training loop. The callback can be used for things such as loading
+  checkpoints.
+
+  The second callback, `on_round_end` is called after each training step. It
+  accepts the output state and metrics of `process.next`, and the current round
+  number, and returns a new state and metrics mapping. This can be used for
+  computing and saving additional metrics.
+
+  WARNING: These callbacks can access and mutate state and are intended for more
+  advanced simulations where the state can be mutated outside of calling
+  `process.next`. For example, the `on_round_end` callback can be used to
+  mutate state according to the training metrics, enabling various kinds of
+  adaptive simulations. If your simulation does not require such mutation, we
+  recommend `tff.simulation.run_simulation` instead.
+
+  Args:
+    process: A `tff.templates.IterativeProcess` instance to run. Must meet the
+      type signature requirements documented above.
+    client_selection_fn: Callable accepting an integer round number, and
+      returning a list of client data to use as federated data for that round.
+    total_rounds: The number of federated training rounds to perform.
+    on_loop_start: An optional callable accepting the initial `state` of the
+      iterative process, and returning a (potentially updated) `state` and an
+      integer `round_num` used to determine where to resume the simulation loop.
+    on_round_end: An optional callable accepting the `state` of the iterative
+      process, an integer round number, and a mapping of metrics. The callable
+      returns a (potentially updated) `state` of the same type, and a
+      (potentially updated) mapping of metrics.
+
+  Returns:
+    The `state` of the iterative process after training.
+  """
+  logging.info('Initializing simulation process')
+  initial_state = process.initialize()
+
+  if on_loop_start is not None:
+    logging.info('Running on loop start callback')
+    state, start_round = on_loop_start(initial_state)
+  else:
+    state = initial_state
+    start_round = 1
+
+  for round_num in range(start_round, total_rounds + 1):
+    logging.info('Executing round %d', round_num)
+    round_metrics = collections.OrderedDict(round_num=round_num)
+
+    train_start_time = time.time()
+    federated_train_data = client_selection_fn(round_num)
+
+    state, metrics = process.next(state, federated_train_data)
+    train_time = time.time() - train_start_time
+    round_metrics[tff.simulation.ROUND_TIME_KEY] = train_time
+    round_metrics.update(metrics)
+
+    if on_round_end is not None:
+      logging.info('running round end callback')
+      state, round_metrics = on_round_end(state, round_num, round_metrics)
+
+    logging.info('Output metrics at round {:d}:\n{!s}'.format(
+        round_num, pprint.pformat(round_metrics)))
+
+  return state
+
+
 def run_simulation(
     process: tff.templates.IterativeProcess,
     client_selection_fn: Callable[[int], Any],
@@ -356,8 +448,9 @@ def run_simulation(
   on_round_end = _create_on_round_end_fn(file_checkpoint_manager,
                                          metrics_managers, part_train_eval_fn,
                                          part_val_fn, unpart_fn)
-  final_state = tff.simulation.run_simulation_with_callbacks(
-      process, client_selection_fn, total_rounds, on_loop_start, on_round_end)
+  final_state = _run_simulation_with_callbacks(process, client_selection_fn,
+                                               total_rounds, on_loop_start,
+                                               on_round_end)
 
   _record_test_metrics(final_state, total_rounds, test_fn, metrics_managers)
   return final_state

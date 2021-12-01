@@ -365,7 +365,7 @@ class CreateOnRoundEndTest(absltest.TestCase):
 
 class RunSimulationTest(parameterized.TestCase):
 
-  @mock.patch.object(tff.simulation, 'run_simulation_with_callbacks')
+  @mock.patch.object(federated_training_loop, '_run_simulation_with_callbacks')
   @mock.patch.object(federated_training_loop, '_create_on_round_end_fn')
   @mock.patch.object(federated_training_loop, '_create_on_loop_start_fn')
   def test_run_simulation_passes_correctly_with_no_optional_arguments(
@@ -393,7 +393,7 @@ class RunSimulationTest(parameterized.TestCase):
       for name, args in zip([f'case_{idx}' for idx in range(64)],
                             itertools.product([None, 'arg'], repeat=6)))
   @mock.patch.object(federated_training_loop, '_record_test_metrics')
-  @mock.patch.object(tff.simulation, 'run_simulation_with_callbacks')
+  @mock.patch.object(federated_training_loop, '_run_simulation_with_callbacks')
   @mock.patch.object(federated_training_loop, '_create_on_round_end_fn')
   @mock.patch.object(federated_training_loop, '_create_on_loop_start_fn')
   def test_run_simulation_passes_named_optional_arguments_correctly(
