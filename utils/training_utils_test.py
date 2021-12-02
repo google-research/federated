@@ -64,7 +64,6 @@ class TrainingUtilsTest(tf.test.TestCase):
     program_state_dir = os.path.join(root_output_dir, 'program_states',
                                      experiment_name)
     test_state = create_scalar_metrics()
-    program_state_manager.set_structure(test_state)
     program_state_manager.save(test_state, 1)
     self.assertCountEqual(
         tf.io.gfile.listdir(program_state_dir), ['program_state_1'])
