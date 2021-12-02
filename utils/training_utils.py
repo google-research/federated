@@ -66,47 +66,6 @@ def configure_managers(
   return checkpoint_manager, [csv_manager, tensorboard_manager]
 
 
-def configure_output_managers(
-    root_output_dir: str,
-    experiment_name: str,
-    csv_metrics_manager_save_mode: tff.simulation.SaveMode = tff.simulation
-    .SaveMode.APPEND
-) -> Tuple[tff.simulation.FileCheckpointManager,
-           List[tff.simulation.MetricsManager]]:
-  """Configures a file program state manager and metrics managers.
-
-  Args:
-    root_output_dir: A string representing the root output directory for the
-      training simulation. All metrics and checkpoints will be logged to
-      subdirectories of this directory.
-    experiment_name: A unique identifier for the current training simulation,
-      used to create appropriate subdirectories of `root_output_dir`.
-    csv_metrics_manager_save_mode: A SaveMode specifying the save mode for
-      CSVMetricsManager.
-
-  Returns:
-    A `tff.program.FileProgramStateManager`, and a list of
-    `tff.simulation.MetricsManager` instances.
-  """
-  program_state_dir = os.path.join(root_output_dir, 'program_states',
-                                   experiment_name)
-  program_state_manager = tff.program.FileProgramStateManager(
-      root_dir=program_state_dir)
-  results_dir = os.path.join(root_output_dir, 'results', experiment_name)
-  csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  csv_manager = tff.simulation.CSVMetricsManager(
-      csv_file, save_mode=csv_metrics_manager_save_mode)
-
-  summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
-  tensorboard_manager = tff.simulation.TensorBoardManager(summary_dir)
-
-  logging.info('Writing...')
-  logging.info('    program states to: %s', program_state_dir)
-  logging.info('    CSV metrics to: %s', csv_file)
-  logging.info('    TensorBoard summaries to: %s', summary_dir)
-  return program_state_manager, [csv_manager, tensorboard_manager]  # pytype: disable=bad-return-type  # gen-stub-imports
-
-
 def write_hparams_to_csv(hparam_dict: Dict[str, Any], root_output_dir: str,
                          experiment_name: str) -> None:
   """Writes a dictionary of hyperparameters to a CSV file.
