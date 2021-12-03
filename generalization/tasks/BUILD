@@ -33,7 +33,10 @@ py_test(
     srcs = ["stackoverflow_word_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["nokokoro"],
+    tags = [
+        "nokokoro",
+        "requires-net:external",
+    ],
     deps = [":stackoverflow_word"],
 )
 
@@ -43,7 +46,10 @@ py_test(
     python_version = "PY3",
     shard_count = 5,
     srcs_version = "PY3",
-    tags = ["nokokoro"],
+    tags = [
+        "nokokoro",
+        "requires-net:external",
+    ],
     deps = [":emnist_character"],
 )
 

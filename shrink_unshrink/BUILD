@@ -71,7 +71,10 @@ py_test(
     srcs = ["models_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["nokokoro"],
+    tags = [
+        "nokokoro",
+        "requires-net:external",
+    ],
     deps = [":models"],
 )
 
@@ -105,7 +108,10 @@ py_test(
     srcs = ["shrink_unshrink_tff_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["nokokoro"],
+    tags = [
+        "nokokoro",
+        "requires-net:external",
+    ],
     deps = [
         ":models",
         ":shrink_unshrink_tff",

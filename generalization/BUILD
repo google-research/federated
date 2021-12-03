@@ -37,7 +37,10 @@ py_test(
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
-    tags = ["nokokoro"],
+    tags = [
+        "nokokoro",
+        "requires-net:external",
+    ],
     deps = [
         "//generalization/tasks:cifar100_image",
         "//generalization/tasks:emnist_character",
@@ -83,7 +86,10 @@ py_test(
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
-    tags = ["nokokoro"],
+    tags = [
+        "nokokoro",
+        "requires-net:external",
+    ],
     deps = [
         "//generalization/tasks:cifar100_image",
         "//generalization/tasks:emnist_character",
