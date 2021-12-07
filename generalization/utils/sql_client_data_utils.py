@@ -15,6 +15,7 @@
 
 import collections
 import os
+import tempfile
 from typing import Callable, List, Mapping
 
 from absl import logging
@@ -136,13 +137,8 @@ def save_to_sql_client_data(
   if tf.io.gfile.exists(database_filepath) and not allow_overwrite:
     raise FileExistsError(f'File already exists at {database_filepath}')
 
-  # TODO(b/199096208) Use `tempfile` module instead to manage scratch space.
-  tmp_dir = os.environ['SCRATCH'] if 'SCRATCH' in os.environ else '/tmp'
-  tmp_database_filepath = os.path.join(tmp_dir,
-                                       f'tmp{hash(database_filepath)}.db')
-  tf.io.gfile.makedirs(tmp_dir)
+  tmp_database_filepath = tempfile.mkstemp()[1]
   logging.info('Building local SQL database at %s.', tmp_database_filepath)
-
   example_client_id = client_ids[0]
   example_dataset = dataset_fn(example_client_id)
   example_element_spec = example_dataset.element_spec
@@ -246,30 +242,36 @@ def load_parsed_sql_client_data(
   """Load a SqlClientData from file and parse with the given element_spec.
 
   Args:
-    database_filepath: A `str` filepath of the SQL database.
+    database_filepath: A `str` filepath of the SQL database. This function will
+      first fetch the SQL database to a local temporary directory if
+      `database_filepath` is a remote directory.
     element_spec: The `element_spec` of the local dataset. This is used to parse
       the serialized SqlClientData.
 
   Returns:
     A parsed ClientData instance backed by SqlClientData.
+
+  Raises:
+    FileNotFoundError: if database_filepath does not exist.
   """
-  # TODO(b/199096208) Use `tempfile` module instead to manage scratch space.
-  tmp_dir = os.environ['SCRATCH'] if 'SCRATCH' in os.environ else '/tmp'
-  tmp_database_filepath = os.path.join(tmp_dir,
-                                       f'tmp{hash(database_filepath)}.db')
-  tf.io.gfile.makedirs(tmp_dir)
-
-  logging.info('Starting loading SQL database.')
-  tf.io.gfile.copy(database_filepath, tmp_database_filepath, overwrite=True)
-  logging.info('Finished loading SQL database.')
-
   parser = build_parser(element_spec)
 
   def dataset_parser(ds: tf.data.Dataset) -> tf.data.Dataset:
     return ds.map(parser, num_parallel_calls=tf.data.AUTOTUNE)
 
-  return tff.simulation.datasets.SqlClientData(
-      tmp_database_filepath).preprocess(dataset_parser)
+  if not tf.io.gfile.exists(database_filepath):
+    raise FileNotFoundError(f'No such file or directory: {database_filepath}')
+  elif not os.path.exists(database_filepath):
+    logging.info('Starting fetching SQL database to local.')
+    tmp_dir = tempfile.mkdtemp()
+    tmp_database_filepath = tf.io.gfile.join(
+        tmp_dir, os.path.basename(database_filepath))
+    tf.io.gfile.copy(database_filepath, tmp_database_filepath, overwrite=True)
+    database_filepath = tmp_database_filepath
+    logging.info('Finished fetching SQL database to local.')
+
+  return tff.simulation.datasets.SqlClientData(database_filepath).preprocess(
+      dataset_parser)
 
 
 def load_sql_client_data_metadata(database_filepath: str) -> pd.DataFrame:
@@ -277,19 +279,26 @@ def load_sql_client_data_metadata(database_filepath: str) -> pd.DataFrame:
 
   Args:
     database_filepath: A `str` filepath of the SQL database.
+  This function will first fetch the SQL database to a local temporary directory
+    if `database_filepath` is a remote directory.
 
   Returns:
     A pandas DataFrame containing the metadata.
+
+  Raises:
+    FileNotFoundError: if database_filepath does not exist.
   """
-  # TODO(b/199096208) Use `tempfile` module instead to manage scratch space.
-  tmp_dir = os.environ['SCRATCH'] if 'SCRATCH' in os.environ else '/tmp'
-  tmp_database_filepath = os.path.join(tmp_dir,
-                                       f'tmp{hash(database_filepath)}.db')
-  tf.io.gfile.makedirs(tmp_dir)
 
-  logging.info('Starting loading SQL database.')
-  tf.io.gfile.copy(database_filepath, tmp_database_filepath, overwrite=True)
-  logging.info('Finished loading SQL database.')
+  if not tf.io.gfile.exists(database_filepath):
+    raise FileNotFoundError(f'No such file or directory: {database_filepath}')
+  elif not os.path.exists(database_filepath):
+    logging.info('Starting fetching SQL database to local.')
+    tmp_dir = tempfile.mkdtemp()
+    tmp_database_filepath = tf.io.gfile.join(
+        tmp_dir, os.path.basename(database_filepath))
+    tf.io.gfile.copy(database_filepath, tmp_database_filepath, overwrite=True)
+    database_filepath = tmp_database_filepath
+    logging.info('Finished fetching SQL database to local.')
 
-  con = sqlite3.connect(tmp_database_filepath)
+  con = sqlite3.connect(database_filepath)
   return pd.read_sql_query('SELECT * from client_metadata', con)
