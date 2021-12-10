@@ -32,8 +32,8 @@ from tqdm import tqdm
 DEFAULT_CHILDREN = ['00', '01', '10', '11']
 
 
-def get_default_children(positivity, split=None):
-  if positivity:
+def get_default_children(aux_data, split=None):
+  if aux_data:
     if split == 'pos':
       return ['001', '011', '101', '111']
     elif split == 'neg':
@@ -87,7 +87,7 @@ def coordinates_to_binary_path(xy_tuple, depth=10):
   """
   if len(xy_tuple) == 2:
     x_coord, y_coord = xy_tuple
-    positivity = False
+    aux_data = False
     pos = ''
   else:
     x_coord, y_coord, pos = xy_tuple
@@ -140,14 +140,14 @@ def report_coordinate_to_vector(xy, tree, tree_prefix_list, count_min):
   return vector
 
 
-def init_tree(positivity=False):
+def init_tree(aux_data=False):
   """Initializes tree to have four leaf nodes.
 
   Creates pgtrie with leafs from `DEFAULT_CHILDREN` and assigns each node
   a positional identifier using positions from the `DEFAULT_CHILDREN`.
 
   Args:
-    positivity: Whether to account for pos and neg users.
+    aux_data: Whether to account for pos and neg users.
 
   Returns:
     constructed pygtrie, reverse prefix of the trie.
@@ -155,9 +155,9 @@ def init_tree(positivity=False):
 
   new_tree = pygtrie.StringTrie()
 
-  for i, z in enumerate(get_default_children(positivity)):
+  for i, z in enumerate(get_default_children(aux_data)):
     new_tree[z] = i
-  return new_tree, list(get_default_children(positivity))
+  return new_tree, list(get_default_children(aux_data))
 
 
 def transform_region_to_coordinates(x_coord,
@@ -189,7 +189,7 @@ def transform_region_to_coordinates(x_coord,
 
 
 def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold=0,
-                        positivity=False, count_min=False):
+                        aux_data=False, count_min=False):
   """Using coordinate vector and the tree produce a resulting image.
 
   For each value in the vector it finds the corresponding prefix and plots the
@@ -201,7 +201,7 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold
     image_size: desired final resolution of the image.
     contour: release only the contours of the grid (for debugging)
     split_threshold: reduces noise by setting values below threshold to 0.
-    positivity: produce two images with positive and negative cases.
+    aux_data: produce two images with positive and negative cases.
     count_min: use count min sketch.
 
   Returns:
@@ -210,7 +210,7 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold
   image_bit_level = int(np.log2(image_size))
   current_image = np.zeros([image_size, image_size])
   pos_image, neg_image = None, None
-  if positivity:
+  if aux_data:
     pos_image = np.zeros([image_size, image_size])
     neg_image = np.zeros([image_size, image_size])
   for path in sorted(tree):
@@ -250,7 +250,7 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold
           count *= scale
 
       current_image[x_bot:x_top + 1, y_bot:y_top + 1] = count
-      if positivity:
+      if aux_data:
         if pos == 1:
           pos_image[x_bot:x_top + 1, y_bot:y_top + 1] = count
         elif pos == 0:
@@ -260,12 +260,30 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold
   return current_image, pos_image, neg_image
 
 
+def update_tree(prefix, tree, tree_prefix_list):
+  """
+  Update tree with new prefix
+  Args:
+    prefix: new path, e.g. '10/01/10'
+    tree: current tree
+    tree_prefix_list: list of tree nodes
+
+  Returns:
+    1 if the prefix does not exist in tree otherwise 0.
+  """
+  if not tree.has_key(prefix):
+    tree[prefix] = len(tree_prefix_list)
+    tree_prefix_list.append(prefix)
+    return 1
+  else:
+    return 0
+
+
 def split_regions(tree_prefix_list,
                   vector_counts,
                   split_threshold,
                   image_bit_level,
                   collapse_threshold=None,
-                  positivity=False,
                   expand_all=False,
                   last_result: AlgResult = None,
                   count_min=None):
@@ -281,121 +299,121 @@ def split_regions(tree_prefix_list,
       split_threshold: threshold value used to split the nodes.
       image_bit_level: stopping criteria once the final resolution is reached.
       collapse_threshold: threshold value used to collapse the nodes.
+      expand_all: expand all regions,
+      last_result: use previous level results to compute conf intervals,
+      count_min: use count-min sketch
   Returns:
-      new_tree, new_tree_prefix_list, finished
+      new_tree, new_tree_prefix_list, fresh_expand
   """
   collapsed = 0
   created = 0
   fresh_expand = 0
   unchanged = 0
-  intervals = list()
   new_tree_prefix_list = list()
   new_tree = pygtrie.StringTrie()
-  if positivity:
-    for i in range(0, len(tree_prefix_list), 2):
-      if expand_all:
-        neg_count = split_threshold + 1
-        pos_count = split_threshold + 1
+  for i in range(len(tree_prefix_list)):
+    if count_min:
+      count = count_min.query(tree_prefix_list[i])
+    else:
+      count = vector_counts[i]
+    prefix = tree_prefix_list[i]
+
+    # check whether the tree has reached the bottom
+    if len(prefix.split('/')) >= image_bit_level:
+      continue
+    if last_result:
+      cond = create_confidence_interval_condition(last_result, prefix, count,
+                                                  split_threshold)
+    else:
+      cond = count > split_threshold
+    if expand_all or cond:
+      for child in DEFAULT_CHILDREN:
+        new_prefix = f'{prefix}/{child}'
+        fresh_expand += update_tree(new_prefix, new_tree, new_tree_prefix_list)
+    else:
+      if collapse_threshold is not None and \
+        count <= collapse_threshold and len(prefix) > 2:
+        old_prefix = prefix[:-3]
+        collapsed += 1
+        created += update_tree(old_prefix, new_tree, new_tree_prefix_list)
       else:
-        neg_count = vector_counts[i]
-        pos_count = vector_counts[i + 1]
-      neg_prefix = tree_prefix_list[i]
-      pos_prefix = tree_prefix_list[i + 1]
+        unchanged += update_tree(prefix, new_tree, new_tree_prefix_list)
 
-      # check whether the tree has reached the bottom
-      if len(pos_prefix.split('/')) >= image_bit_level:
-        continue
+  return new_tree, new_tree_prefix_list, fresh_expand
 
-      if pos_count > split_threshold and neg_count > split_threshold:
-        neg_child = get_default_children(positivity, split='neg')
-        pos_child = get_default_children(positivity, split='pos')
-        for j in range(len(pos_child)):
-          new_prefix = f'{neg_prefix}/{neg_child[j]}'
-          if not new_tree.has_key(new_prefix):
-            fresh_expand += 1
-            new_tree[new_prefix] = len(new_tree_prefix_list)
-            new_tree_prefix_list.append(new_prefix)
 
-            new_prefix = f'{pos_prefix}/{pos_child[j]}'
-            new_tree[new_prefix] = len(new_tree_prefix_list)
-            new_tree_prefix_list.append(new_prefix)
+def split_regions_aux(tree_prefix_list,
+                  vector_counts,
+                  split_threshold,
+                  image_bit_level,
+                  collapse_threshold=None,
+                  expand_all=False,
+                  last_result: AlgResult = None,
+                  count_min=None):
+  """Use expansion with aux data.
+
+  We check both counts for positive and negative attributes for each location.
+
+  Args:
+      tree_prefix_list: matches vector id to the tree prefix.
+      vector_counts: vector values aggregated from the users.
+      split_threshold: threshold value used to split the nodes.
+      image_bit_level: stopping criteria once the final resolution is reached.
+      collapse_threshold: threshold value used to collapse the nodes.
+      expand_all: expand all regions,
+      last_result: use previous level results to compute conf intervals,
+      count_min: use count-min sketch
+  Returns:
+      new_tree, new_tree_prefix_list, fresh_expand
+  """
+  new_tree_prefix_list = list()
+  new_tree = pygtrie.StringTrie()
+  collapsed = 0
+  created = 0
+  fresh_expand = 0
+  unchanged = 0
+
+  for i in range(0, len(tree_prefix_list), 2):
+    if count_min:
+      raise ValueError('CountMin is not implemented for Aux data.')
+    neg_count = vector_counts[i]
+    pos_count = vector_counts[i + 1]
+    neg_prefix = tree_prefix_list[i]
+    pos_prefix = tree_prefix_list[i + 1]
+
+    # check whether the tree has reached the bottom
+    if len(pos_prefix.split('/')) >= image_bit_level:
+      continue
+    if last_result:
+      p_cond = create_confidence_interval_condition(last_result, pos_prefix,
+                                                    pos_count, split_threshold)
+      n_cond = create_confidence_interval_condition(last_result, neg_prefix,
+                                                    neg_count, split_threshold)
+      cond = p_cond and n_cond
+    else:
+      cond = (pos_count > split_threshold and neg_count > split_threshold)
+    if expand_all or cond:
+      neg_child = get_default_children(aux_data=True, split='neg')
+      pos_child = get_default_children(aux_data=True, split='pos')
+      for j in range(len(pos_child)):
+        new_prefix = f'{neg_prefix}/{neg_child[j]}'
+        fresh_expand += update_tree(new_prefix, new_tree, new_tree_prefix_list)
+        new_prefix = f'{pos_prefix}/{pos_child[j]}'
+        update_tree(new_prefix, new_tree, new_tree_prefix_list)
+    else:
+      if collapse_threshold is not None and \
+          (pos_count < collapse_threshold or neg_count < collapse_threshold) \
+          and len(pos_prefix) > 3 and len(neg_prefix) > 3:
+        old_prefix = neg_prefix[:-4]
+        collapsed += 1
+        created += update_tree(old_prefix, new_tree, new_tree_prefix_list)
+        old_prefix = pos_prefix[:-4]
+        update_tree(old_prefix, new_tree, new_tree_prefix_list)
       else:
-        if collapse_threshold is not None and \
-            (
-                pos_count < collapse_threshold or neg_count < collapse_threshold) and \
-            len(pos_prefix) > 3 and len(neg_prefix) > 3:
+        unchanged += update_tree(neg_prefix, new_tree, new_tree_prefix_list)
+        update_tree(pos_prefix, new_tree, new_tree_prefix_list)
 
-          old_prefix = neg_prefix[:-4]
-          collapsed += 1
-          if not new_tree.has_key(old_prefix):
-            created += 1
-            new_tree[old_prefix] = len(new_tree_prefix_list)
-            new_tree_prefix_list.append(old_prefix)
-
-            old_prefix = pos_prefix[:-4]
-            new_tree[old_prefix] = len(new_tree_prefix_list)
-            new_tree_prefix_list.append(old_prefix)
-        else:
-          unchanged += 1
-          new_tree[f'{neg_prefix}'] = len(new_tree_prefix_list)
-          new_tree_prefix_list.append(f'{neg_prefix}')
-          new_tree[f'{pos_prefix}'] = len(new_tree_prefix_list)
-          new_tree_prefix_list.append(f'{pos_prefix}')
-  else:
-    for i in range(len(tree_prefix_list)):
-      if expand_all:
-        count = split_threshold + 1
-      else:
-        if count_min:
-          count = count_min.query(tree_prefix_list[i])
-        else:
-          count = vector_counts[i]
-      prefix = tree_prefix_list[i]
-
-      # check whether the tree has reached the bottom
-      if len(prefix.split('/')) >= image_bit_level:
-        continue
-      if last_result is not None:
-        (last_prefix, last_prefix_pos) = last_result.tree.longest_prefix(prefix)
-        if last_prefix is None:
-          cond = False
-        else:
-          last_count = last_result.sum_vector[last_prefix_pos]
-          p = (last_count - count) / last_count
-          if p <= 0 or count < 5 or last_count < 5:
-            cond = False
-          else:
-            conf_int = 1.96 * np.sqrt((p * (1 - p) / last_count)) * last_count
-            cond = conf_int < split_threshold
-            intervals.append(conf_int)
-      else:
-        cond = count > split_threshold
-      if cond:
-        for child in DEFAULT_CHILDREN:
-          new_prefix = f'{prefix}/{child}'
-          if not new_tree.has_key(new_prefix):
-            fresh_expand += 1
-            new_tree[new_prefix] = len(new_tree_prefix_list)
-            new_tree_prefix_list.append(new_prefix)
-      else:
-        if collapse_threshold is not None and \
-            count <= collapse_threshold and \
-            len(prefix) > 2:
-          old_prefix = prefix[:-3]
-          collapsed += 1
-          if not new_tree.has_key(old_prefix):
-            created += 1
-            new_tree[old_prefix] = len(new_tree_prefix_list)
-            new_tree_prefix_list.append(old_prefix)
-        else:
-          unchanged += 1
-          new_tree[f'{prefix}'] = len(new_tree_prefix_list)
-          new_tree_prefix_list.append(f'{prefix}')
-  finished = False
-  if fresh_expand == 0:
-    print('Finished expanding, no new results.')
-    finished = True
-  return new_tree, new_tree_prefix_list, finished
+  return new_tree, new_tree_prefix_list, fresh_expand
 
 
 def build_from_sample(samples, total_size):
@@ -503,9 +521,26 @@ def compute_conf_intervals(sum_vector: np.ndarray, level=95):
   return conf_intervals, conf_interval_weighted
 
 
+def create_confidence_interval_condition(last_result, prefix, count, split_threshold):
+
+  (last_prefix, last_prefix_pos) = last_result.tree.longest_prefix(prefix)
+  if last_prefix is None:
+    cond = False
+  else:
+    last_count = last_result.sum_vector[last_prefix_pos]
+    p = (last_count - count) / last_count
+    if p <= 0 or count < 5 or last_count < 5:
+      cond = False
+    else:
+      conf_int = 1.96 * np.sqrt((p * (1 - p) / last_count)) * last_count
+      cond = conf_int < split_threshold
+
+  return cond
+
+
 def make_step(samples, eps, split_threshold, partial,
               prefix_len, dropout_rate, tree, tree_prefix_list,
-              noiser, quantize, total_size, positivity, count_min):
+              noiser, quantize, total_size, aux_data, count_min):
   """
 
   Args:
@@ -520,7 +555,7 @@ def make_step(samples, eps, split_threshold, partial,
     noiser: class for the noise
     quantize: use of quantization
     total_size: size of the location area (e.g. 1024).
-    positivity: each entry in the dataset has also positivity status (x,y,positivity)
+    aux_data: each entry in the dataset has also positivity status (x,y,positivity)
     count_min: use count-min sketch
 
   Returns: AlgResult and contour of the current split.
@@ -563,7 +598,7 @@ def make_step(samples, eps, split_threshold, partial,
       if j % (samples_len//10) == 0 or j == samples_len - 1:
         test_image, _, _ = rebuild_from_vector(
           np.copy(sum_vector), tree, image_size=total_size, split_threshold=split_threshold if eps else -1,
-          positivity=positivity, count_min=count_min)
+          aux_data=aux_data, count_min=count_min)
         level_animation_list.append(test_image)
   del round_vector
   rebuilder = np.copy(sum_vector)
@@ -574,7 +609,7 @@ def make_step(samples, eps, split_threshold, partial,
 
   test_image, pos_image, neg_image = rebuild_from_vector(
     rebuilder, tree, image_size=total_size, split_threshold=threshold_rebuild,
-    positivity=positivity, count_min=count_min)
+    aux_data=aux_data, count_min=count_min)
 
   grid_contour, _, _ = rebuild_from_vector(
     sum_vector,

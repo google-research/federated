@@ -102,7 +102,7 @@ def run_experiment(true_image,
                    quantize=None,
                    noise_class=mechanisms.GeometricNoise,
                    save_gif=False,
-                   positivity=False,
+                   aux_data=False,
                    start_with_level=0,
                    ignore_start_eps=False,
                    last_result_ci=None,
@@ -132,7 +132,7 @@ def run_experiment(true_image,
       quantize: apply quantization to the vectors.
       noise_class: use specific noise, defaults to GeometricNoise.
       save_gif: saves all images as a gif.
-      positivity: each entry in the dataset has also positivity status (x,y,positivity)
+      aux_data: each entry in the dataset has also positivity status (x,y,positivity)
       start_with_level: skip first levels and always expand them.
       ignore_start_eps: ignore spending epsilon when using start_with_level.
       last_result_ci: for two label save previous results.
@@ -161,15 +161,15 @@ def run_experiment(true_image,
                   quantize=quantize,
                   noise_class=noise_class,
                   save_gif=save_gif,
-                  positivity=positivity,
+                  aux_data=aux_data,
                   start_with_level=start_with_level)
 
-  tree, tree_prefix_list = geo_utils.init_tree(config.positivity)
+  tree, tree_prefix_list = geo_utils.init_tree(config.aux_data)
   per_level_results = list()
   per_level_grid = list()
   finished = False
   sum_vector = None
-  print_output(f'positivity: {config.positivity}', config.output_flag)
+  print_output(f'aux_data: {config.aux_data}', config.output_flag)
   spent_budget = 0
   remaining_budget = total_epsilon_budget
   if config.level_sample_size % config.secagg_round_size != 0:
@@ -245,7 +245,7 @@ def run_experiment(true_image,
         tree_prefix_list=tree_prefix_list,
         vector_counts=None,
         split_threshold=split_threshold, image_bit_level=10,
-        collapse_threshold=collapse_threshold, positivity=positivity,
+        collapse_threshold=collapse_threshold, aux_data=aux_data,
         expand_all=True, count_min=count_min)
       print_output(f"Expanding all at the level: {i}.", output_flag)
       continue
@@ -255,13 +255,13 @@ def run_experiment(true_image,
                                                prefix_len, dropout_rate,
                                                tree, tree_prefix_list,
                                                noiser, quantize, total_size,
-                                               positivity, count_min=count_min_sketch)
+                                               aux_data, count_min=count_min_sketch)
 
     per_level_results.append(result)
     per_level_grid.append(grid_contour)
 
     # compare to true image without sampling error
-    if positivity:
+    if aux_data:
       im = result.pos_image
     else:
       im = result.image
@@ -285,12 +285,14 @@ def run_experiment(true_image,
       last_result = None
     else:
       last_result = per_level_results[i - 1]
-    tree, tree_prefix_list, finished = geo_utils.split_regions(
+
+    process_split = geo_utils.split_regions_aux if aux_data else geo_utils.split_regions
+    tree, tree_prefix_list, fresh_expand = process_split(
       tree_prefix_list=result.tree_prefix_list, vector_counts=result.sum_vector,
       split_threshold=split_threshold, image_bit_level=10,
-      collapse_threshold=collapse_threshold, positivity=positivity,
+      collapse_threshold=collapse_threshold,
       last_result=last_result)
-    if finished:
+    if fresh_expand==0:
       break
   if output_flag:
     print(f'Total epsilon-users: {spent_budget:.2f} with ' + \
@@ -308,7 +310,7 @@ def run_experiment(true_image,
       result = per_level_results[i]
       plotting.plot_it(
         ax=axis,
-        test_image=result.pos_image if positivity else result.image,
+        test_image=result.pos_image if aux_data else result.image,
         eps=result.eps,
         total_regions=len(result.tree_prefix_list),
         metric=result.metric)
