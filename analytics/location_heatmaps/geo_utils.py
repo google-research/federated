@@ -438,7 +438,7 @@ def quantize_vector(vector, left_bound, right_bound):
   return vector
 
 
-def makeGaussian(image, total_size, fwhm=3, center=None,
+def make_gaussian(image, total_size, fwhm=3, center=None,
                  convert=False, save=False, load=False):
   """ Make a square gaussian kernel.
   size is the length of a side of the square
