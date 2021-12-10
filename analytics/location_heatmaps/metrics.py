@@ -145,6 +145,9 @@ def get_metrics(test_image, true_image, top_k, total_size):
   the provided TOP-K parameter, and an MSE error. For the correct comparison the
   images are scaled to the same size first,and then compared per coordinate.
 
+  Some metrics do not accept zero values, therefore we replace all zeros with
+  the next smallest value from the image.
+
 
   Args:
     test_image: obtained image to obtain the metrics
@@ -154,7 +157,7 @@ def get_metrics(test_image, true_image, top_k, total_size):
 
   Returns:
     l2 dist, hot spot counts, movers distance, f1-score, l1 dist, mutual info,
-    MSE.
+    MSE, mape, smape, maape.
   """
 
   # normalize the input images
