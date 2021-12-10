@@ -54,7 +54,7 @@ class AlgResult:
     sum_vector: a vector of reports on the tree leaves.
     tree: a prefix trie used to convert the sum_vector into image.
     tree_prefix_list: a reverse prefix matching vector coordinates to the trie.
-    threshold: threshold parameter used to obtain the current tree.
+    split_threshold: threshold parameter used to obtain the current tree.
     grid_contour: image showing the tree leafs locations on the map.
     eps: current value of the epsilon in SecAgg round.
   """
@@ -62,7 +62,7 @@ class AlgResult:
   sum_vector: np.ndarray
   tree: pygtrie.StringTrie
   tree_prefix_list: List[str]
-  threshold: float
+  split_threshold: float
   grid_contour: np.ndarray
   eps: float
   pos_image: np.ndarray = None
@@ -188,7 +188,7 @@ def transform_region_to_coordinates(x_coord,
   return (x_bot, x_top, y_bot, y_top)
 
 
-def rebuild_from_vector(vector, tree, image_size, contour=False, threshold=0,
+def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold=0,
                         positivity=False, count_min=False):
   """Using coordinate vector and the tree produce a resulting image.
 
@@ -200,7 +200,7 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, threshold=0,
     tree: current tree object
     image_size: desired final resolution of the image.
     contour: release only the contours of the grid (for debugging)
-    threshold: reduces noise by setting values below threshold to 0.
+    split_threshold: reduces noise by setting values below threshold to 0.
     positivity: produce two images with positive and negative cases.
     count_min: use count min sketch.
 
@@ -223,7 +223,7 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, threshold=0,
      y_top) = transform_region_to_coordinates(x, y, prefix_len,
                                               image_bit_level)
 
-    if value < threshold:
+    if value < split_threshold:
       value = 0
     count = value / 2 ** (1 * (image_bit_level - prefix_len))
 
@@ -262,7 +262,7 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, threshold=0,
 
 def split_regions(tree_prefix_list,
                   vector_counts,
-                  threshold,
+                  split_threshold,
                   image_bit_level,
                   collapse_threshold=None,
                   positivity=False,
@@ -278,7 +278,7 @@ def split_regions(tree_prefix_list,
   Args:
       tree_prefix_list: matches vector id to the tree prefix.
       vector_counts: vector values aggregated from the users.
-      threshold: threshold value used to split the nodes.
+      split_threshold: threshold value used to split the nodes.
       image_bit_level: stopping criteria once the final resolution is reached.
       collapse_threshold: threshold value used to collapse the nodes.
   Returns:
@@ -294,8 +294,8 @@ def split_regions(tree_prefix_list,
   if positivity:
     for i in range(0, len(tree_prefix_list), 2):
       if expand_all:
-        neg_count = threshold + 1
-        pos_count = threshold + 1
+        neg_count = split_threshold + 1
+        pos_count = split_threshold + 1
       else:
         neg_count = vector_counts[i]
         pos_count = vector_counts[i + 1]
@@ -306,14 +306,7 @@ def split_regions(tree_prefix_list,
       if len(pos_prefix.split('/')) >= image_bit_level:
         continue
 
-      # total = pos_count + neg_count
-      # p = pos_count / total
-      # confidence = np.sqrt((1-p)*p/total)
-      # error bound propagation.
-      # confidence +/- noise
-      # pos_count/total +/- (confidence+conf_noise) => 95% interval for 95% noise interval.
-
-      if pos_count > threshold and neg_count > threshold:
+      if pos_count > split_threshold and neg_count > split_threshold:
         neg_child = get_default_children(positivity, split='neg')
         pos_child = get_default_children(positivity, split='pos')
         for j in range(len(pos_child)):
@@ -351,7 +344,7 @@ def split_regions(tree_prefix_list,
   else:
     for i in range(len(tree_prefix_list)):
       if expand_all:
-        count = threshold + 1
+        count = split_threshold + 1
       else:
         if count_min:
           count = count_min.query(tree_prefix_list[i])
@@ -371,16 +364,12 @@ def split_regions(tree_prefix_list,
           p = (last_count - count) / last_count
           if p <= 0 or count < 5 or last_count < 5:
             cond = False
-            # print(last_prefix, prefix, last_prefix_pos, last_count,
-            #       count)
           else:
             conf_int = 1.96 * np.sqrt((p * (1 - p) / last_count)) * last_count
-            cond = conf_int < threshold
+            cond = conf_int < split_threshold
             intervals.append(conf_int)
-            # print(last_prefix, prefix, last_prefix_pos, last_count, count, conf_int, cond)
       else:
-        cond = count > threshold
-      # print(cond, threshold, count)
+        cond = count > split_threshold
       if cond:
         for child in DEFAULT_CHILDREN:
           new_prefix = f'{prefix}/{child}'
@@ -392,7 +381,6 @@ def split_regions(tree_prefix_list,
         if collapse_threshold is not None and \
             count <= collapse_threshold and \
             len(prefix) > 2:
-
           old_prefix = prefix[:-3]
           collapsed += 1
           if not new_tree.has_key(old_prefix):
@@ -404,12 +392,7 @@ def split_regions(tree_prefix_list,
           new_tree[f'{prefix}'] = len(new_tree_prefix_list)
           new_tree_prefix_list.append(f'{prefix}')
   finished = False
-  # print(f'Conf int {np.mean(intervals) if len(intervals) else 0}.')
-  # if collapse_threshold:
-  # print(f'Collapsed: {collapsed}, created when collapsing: {created},' + \
-  #       f'new expanded: {fresh_expand},' + \
-  #       f'unchanged: {unchanged}, total: {len(new_tree_prefix_list)}')
-  if fresh_expand == 0:  # len(new_tree_prefix_list) <= len(tree_prefix_list):
+  if fresh_expand == 0:
     print('Finished expanding, no new results.')
     finished = True
   return new_tree, new_tree_prefix_list, finished
@@ -499,18 +482,11 @@ def convert_to_dataset(image, total_size, value=None):
 
 
 def compute_conf_intervals(sum_vector: np.ndarray, level=95):
+  from scipy.stats import norm
+
   conf_intervals = dict()
   conf_interval_weighted = dict()
-  if level == 95:
-    z = 1.96
-  elif level == 99:
-    z = 2.576
-  elif level == 90:
-    z = 1.645
-  elif level == 98:
-    z = 2.326
-  else:
-    raise ValueError(f'Incorrect confidence level {level}.')
+  z = norm.ppf(1-(1-level/100)/2)
 
   for i in range(0, sum_vector.shape[0], 2):
     neg_count = sum_vector[i]
@@ -527,9 +503,29 @@ def compute_conf_intervals(sum_vector: np.ndarray, level=95):
   return conf_intervals, conf_interval_weighted
 
 
-def make_step(samples, eps, threshold, partial,
+def make_step(samples, eps, split_threshold, partial,
               prefix_len, dropout_rate, tree, tree_prefix_list,
               noiser, quantize, total_size, positivity, count_min):
+  """
+
+  Args:
+    samples: list of user datapoints.
+    eps: current privacy budget for the level.
+    split_threshold: threshold for current level.
+    partial: uses sub-arrays to prevent OOM.
+    prefix_len: current level prefix.
+    dropout_rate: rate of the dropout from SecAgg round.
+    tree: current tree
+    tree_prefix_list: list of tree nodes.
+    noiser: class for the noise
+    quantize: use of quantization
+    total_size: size of the location area (e.g. 1024).
+    positivity: each entry in the dataset has also positivity status (x,y,positivity)
+    count_min: use count-min sketch
+
+  Returns: AlgResult and contour of the current split.
+
+  """
   samples_len = len(samples)
   level_animation_list = list()
   if count_min:
@@ -566,18 +562,18 @@ def make_step(samples, eps, threshold, partial,
       # save 10 frames for each run for animation
       if j % (samples_len//10) == 0 or j == samples_len - 1:
         test_image, _, _ = rebuild_from_vector(
-          np.copy(sum_vector), tree, image_size=total_size, threshold=threshold if eps else -1,
+          np.copy(sum_vector), tree, image_size=total_size, split_threshold=split_threshold if eps else -1,
           positivity=positivity, count_min=count_min)
         level_animation_list.append(test_image)
   del round_vector
   rebuilder = np.copy(sum_vector)
   if eps:
-    threshold_rebuild = threshold
+    threshold_rebuild = split_threshold
   else:
     threshold_rebuild = 0.0
 
   test_image, pos_image, neg_image = rebuild_from_vector(
-    rebuilder, tree, image_size=total_size, threshold=threshold_rebuild,
+    rebuilder, tree, image_size=total_size, split_threshold=threshold_rebuild,
     positivity=positivity, count_min=count_min)
 
   grid_contour, _, _ = rebuild_from_vector(
@@ -585,13 +581,14 @@ def make_step(samples, eps, threshold, partial,
     tree,
     image_size=total_size,
     contour=True,
-    threshold=threshold_rebuild, count_min=count_min)
+    split_threshold=threshold_rebuild, count_min=count_min)
+
   result = AlgResult(
     image=test_image,
     sum_vector=sum_vector,
     tree=tree,
     tree_prefix_list=tree_prefix_list,
-    threshold=threshold,
+    split_threshold=split_threshold,
     grid_contour=grid_contour,
     pos_image=pos_image,
     level_animation_list=level_animation_list,

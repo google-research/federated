@@ -24,7 +24,7 @@ class NoiseAddition(abc.ABC):
   """Base class for different DP mechanisms."""
 
   @abc.abstractmethod
-  def get_noise_tensor(self, input_shape):
+  def _get_noise_tensor(self, input_shape):
     """Generates a noise tensor of the shape `input_tensor`.
 
     Args:
@@ -46,14 +46,14 @@ class NoiseAddition(abc.ABC):
         noised tensor
     """
 
-    noise = self.get_noise_tensor(input_tensor.shape)
+    noise = self._get_noise_tensor(input_tensor.shape)
     return input_tensor + noise
 
 
 class ZeroNoise(NoiseAddition):
   """Implements no noise mechanism, when no DP guarantees needed."""
 
-  def get_noise_tensor(self, input_shape):
+  def _get_noise_tensor(self, input_shape):
     return 0
 
 
@@ -81,7 +81,7 @@ class GeometricNoise(NoiseAddition):
     return sign * np.round(
       np.log(1.0 - one_sided_percentile / 100.0) / np.log(self.r))
 
-  def get_noise_tensor(self, input_shape):
+  def _get_noise_tensor(self, input_shape):
     alpha = 1.0 / self.num_clients
     beta = (1 - self.r) / self.r
 
@@ -123,8 +123,8 @@ class RapporNoise(NoiseAddition):
   def eps_local(self):
     return np.log(2 * self.num_clients / self.lam - 1)
 
-  def get_noise_tensor(self, input_shape):
-    return
+  def _get_noise_tensor(self, input_shape):
+    raise NotImplementedError
 
   def apply_noise(self, input_tensor):
     """Sample bool vector for zeros using RAPPOR.

@@ -9,7 +9,7 @@ Here is the example of the algorithm running on NYC location map from
 
 To experiment with the code there is a working [notebook](dp_location_heatmaps.ipynb) 
 with all the examples from the paper, please don't hesitate to contact the 
-[author](mailto:eugene@cs.cornell.edu) or raise an issue.1 
+[author](mailto:eugene@cs.cornell.edu) or raise an issue.
 
 For citation:
 ```

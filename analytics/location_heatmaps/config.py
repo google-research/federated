@@ -11,14 +11,14 @@ class Config:
     image: Any
     level_sample_size: int = 10000
     secagg_round_size: int = 10000
-    threshold: float = 0
+    split_threshold: float = 0
     collapse_threshold: float = None
-    eps_func: Any  = lambda x, y: 1
+    eps_func: Any = lambda x, y: 1
     total_epsilon_budget: float = None
     top_k: int = TOPK
-    partial:int  = 100
-    max_levels: int  = 10
-    threshold_func: Any = None
+    partial:int = 100
+    max_levels: int = 10
+    split_threshold_func: Any = None
     collapse_func: Any = None
     total_size: int = TOTAL_SIZE
     min_dp_size: int = None

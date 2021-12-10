@@ -36,6 +36,11 @@ class Metrics:
     hotspots_count: count of the current hotspots.
     f1: f1 score on the discovered hot spots.
     mutual_info: mutual information metric.
+    mutual_info: Mutual Information Metric.
+    mape: Mean Absolute Percentage Error.
+    smape: Symmetric Mean Absolute Percentage Error.
+    maape: Mean Arctangent Absolute Percentage Error.
+    nmse: Normalized Mean Squared Error
   """
   mse: float = 0
   l1_distance: float = 0

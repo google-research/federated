@@ -86,14 +86,14 @@ def run_experiment(true_image,
                    dataset,
                    level_sample_size=10000,
                    secagg_round_size=10000,
-                   threshold=0,
+                   split_threshold=0,
                    collapse_threshold=None,
                    eps_func=lambda x, y: 1,
                    total_epsilon_budget=None,
                    top_k=TOPK,
                    partial=100,
                    max_levels=10,
-                   threshold_func=None,
+                   split_threshold_func=None,
                    collapse_func=None,
                    total_size=TOTAL_SIZE,
                    min_dp_size=None,
@@ -114,7 +114,7 @@ def run_experiment(true_image,
       dataset: dataset of user contributions, i.e. coordinates (x,y).
       level_sample_size: Sample size to run at every level for the algorithm.
       secagg_round_size: SecAgg round size to use for the noise generator.
-      threshold: Threshold to split the tree leaf into 4 subregions.
+      split_threshold: Threshold to split the tree leaf into 4 subregions.
       collapse_threshold: collapse node threshold.
       eps_func: function that produces epsilon value for each level, takes
         round_num and count of the tree leafs.
@@ -123,7 +123,7 @@ def run_experiment(true_image,
       top_k: a parameter to estimate the hotspot percentile, defaults to `TOPK`.
       partial: uses sub-arrays to prevent OOM.
       max_levels: max number of levels to run deep.
-      threshold_func: a function to determine threshold takes eps and tree size.
+      split_threshold_func: a function to determine threshold takes eps and tree size.
       collapse_func: a function to determine collapse threshold.
       total_size: size of the location area (e.g. 1024).
       min_dp_size: minimim size to reach DP, defaults to `secagg_round_size`.
@@ -132,6 +132,10 @@ def run_experiment(true_image,
       quantize: apply quantization to the vectors.
       noise_class: use specific noise, defaults to GeometricNoise.
       save_gif: saves all images as a gif.
+      positivity: each entry in the dataset has also positivity status (x,y,positivity)
+      start_with_level: skip first levels and always expand them.
+      ignore_start_eps: ignore spending epsilon when using start_with_level.
+      last_result_ci: for two label save previous results.
       count_min: use count-min sketch.
 
   Returns:
@@ -141,14 +145,14 @@ def run_experiment(true_image,
                   image=true_image,
                   level_sample_size=level_sample_size,
                   secagg_round_size=secagg_round_size,
-                  threshold=threshold,
+                  split_threshold=split_threshold,
                   collapse_threshold=collapse_threshold,
                   eps_func=eps_func,
                   total_epsilon_budget=total_epsilon_budget,
                   top_k=top_k,
                   partial=partial,
                   max_levels=max_levels,
-                  threshold_func=threshold_func,
+                  split_threshold_func=split_threshold_func,
                   collapse_func=collapse_func,
                   total_size=total_size,
                   min_dp_size=min_dp_size,
@@ -160,28 +164,27 @@ def run_experiment(true_image,
                   positivity=positivity,
                   start_with_level=start_with_level)
 
-  tree, tree_prefix_list = geo_utils.init_tree(positivity)
+  tree, tree_prefix_list = geo_utils.init_tree(config.positivity)
   per_level_results = list()
   per_level_grid = list()
   finished = False
   sum_vector = None
-  print_output(f'positivity: {positivity}', output_flag)
-
+  print_output(f'positivity: {config.positivity}', config.output_flag)
   spent_budget = 0
   remaining_budget = total_epsilon_budget
-  if level_sample_size % secagg_round_size != 0:
+  if config.level_sample_size % config.secagg_round_size != 0:
     raise ValueError('Sample size cannot be split into SecAgg')
   else:
-    print_output(f'Total of {level_sample_size / secagg_round_size} ' + \
-                 'SecAgg rounds per level', output_flag)
+    print_output(f'Total of {config.level_sample_size / config.secagg_round_size} ' + \
+                 'SecAgg rounds per level', config.output_flag)
   # define DP round size
-  dp_round_size = min_dp_size if min_dp_size else secagg_round_size
-  if threshold and threshold_func:
+  dp_round_size = config.min_dp_size if config.min_dp_size else config.secagg_round_size
+  if config.split_threshold and config.split_threshold_func:
     raise ValueError('Specify either `threshold` or `threshold_func`.')
   if collapse_threshold and collapse_func:
     raise ValueError(
       'Specify either `collapse_threshold` or `collapse_func`.')
-  samples = np.random.choice(dataset, level_sample_size, replace=False)
+  samples = np.random.choice(dataset, config.level_sample_size, replace=False)
   if count_min:
     count_min_sketch = get_count_min_sketch(depth=20, width=2000)
     sensitivity = 20
@@ -189,13 +192,12 @@ def run_experiment(true_image,
     count_min_sketch = None
     sensitivity = 1
 
-  for i in range(max_levels):
-
+  for i in range(config.max_levels):
     samples_len = len(samples)
     prefix_len = len(tree_prefix_list)
     # create an image from the sampled data.
     image_sampled = geo_utils.build_from_sample(samples,
-                                                total_size=total_size)
+                                                total_size=config.total_size)
 
     if total_epsilon_budget:
       remaining_budget = total_epsilon_budget - spent_budget
@@ -227,14 +229,14 @@ def run_experiment(true_image,
       else:
         spent_budget += eps * samples_len
 
-    if threshold_func:
-      threshold = threshold_func(
+    if split_threshold_func:
+      split_threshold = split_threshold_func(
         i, prefix_len, eps,
         (total_epsilon_budget - spent_budget) / samples_len)
     if collapse_func:
-      collapse_threshold = collapse_func(threshold)
+      collapse_threshold = collapse_func(split_threshold)
     print_output(
-      f'Level: {i}. Eps: {eps}. Threshold: {threshold:.2f}. Remaining: {remaining_budget / samples_len if remaining_budget is not None else 0:.2f}',
+      f'Level: {i}. Eps: {eps}. Threshold: {split_threshold:.2f}. Remaining: {remaining_budget / samples_len if remaining_budget is not None else 0:.2f}',
       output_flag)
 
     # to prevent OOM errors we use vectors of size partial.
@@ -242,13 +244,13 @@ def run_experiment(true_image,
       tree, tree_prefix_list, finished = geo_utils.split_regions(
         tree_prefix_list=tree_prefix_list,
         vector_counts=None,
-        threshold=threshold, image_bit_level=10,
+        split_threshold=split_threshold, image_bit_level=10,
         collapse_threshold=collapse_threshold, positivity=positivity,
         expand_all=True, count_min=count_min)
       print_output(f"Expanding all at the level: {i}.", output_flag)
       continue
 
-    result, grid_contour = geo_utils.make_step(samples, eps, threshold,
+    result, grid_contour = geo_utils.make_step(samples, eps, split_threshold,
                                                partial,
                                                prefix_len, dropout_rate,
                                                tree, tree_prefix_list,
@@ -285,7 +287,7 @@ def run_experiment(true_image,
       last_result = per_level_results[i - 1]
     tree, tree_prefix_list, finished = geo_utils.split_regions(
       tree_prefix_list=result.tree_prefix_list, vector_counts=result.sum_vector,
-      threshold=threshold, image_bit_level=10,
+      split_threshold=split_threshold, image_bit_level=10,
       collapse_threshold=collapse_threshold, positivity=positivity,
       last_result=last_result)
     if finished:
