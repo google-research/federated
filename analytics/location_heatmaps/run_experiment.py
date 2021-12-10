@@ -167,9 +167,10 @@ def run_experiment(true_image,
   tree, tree_prefix_list = geo_utils.init_tree(config.aux_data)
   per_level_results = list()
   per_level_grid = list()
-  finished = False
+  fresh_expand = None
   sum_vector = None
   print_output(f'aux_data: {config.aux_data}', config.output_flag)
+  process_split = geo_utils.split_regions_aux if aux_data else geo_utils.split_regions
   spent_budget = 0
   remaining_budget = total_epsilon_budget
   if config.level_sample_size % config.secagg_round_size != 0:
@@ -216,7 +217,7 @@ def run_experiment(true_image,
       # prevent spilling over the budget
       if remaining_budget:
         # last round, no progress in tree, or cannot run at least two rounds.
-        if i == max_levels - 1 or finished \
+        if i == max_levels - 1 or fresh_expand == 0 \
             or remaining_budget < 2 * eps * samples_len:
           print_output(
             'Last round. Spending remaining epsilon budget: ' + \
@@ -241,11 +242,11 @@ def run_experiment(true_image,
 
     # to prevent OOM errors we use vectors of size partial.
     if start_with_level > i:
-      tree, tree_prefix_list, finished = geo_utils.split_regions(
+      tree, tree_prefix_list, fresh_expand = process_split(
         tree_prefix_list=tree_prefix_list,
         vector_counts=None,
         split_threshold=split_threshold, image_bit_level=10,
-        collapse_threshold=collapse_threshold, aux_data=aux_data,
+        collapse_threshold=collapse_threshold,
         expand_all=True, count_min=count_min)
       print_output(f"Expanding all at the level: {i}.", output_flag)
       continue
@@ -286,7 +287,6 @@ def run_experiment(true_image,
     else:
       last_result = per_level_results[i - 1]
 
-    process_split = geo_utils.split_regions_aux if aux_data else geo_utils.split_regions
     tree, tree_prefix_list, fresh_expand = process_split(
       tree_prefix_list=result.tree_prefix_list, vector_counts=result.sum_vector,
       split_threshold=split_threshold, image_bit_level=10,
