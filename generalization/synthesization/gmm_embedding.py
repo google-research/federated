@@ -129,7 +129,12 @@ def pairwise_kl_divergence_between_multivariate_normal_tril_in_batch(
 
 
 class _GMMOverPretrainedEmbeddingSynthesizer():
-  """Backend class of function synthesize_by_GMM_over_pretrained_embedding()."""
+  # TODO(b/210260308): Add arxiv identifier after acceptance.
+  """Backend class of function synthesize_by_GMM_over_pretrained_embedding().
+
+  Please refer to section D of paper "What Do We Mean by Generalization in
+    Federated Learning?" for detailed descriptions.
+  """
 
   def __init__(self,
                dataset: tf.data.Dataset,
@@ -337,7 +342,6 @@ class _GMMOverPretrainedEmbeddingSynthesizer():
   def build_client_data_by_progressive_matching(
       self, kl_pairwise_batch_size=100) -> tff.simulation.datasets.ClientData:
     """Build federated ClientData by progressive matching."""
-    # TODO(b/198656321): Detailed documentation pointing to writeup.
     cluster_assignment = {
         label: [None for _ in range(self._num_clusters_per_label)
                ] for label in self._label_cluster_means
@@ -404,7 +408,11 @@ def synthesize_by_gmm_over_pretrained_embedding(
     kl_pairwise_batch_size: Optional[int] = 100,
     gmm_init_params: str = 'random',
     seed: Optional[int] = None) -> tff.simulation.datasets.ClientData:
+  # TODO(b/210260308): Add arxiv identifier after acceptance.
   """Construct a federated dataset from a centralized dataset based on GMM clustering.
+
+  Please refer to section D of paper "What Do We Mean by Generalization in
+    Federated Learning?" for detailed descriptions.
 
   Assumptions:
     1) `dataset` should has `element_spec` of type `Mapping[str,
