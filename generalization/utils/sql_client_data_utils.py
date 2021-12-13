@@ -25,11 +25,12 @@ import sqlite3
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from generalization.utils import logging_utils
+
+class ElementSpecCompatibilityError(Exception):
+  """Exception if the element_spec does not follow `Mapping[str, tf.TensorSpec]`."""
+  pass
 
 
-# The following three feature builders are borrowed from
-# https://www.tensorflow.org/tutorials/load_data/tfrecord
 def _bytes_feature(tensor) -> tf.train.Feature:
   """Returns a bytes_list from a string / byte."""
   return tf.train.Feature(bytes_list=tf.train.BytesList(value=[tensor.numpy()]))
@@ -47,24 +48,46 @@ def _int64_feature(tensor) -> tf.train.Feature:
       int64_list=tf.train.Int64List(value=tensor.numpy().flatten()))
 
 
-def build_serializer(
+def _validate_element_spec(element_spec: Mapping[str, tf.TensorSpec]):
+  """Validate the type of element_spec."""
+
+  if not isinstance(element_spec, collections.abc.Mapping):
+    raise ElementSpecCompatibilityError(
+        f'{element_spec} has type {type(element_spec)}, but expected '
+        f'`Mapping[str, tf.TensorSpec]`.')
+  for key, tensor_spec in element_spec.items():
+    if not isinstance(key, str):
+      raise ElementSpecCompatibilityError(
+          f'{key} has type {type(key)}, but expected str.')
+    if not isinstance(tensor_spec, tf.TensorSpec):
+      raise ElementSpecCompatibilityError(
+          f'{tensor_spec} has type {type(tensor_spec)}, but expected '
+          '`tf.TensorSpec`.')
+
+
+def _build_serializer(
     element_spec: Mapping[str, tf.TensorSpec]
 ) -> Callable[[Mapping[str, tf.Tensor]], bytes]:
   """Build a serializer based on the element_spec of a dataset."""
-  feature_fn = {}
+
+  _validate_element_spec(element_spec)
+  feature_funcs = collections.OrderedDict()
   for key, tensor_spec in element_spec.items():
+
     if tensor_spec.dtype is tf.string:
-      feature_fn[key] = _bytes_feature
+      feature_funcs[key] = _bytes_feature
     elif tensor_spec.dtype.is_floating:
-      feature_fn[key] = _float_feature
+      feature_funcs[key] = _float_feature
     elif tensor_spec.dtype.is_integer:
-      feature_fn[key] = _int64_feature
+      feature_funcs[key] = _int64_feature
     else:
-      raise ValueError(f'unsupported dtype {tensor_spec.dtype}')
+      raise TypeError(f'Unsupported dtype {tensor_spec.dtype}.')
 
   def serializer(element: Mapping[str, tf.Tensor]) -> bytes:
 
-    feature = {key: feature_fn[key](tensor) for key, tensor in element.items()}
+    feature = {
+        key: feature_funcs[key](tensor) for key, tensor in element.items()
+    }
 
     return tf.train.Example(features=tf.train.Features(
         feature=feature)).SerializeToString()
@@ -72,11 +95,14 @@ def build_serializer(
   return serializer
 
 
-def build_parser(
+def _build_parser(
     element_spec: Mapping[str, tf.TensorSpec]
 ) -> Callable[[bytes], Mapping[str, tf.Tensor]]:
   """Build a parser based on the element_spec of a dataset."""
-  parse_spec = {}
+
+  _validate_element_spec(element_spec)
+
+  parse_specs = collections.OrderedDict()
   for key, tensor_spec in element_spec.items():
     if tensor_spec.dtype is tf.string:
       parser_dtype = tf.string
@@ -87,11 +113,11 @@ def build_parser(
     else:
       raise ValueError(f'unsupported dtype {tensor_spec.dtype}')
 
-    parse_spec[key] = tf.io.FixedLenFeature(
+    parse_specs[key] = tf.io.FixedLenFeature(
         shape=tensor_spec.shape, dtype=parser_dtype)
 
   def parser(tensor_proto: bytes) -> Mapping[str, tf.Tensor]:
-    parsed_features = tf.io.parse_example(tensor_proto, parse_spec)
+    parsed_features = tf.io.parse_example(tensor_proto, parse_specs)
 
     result = collections.OrderedDict()
 
@@ -111,10 +137,7 @@ def save_to_sql_client_data(
 ) -> None:
   """Serialize a federated dataset into a SQL database compatible with `SqlClientData`.
 
-  Requirement: All the clients must share the same dataset.element_spec.
-    Otherwise TypeError will be raised.
-
-  Limitations: At this time the shared element_spec must be of type
+  Note: All the clients must share the same dataset.element_spec of type
     `Mapping[str, TensorSpec]`. Otherwise `TypeError` will be raised.
 
   Args:
@@ -127,11 +150,10 @@ def save_to_sql_client_data(
 
   Raises:
     FileExistsError: if file exists at `dataset_filepath` and `allow_overwrite`
-      is False.
+      is False. If overwriting is intended, please use allow_overwrite = True.
     TypeError: if the element_spec of local datasets are not identical across
-    clients, or if the element_spec of datasets are not of type
+      clients, or if the element_spec of datasets are not of type
       `Mapping[str, TensorSpec]`.
-
   """
 
   if tf.io.gfile.exists(database_filepath) and not allow_overwrite:
@@ -152,8 +174,8 @@ def save_to_sql_client_data(
           'The element_spec of the local dataset must be a Mapping[str, TensorSpec], '
           f'and must not be nested, found {key}:{val} instead.')
 
-  serializer = build_serializer(example_element_spec)
-  parser = build_parser(example_element_spec)
+  serializer = _build_serializer(example_element_spec)
+  parser = _build_parser(example_element_spec)
 
   with sqlite3.connect(tmp_database_filepath) as con:
     test_setup_queries = [
@@ -173,11 +195,6 @@ def save_to_sql_client_data(
     logging.info('Starting writing to SQL database at scratch path {%s}.',
                  tmp_database_filepath)
 
-    logger = logging_utils.ProgressLogger(
-        name='writing SQL Database',
-        every=(len(client_ids) + 9) // 10,
-        total=len(client_ids),
-    )
     for client_id in client_ids:
       local_ds = dataset_fn(client_id)
 
@@ -201,27 +218,12 @@ def save_to_sql_client_data(
           'INSERT INTO client_metadata (client_id, split_name, num_examples) '
           'VALUES (?, ?, ?);', (client_id, 'N/A', num_elem))
 
-      logger.increment(1)
-    del logger
-
   if tf.io.gfile.exists(database_filepath):
     tf.io.gfile.remove(database_filepath)
   tf.io.gfile.makedirs(os.path.dirname(database_filepath))
   tf.io.gfile.copy(tmp_database_filepath, database_filepath)
   tf.io.gfile.remove(tmp_database_filepath)
   logging.info('SQL database saved at %s', database_filepath)
-
-
-def save_to_sql_client_data_from_mapping(
-    cid_to_ds_mapping: Mapping[str, tf.data.Dataset],
-    database_filepath: str,
-    allow_overwrite: bool = False,
-) -> None:
-  """Serialize a federated dataset into a `SqlClientData` from a mapping."""
-  client_ids = list(cid_to_ds_mapping.keys())
-  dataset_fn = cid_to_ds_mapping.get
-  save_to_sql_client_data(client_ids, dataset_fn, database_filepath,
-                          allow_overwrite)
 
 
 def save_to_sql_client_data_from_client_data(
@@ -246,15 +248,18 @@ def load_parsed_sql_client_data(
       first fetch the SQL database to a local temporary directory if
       `database_filepath` is a remote directory.
     element_spec: The `element_spec` of the local dataset. This is used to parse
-      the serialized SqlClientData.
+      the serialized SqlClientData. The element_spec must be of type
+      `Mapping[str, TensorSpec]`. Otherwise `TypeError` will be raised.
 
   Returns:
     A parsed ClientData instance backed by SqlClientData.
 
   Raises:
     FileNotFoundError: if database_filepath does not exist.
+    TypeError: if the element_spec of datasets are not of type
+      `Mapping[str, TensorSpec]`.
   """
-  parser = build_parser(element_spec)
+  parser = _build_parser(element_spec)
 
   def dataset_parser(ds: tf.data.Dataset) -> tf.data.Dataset:
     return ds.map(parser, num_parallel_calls=tf.data.AUTOTUNE)
@@ -277,13 +282,14 @@ def load_parsed_sql_client_data(
 def load_sql_client_data_metadata(database_filepath: str) -> pd.DataFrame:
   """Load the metadata from a SqlClientData database.
 
+  This function will first fetch the SQL database to a local temporary
+  directory if `database_filepath` is a remote directory.
+
   Args:
     database_filepath: A `str` filepath of the SQL database.
-  This function will first fetch the SQL database to a local temporary directory
-    if `database_filepath` is a remote directory.
 
   Returns:
-    A pandas DataFrame containing the metadata.
+    A pandas.DataFrame containing the metadata.
 
   Raises:
     FileNotFoundError: if database_filepath does not exist.

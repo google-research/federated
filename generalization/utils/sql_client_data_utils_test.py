@@ -16,37 +16,62 @@
 import collections
 import os
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 
 from generalization.utils import sql_client_data_utils
 
 
-class SqlClientDataUtilsTest(tf.test.TestCase):
+class SerializerParserTest(tf.test.TestCase, parameterized.TestCase):
 
-  def test_serializer_parser_on_a_single_elem(self):
-    elem = collections.OrderedDict(
-        int8_scalar=tf.convert_to_tensor(0, dtype=tf.int8),
-        int32_scalar=tf.convert_to_tensor(1, dtype=tf.int32),
-        int64_scalar=tf.convert_to_tensor(2, dtype=tf.int64),
-        int64_1darray=tf.convert_to_tensor([3, 4, 5], dtype=tf.int64),
-        int64_2darray=tf.convert_to_tensor(np.eye(3), dtype=tf.int64),
-        int64_3darray=tf.convert_to_tensor(np.ones((2, 3, 4)), dtype=tf.int64),
-        float32_scalar=tf.convert_to_tensor(1.0, dtype=tf.float32),
-        float32_1darray=tf.convert_to_tensor([3.0, 4.0, 5.0], dtype=tf.float32),
-        float32_2darray=tf.convert_to_tensor(
-            np.random.randn(3, 4), dtype=tf.float32),
-        float32_3darray=tf.convert_to_tensor(
-            np.random.randn(3, 4, 5), dtype=tf.float32),
-        string=tf.convert_to_tensor('19260817', dtype=tf.string),
-    )
+  @parameterized.named_parameters(
+      ('non-iterable None', None),
+      ('non-iterable tensorspec', tf.TensorSpec(shape=())),
+      ('non-iterable tensorspec batched', tf.TensorSpec(shape=(None,))),
+      ('tuple of tensorspec',
+       (tf.TensorSpec(shape=()), tf.TensorSpec(shape=()))),
+      ('list of tensorspec', [tf.TensorSpec(shape=()),
+                              tf.TensorSpec(shape=())]))
+  def test_check_element_spec_type_raises_type_error(self, element_spec):
+    with self.assertRaises(sql_client_data_utils.ElementSpecCompatibilityError):
+      sql_client_data_utils._validate_element_spec(element_spec)
 
-    elem_spec = collections.OrderedDict([(key,
-                                          tf.TensorSpec.from_tensor(tensor))
-                                         for key, tensor in elem.items()])
+  @parameterized.named_parameters(('integer key', {
+      1: tf.TensorSpec(shape=())
+  }), ('tuple key', {
+      ('a', 'b'): tf.TensorSpec(shape=())
+  }), ('nested mapping', {
+      'outer': {
+          'inner': tf.TensorSpec(shape=())
+      }
+  }))
+  def test_check_element_spec_key_type_raises_type_error(self, element_spec):
+    with self.assertRaises(sql_client_data_utils.ElementSpecCompatibilityError):
+      sql_client_data_utils._validate_element_spec(element_spec)
 
-    serializer = sql_client_data_utils.build_serializer(elem_spec)
-    parser = sql_client_data_utils.build_parser(elem_spec)
+  @parameterized.named_parameters(
+      ('int8_scalar', tf.convert_to_tensor(0, dtype=tf.int8)),
+      ('int32_scalar', tf.convert_to_tensor(1, dtype=tf.int32)),
+      ('int64_scalar', tf.convert_to_tensor(2, dtype=tf.int64)),
+      ('int64_1darray', tf.convert_to_tensor([3, 4, 5], dtype=tf.int64)),
+      ('int64_2darray', tf.eye(3, dtype=tf.int64)),
+      ('int64_3darray', tf.ones((2, 3, 4), dtype=tf.int64)),
+      ('float32_scalar', tf.convert_to_tensor(1.0, dtype=tf.float32)),
+      ('float32_1darray', tf.convert_to_tensor([3.0, 4.0, 5.0],
+                                               dtype=tf.float32)),
+      ('float32_2darray',
+       tf.convert_to_tensor(np.random.randn(3, 4), dtype=tf.float32)),
+      ('float32_3darray',
+       tf.convert_to_tensor(np.random.randn(3, 4, 5), dtype=tf.float32)),
+      ('string', tf.convert_to_tensor('test', dtype=tf.string)))
+  def test_serializer_parser_on_a_single_elem(self, tensor):
+    elem = collections.OrderedDict(test_key=tensor)
+    elem_spec = collections.OrderedDict(
+        test_key=tf.TensorSpec.from_tensor(tensor))
+
+    serializer = sql_client_data_utils._build_serializer(elem_spec)
+    parser = sql_client_data_utils._build_parser(elem_spec)
 
     rebuilt_elem = parser(serializer(elem))
 
@@ -54,6 +79,9 @@ class SqlClientDataUtilsTest(tf.test.TestCase):
 
     for key in rebuilt_elem.keys():
       self.assertAllEqual(elem[key], rebuilt_elem[key])
+
+
+class SqlClientDataUtilsTest(tf.test.TestCase):
 
   def test_save_to_sql_client_data(self):
     test_ds1 = tf.data.Dataset.from_tensor_slices(

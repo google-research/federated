@@ -122,7 +122,6 @@ py_library(
     name = "sql_client_data_utils",
     srcs = ["sql_client_data_utils.py"],
     srcs_version = "PY3",
-    deps = [":logging_utils"],
 )
 
 py_test(
