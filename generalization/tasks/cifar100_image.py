@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Federated and Centralized CIFAR-100 image classification library using TFF."""
-# TODO(b/200741592): Add unit test for this file.
 
 import collections
 import functools
@@ -288,8 +287,6 @@ class _Cifar100ImageTask():
     # We convert the output to a list (instead of an np.ndarray) so that it can
     # be used as input to the iterative process.
 
-    # TODO(b/199914896): consider having build_uniform_sampling_fn return a list
-    # via .tolist() instead of doing it here.
     client_sampling_fn = lambda x: list(client_ids_fn(x))
     training_process.get_model_weights = iterative_process.get_model_weights
 

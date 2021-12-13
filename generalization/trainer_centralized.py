@@ -233,7 +233,6 @@ def main(argv):
   runner_spec = config_fn(task_spec, **(_get_task_kwargs_from_flags()))
   logging.info('Finished configuring task.')
 
-  # TODO(b/194421866): Consider to incorporate write_hparams to end-to-end test.
   metric_utils.write_hparams(
       hparam_dict=_get_hparam_dict_from_flags(),
       root_output_dir=FLAGS.root_output_dir,
