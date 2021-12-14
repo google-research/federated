@@ -16,32 +16,16 @@
 import collections
 import itertools
 
-from typing import List, Mapping, Sequence, Union
+from typing import List, Mapping, Union
 
-
-def hyper_discrete_grid(
-    grid_dict: Mapping[str, Sequence[Union[str, int, float]]]
-) -> List[Mapping[str, Union[str, int, float]]]:
-  """Converts a param-keyed dict of lists to a list of mapping.
-
-  Args:
-    grid_dict: A Mapping from string parameter names to lists of values.
-
-  Returns:
-    A list of parameter sweep based on the Cartesian product of
-    all options in param_dict.
-  """
-  return [
-      dict(zip(grid_dict, val))
-      for val in itertools.product(*grid_dict.values())
-  ]
+from generalization.experiments import config_utils
 
 
 def define_parameters() -> List[Mapping[str, Union[str, int, float]]]:
   """Returns a list of dicts of parameters defining the experiment grid."""
   # Base hyperparameters grid for all experiments
 
-  mnist_hyper = hyper_discrete_grid(  # pylint: disable=unused-variable
+  mnist_hyper = config_utils.hyper_grid(  # pylint: disable=unused-variable
       collections.OrderedDict(
           dataset=['mnist'],
           synthesization=['gmm_embedding'],
@@ -52,7 +36,7 @@ def define_parameters() -> List[Mapping[str, Union[str, int, float]]]:
           gmm_embedding_init_params=['random'],
           gmm_embedding_pca_components=[256]))
 
-  fashion_mnist_hyper = hyper_discrete_grid(  # pylint: disable=unused-variable
+  fashion_mnist_hyper = config_utils.hyper_grid(  # pylint: disable=unused-variable
       collections.OrderedDict(
           dataset=['fashion_mnist'],
           synthesization=['gmm_embedding'],
@@ -63,7 +47,7 @@ def define_parameters() -> List[Mapping[str, Union[str, int, float]]]:
           gmm_embedding_init_params=['random'],
           gmm_embedding_pca_components=[256]))
 
-  emnist10_hyper = hyper_discrete_grid(  # pylint: disable=unused-variable
+  emnist10_hyper = config_utils.hyper_grid(  # pylint: disable=unused-variable
       collections.OrderedDict(
           dataset=['emnist10'],
           synthesization=['gmm_embedding'],
@@ -74,7 +58,7 @@ def define_parameters() -> List[Mapping[str, Union[str, int, float]]]:
           gmm_embedding_init_params=['random'],
           gmm_embedding_pca_components=[256]))
 
-  emnist62_hyper = hyper_discrete_grid(  # pylint: disable=unused-variable
+  emnist62_hyper = config_utils.hyper_grid(  # pylint: disable=unused-variable
       collections.OrderedDict(
           dataset=['emnist62'],
           synthesization=['gmm_embedding'],
@@ -85,7 +69,7 @@ def define_parameters() -> List[Mapping[str, Union[str, int, float]]]:
           gmm_embedding_init_params=['random'],
           gmm_embedding_pca_components=[256]))
 
-  cifar10_hyper = hyper_discrete_grid(  # pylint: disable=unused-variable
+  cifar10_hyper = config_utils.hyper_grid(  # pylint: disable=unused-variable
       collections.OrderedDict(
           dataset=['cifar10'],
           synthesization=['gmm_embedding'],
@@ -98,7 +82,7 @@ def define_parameters() -> List[Mapping[str, Union[str, int, float]]]:
           gmm_embedding_init_params=['kmeans'],
           gmm_embedding_pca_components=[256]))
 
-  cifar100_hyper = hyper_discrete_grid(  # pylint: disable=unused-variable
+  cifar100_hyper = config_utils.hyper_grid(  # pylint: disable=unused-variable
       collections.OrderedDict(
           dataset=['cifar100'],
           synthesization=['gmm_embedding'],
@@ -111,7 +95,7 @@ def define_parameters() -> List[Mapping[str, Union[str, int, float]]]:
           gmm_embedding_init_params=['kmeans'],
           gmm_embedding_pca_components=[256]))
 
-  cifar10_dirichlet = hyper_discrete_grid(  # pylint: disable=unused-variable
+  cifar10_dirichlet = config_utils.hyper_grid(  # pylint: disable=unused-variable
       collections.OrderedDict(
           dataset=['cifar10'],
           synthesization=['dirichlet'],
@@ -119,7 +103,7 @@ def define_parameters() -> List[Mapping[str, Union[str, int, float]]]:
           dirichlet_concentration_factor=[100, 1000],
       ))
 
-  cifar100_coarse_dirichlet = hyper_discrete_grid(  # pylint: disable=unused-variable
+  cifar100_coarse_dirichlet = config_utils.hyper_grid(  # pylint: disable=unused-variable
       collections.OrderedDict(
           dataset=['cifar100'],
           synthesization=['coarse_dirichlet'],
@@ -128,7 +112,7 @@ def define_parameters() -> List[Mapping[str, Union[str, int, float]]]:
           coarse_dirichlet_fine_concentration_factor=[1000],
       ))
 
-  emnist62_dirichlet = hyper_discrete_grid(  # pylint: disable=unused-variable
+  emnist62_dirichlet = config_utils.hyper_grid(  # pylint: disable=unused-variable
       collections.OrderedDict(
           dataset=['emnist62'],
           synthesization=['dirichlet'],
