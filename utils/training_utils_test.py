@@ -14,7 +14,9 @@
 
 import collections
 import os.path
+from unittest import mock
 
+from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_federated as tff
 
@@ -35,6 +37,55 @@ def create_task():
       num_epochs=1, batch_size=10, shuffle_buffer_size=1)
   return tff.simulation.baselines.emnist.create_autoencoder_task(
       train_client_spec, use_synthetic_data=True)
+
+
+class CreateManagersTest(parameterized.TestCase):
+
+  def test_create_managers_returns_managers(self):
+    root_dir = self.create_tempdir()
+
+    file_program_state_manager, release_managers = training_utils.create_managers(
+        root_dir=root_dir, experiment_name='test')
+
+    self.assertIsInstance(file_program_state_manager,
+                          tff.program.FileProgramStateManager)
+    self.assertLen(release_managers, 3)
+    self.assertIsInstance(release_managers[0],
+                          tff.program.LoggingReleaseManager)
+    self.assertIsInstance(release_managers[1],
+                          tff.program.CSVFileReleaseManager)
+    self.assertIsInstance(release_managers[2],
+                          tff.program.TensorboardReleaseManager)
+
+  @mock.patch.object(tff.program, 'TensorboardReleaseManager')
+  @mock.patch.object(tff.program, 'CSVFileReleaseManager')
+  @mock.patch.object(tff.program, 'LoggingReleaseManager')
+  @mock.patch.object(tff.program, 'FileProgramStateManager')
+  def test_create_managers_creates_managers(self,
+                                            mock_file_program_state_manager,
+                                            mock_logging_release_manager,
+                                            mock_csv_file_release_manager,
+                                            mock_tensorboard_release_manager):
+    root_dir = self.create_tempdir()
+    experiment_name = 'test'
+    csv_save_mode = tff.program.CSVSaveMode.APPEND
+
+    training_utils.create_managers(
+        root_dir=root_dir,
+        experiment_name=experiment_name,
+        csv_save_mode=csv_save_mode)
+
+    program_state_dir = os.path.join(root_dir, 'checkpoints', experiment_name)
+    mock_file_program_state_manager.assert_called_with(
+        root_dir=program_state_dir)
+    mock_logging_release_manager.assert_called_once_with()
+    csv_file_path = os.path.join(root_dir, 'results', experiment_name,
+                                 'experiment.metrics.csv')
+    mock_csv_file_release_manager.assert_called_once_with(
+        file_path=csv_file_path, save_mode=csv_save_mode)
+    summary_dir = os.path.join(root_dir, 'logdir', experiment_name)
+    mock_tensorboard_release_manager.assert_called_once_with(
+        summary_dir=summary_dir)
 
 
 class TrainingUtilsTest(tf.test.TestCase):

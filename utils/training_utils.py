@@ -23,6 +23,57 @@ import tensorflow_federated as tff
 from utils import utils_impl
 
 
+def create_managers(
+    root_dir: str,
+    experiment_name: str,
+    csv_save_mode: tff.program.CSVSaveMode = tff.program.CSVSaveMode.APPEND
+) -> Tuple[tff.program.FileProgramStateManager,
+           List[tff.program.ReleaseManager]]:
+  """Creates a set of managers for running a simulation.
+
+  The managers that are created and how they are configured are indended to be
+  used with `tff.simulation.run_training_process` to run a simulation.
+
+  Args:
+    root_dir: A string representing the root output directory for the
+      simulation.
+    experiment_name: A unique identifier for the simulation, used to create
+      appropriate subdirectories in `root_dir`.
+    csv_save_mode: A `tff.program.CSVSaveMode` specifying the save mode for the
+      `tff.program.CSVFileReleaseManager`.
+
+  Returns:
+    A `tff.program.FileProgramStateManager`, and a list of
+    `tff.program.ReleaseManager`s consisting of a
+    `tff.program.LoggingReleaseManager`, a `tff.program.CSVFileReleaseManager`,
+    and a `tff.program.TensorboardReleaseManager`.
+  """
+  program_state_dir = os.path.join(root_dir, 'checkpoints', experiment_name)
+  program_state_manager = tff.program.FileProgramStateManager(
+      root_dir=program_state_dir)
+
+  logging_release_manager = tff.program.LoggingReleaseManager()
+
+  csv_file_path = os.path.join(root_dir, 'results', experiment_name,
+                               'experiment.metrics.csv')
+  csv_file_release_manager = tff.program.CSVFileReleaseManager(
+      file_path=csv_file_path, save_mode=csv_save_mode)
+
+  summary_dir = os.path.join(root_dir, 'logdir', experiment_name)
+  tensorboard_release_manager = tff.program.TensorboardReleaseManager(
+      summary_dir=summary_dir)
+
+  logging.info('Writing...')
+  logging.info('    program state to: %s', program_state_dir)
+  logging.info('    CSV metrics to: %s', csv_file_path)
+  logging.info('    TensorBoard summaries to: %s', summary_dir)
+  return program_state_manager, [
+      logging_release_manager,
+      csv_file_release_manager,
+      tensorboard_release_manager,
+  ]
+
+
 def configure_managers(
     root_output_dir: str,
     experiment_name: str,
