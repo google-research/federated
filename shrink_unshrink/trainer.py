@@ -20,9 +20,7 @@ and optimization methods, see `shared/optimizer_utils.py`. For details on the
 iterative process, see `shared/fed_avg_schedule.py`.
 """
 import functools
-import pprint
 
-from typing import Any, Callable, Optional
 from absl import app
 from absl import flags
 from absl import logging
@@ -305,71 +303,46 @@ def main(argv):
         tff.simulation.compose_dataset_computation_with_iterative_process(
             train_data.dataset_computation, iterative_process))
 
-  client_selection_fn = functools.partial(
+  training_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
           train_data.client_ids, random_seed=FLAGS.client_datasets_random_seed),
       size=FLAGS.clients_per_round)
 
-  def create_validation_fn(
-      validation_frequency: int,
-      num_validation_examples: Optional[int] = None
-  ) -> Callable[[tff.learning.ModelWeights, int], Any]:
-    """Creates a function for validating performance of a `tff.learning.Model`."""
-    if task.datasets.validation_data is not None:
-      validation_set = task.datasets.validation_data
-    else:
-      validation_set = task.datasets.test_data
-    validation_set = validation_set.create_tf_dataset_from_all_clients()
-    if num_validation_examples is not None:
-      validation_set = validation_set.take(num_validation_examples)
-    validation_set = task.datasets.eval_preprocess_fn(validation_set)
+  if task.datasets.validation_data is not None:
+    validation_set = task.datasets.validation_data
+  else:
+    validation_set = task.datasets.test_data
+  validation_set = validation_set.create_tf_dataset_from_all_clients()
+  if FLAGS.num_validation_examples is not None:
+    validation_set = validation_set.take(FLAGS.num_validation_examples)
+  validation_set = task.datasets.eval_preprocess_fn(validation_set)
+  federated_eval = tff.learning.build_federated_evaluation(server_model_fn)
+  evaluation_selection_fn = lambda round_num: [validation_set]
 
-    evaluate_fn = tff.learning.build_federated_evaluation(server_model_fn)
+  # TODO(b/210890827): Use a polymorphic computation if possible
+  @tff.federated_computation(training_process.initialize.type_signature.result,
+                             federated_eval.type_signature.parameter[1])
+  def evaluation_fn(state, evaluation_data):
+    return federated_eval(state.model_weights, evaluation_data)
 
-    def validation_fn(model_weights, round_num):
-      if round_num % validation_frequency == 0:
-        return evaluate_fn(model_weights, [validation_set])
-      else:
-        return {}
-
-    return validation_fn
-
-  def create_test_fn() -> Callable[[tff.learning.ModelWeights], Any]:
-    """Creates a function for testing performance of a `tff.learning.Model`."""
-    test_set = task.datasets.get_centralized_test_data()
-    evaluate_fn = tff.learning.build_federated_evaluation(server_model_fn)
-
-    def test_fn(model_weights):
-      return evaluate_fn(model_weights, [test_set])
-
-    return test_fn
-
-  validation_fn = create_validation_fn(
-      validation_frequency=FLAGS.rounds_per_eval,
-      num_validation_examples=FLAGS.num_validation_examples)
-
-  def validation_fn_from_state(state, round_num):
-    return validation_fn(state.model_weights, round_num)
-
-  checkpoint_manager, metrics_managers = training_utils.configure_managers(
-      FLAGS.root_output_dir,
-      FLAGS.experiment_name,
-      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint,
-      csv_metrics_manager_save_mode=tff.simulation.SaveMode.WRITE)
+  program_state_manager, metrics_managers = training_utils.create_managers(
+      FLAGS.root_output_dir, FLAGS.experiment_name)
   _write_hparam_flags()
-  logging.info('about to run simulation')
-  state = tff.simulation.run_simulation(
-      process=training_process,
-      client_selection_fn=client_selection_fn,
+  state = tff.simulation.run_training_process(
+      training_process=training_process,
+      training_selection_fn=training_selection_fn,
       total_rounds=FLAGS.total_rounds,
-      validation_fn=validation_fn_from_state,
-      file_checkpoint_manager=checkpoint_manager,
+      evaluation_fn=evaluation_fn,
+      evaluation_selection_fn=evaluation_selection_fn,
+      rounds_per_evaluation=FLAGS.rounds_per_eval,
+      program_state_manager=program_state_manager,
+      rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers)
-  test_fn = create_test_fn()
-  test_metrics = test_fn(state.model_weights)
-  logging.info('Test metrics:\n %s', pprint.pformat(test_metrics))
+
+  test_set = task.datasets.get_centralized_test_data()
+  test_metrics = federated_eval(state.model_weights, [test_set])
   for metrics_manager in metrics_managers:
-    metrics_manager.save_metrics(test_metrics, FLAGS.total_rounds + 1)
+    metrics_manager.release(test_metrics, FLAGS.total_rounds + 1)
 
 
 if __name__ == '__main__':

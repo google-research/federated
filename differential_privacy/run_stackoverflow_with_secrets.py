@@ -16,7 +16,6 @@
 import collections
 import functools
 import itertools
-import pprint
 
 from absl import app
 from absl import flags
@@ -290,34 +289,38 @@ def train_and_eval():
           train_data.dataset_computation, training_process))
 
   if FLAGS.uniform_sampling:
-    client_selection_fn = functools.partial(
+    training_selection_fn = functools.partial(
         tff.simulation.build_uniform_sampling_fn(
             train_data.client_ids,
             random_seed=FLAGS.client_datasets_random_seed),
         size=FLAGS.clients_per_round)
   else:
-    client_selection_fn = PermuteAndBatch(train_data.client_ids,
-                                          FLAGS.client_datasets_random_seed,
-                                          FLAGS.clients_per_round)
-  validation_fn = training_utils.create_validation_fn(
-      task,
-      validation_frequency=FLAGS.rounds_per_eval,
-      num_validation_examples=FLAGS.num_validation_examples)
+    training_selection_fn = PermuteAndBatch(train_data.client_ids,
+                                            FLAGS.client_datasets_random_seed,
+                                            FLAGS.clients_per_round)
+  test_data = task.datasets.get_centralized_test_data()
+  validation_data = test_data.take(FLAGS.num_validation_examples)
+  federated_eval = tff.learning.build_federated_evaluation(task.model_fn)
+  evaluation_selection_fn = lambda round_num: [validation_data]
 
-  def validation_fn_from_state(state, round_num):
-    return validation_fn(state.model, round_num)
+  # TODO(b/210890827): Use a polymorphic computation if possible
+  @tff.federated_computation(training_process.initialize.type_signature.result,
+                             federated_eval.type_signature.parameter[1])
+  def evaluation_fn(state, evaluation_data):
+    return federated_eval(state.model, evaluation_data)
 
-  checkpoint_manager, metrics_managers = training_utils.configure_managers(
-      FLAGS.root_output_dir, FLAGS.experiment_name, FLAGS.rounds_per_checkpoint)
-
+  program_state_manager, metrics_managers = training_utils.create_managers(
+      FLAGS.root_output_dir, FLAGS.experiment_name)
   _write_hparam_flags()
-
-  state = tff.simulation.run_simulation(
-      process=training_process,
-      client_selection_fn=client_selection_fn,
+  state = tff.simulation.run_training_process(
+      training_process=training_process,
+      training_selection_fn=training_selection_fn,
       total_rounds=FLAGS.total_rounds,
-      validation_fn=validation_fn_from_state,
-      file_checkpoint_manager=checkpoint_manager,
+      evaluation_fn=evaluation_fn,
+      evaluation_selection_fn=evaluation_selection_fn,
+      rounds_per_evaluation=FLAGS.rounds_per_eval,
+      program_state_manager=program_state_manager,
+      rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
   orig_test_fn = training_utils.create_test_fn(task)
@@ -351,11 +354,8 @@ def train_and_eval():
     return test_metric_dict
 
   test_metrics = test_fn(state.model)
-
-  logging.info('Test metrics:\n %s', pprint.pformat(test_metrics))
-
   for metrics_manager in metrics_managers:
-    metrics_manager.save_metrics(test_metrics, FLAGS.total_rounds + 1)
+    metrics_manager.release(test_metrics, FLAGS.total_rounds + 1)
 
 
 def main(argv):

@@ -21,11 +21,8 @@ For details on the iterative process, see
 `posterior_inference/shared/fed_pa_schedule.py`.
 """
 
-import pprint
-
 from absl import app
 from absl import flags
-from absl import logging
 import tensorflow_federated as tff
 
 from posterior_averaging import fed_pa_schedule
@@ -143,7 +140,7 @@ def main(argv):
       max_elements=FLAGS.max_elements_per_client)
   task = task_utils.create_task_from_flags(train_client_spec)
 
-  process = fed_pa_schedule.build_fed_pa_process(
+  training_process = fed_pa_schedule.build_fed_pa_process(
       model_fn=task.model_fn,
       client_update_epochs=FLAGS.client_epochs_per_round,
       client_optimizer_fn=client_optimizer_fn,
@@ -153,36 +150,39 @@ def main(argv):
       client_mixedin_schedule_fn=client_mixedin_schedule_fn,
       client_update_delta_fn=client_update_delta_fn,
       mask_zeros_in_client_updates=FLAGS.mask_zeros_in_client_updates)
-  client_selection_fn = training_utils.create_client_selection_fn(
+  training_selection_fn = training_utils.create_client_selection_fn(
       task,
       clients_per_round=FLAGS.clients_per_round,
       random_seed=FLAGS.client_datasets_random_seed)
-  validation_fn = training_utils.create_validation_fn(
-      task,
-      validation_frequency=FLAGS.rounds_per_eval,
-      num_validation_examples=FLAGS.num_validation_examples)
 
-  def validation_fn_from_state(state, round_num):
-    return validation_fn(state.model, round_num)
+  test_data = task.datasets.get_centralized_test_data()
+  validation_data = test_data.take(FLAGS.num_validation_examples)
+  federated_eval = tff.learning.build_federated_evaluation(task.model_fn)
+  evaluation_selection_fn = lambda round_num: [validation_data]
 
-  checkpoint_manager, metrics_managers = training_utils.configure_managers(
-      FLAGS.root_output_dir,
-      FLAGS.experiment_name,
-      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint)
+  # TODO(b/210890827): Use a polymorphic computation if possible
+  @tff.federated_computation(training_process.initialize.type_signature.result,
+                             federated_eval.type_signature.parameter[1])
+  def evaluation_fn(state, evaluation_data):
+    return federated_eval(state.model, evaluation_data)
+
+  program_state_manager, metrics_managers = training_utils.create_managers(
+      FLAGS.root_output_dir, FLAGS.experiment_name)
   _write_hparam_flags()
-  state = tff.simulation.run_simulation(
-      process=process,
-      client_selection_fn=client_selection_fn,
+  state = tff.simulation.run_training_process(
+      training_process=training_process,
+      training_selection_fn=training_selection_fn,
       total_rounds=FLAGS.total_rounds,
-      validation_fn=validation_fn_from_state,
-      file_checkpoint_manager=checkpoint_manager,
+      evaluation_fn=evaluation_fn,
+      evaluation_selection_fn=evaluation_selection_fn,
+      rounds_per_evaluation=FLAGS.rounds_per_eval,
+      program_state_manager=program_state_manager,
+      rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
-  test_fn = training_utils.create_test_fn(task)
-  test_metrics = test_fn(state.model)
-  logging.info('Test metrics:\n %s', pprint.pformat(test_metrics))
+  test_metrics = federated_eval(state.model, [test_data])
   for metrics_manager in metrics_managers:
-    metrics_manager.save_metrics(test_metrics, FLAGS.total_rounds + 1)
+    metrics_manager.release(test_metrics, FLAGS.total_rounds + 1)
 
 
 if __name__ == '__main__':

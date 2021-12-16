@@ -49,7 +49,7 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_integer('clients_per_thread', 1, 'TFF config.')
   flags.DEFINE_integer('client_epochs_per_round', 1,
                        'Number of epochs in the client to take per round.')
-  flags.DEFINE_integer('client_batch_size', None, 'Batch size on the clients.')
+  flags.DEFINE_integer('client_batch_size', 32, 'Batch size on the clients.')
   flags.DEFINE_integer('clients_per_round', 100,
                        'How many clients to sample per round.')
   flags.DEFINE_integer('client_datasets_random_seed', 42,
@@ -256,7 +256,7 @@ def main(argv):
       tff.simulation.compose_dataset_computation_with_iterative_process(
           train_data.dataset_computation, iterative_process))
 
-  client_selection_fn = functools.partial(
+  training_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
           train_data.client_ids, random_seed=FLAGS.client_datasets_random_seed),
       size=FLAGS.clients_per_round)
@@ -264,6 +264,7 @@ def main(argv):
   test_data = task.datasets.get_centralized_test_data()
   validation_data = test_data.take(FLAGS.num_validation_examples)
   federated_eval = tff.learning.build_federated_evaluation(task.model_fn)
+  evaluation_selection_fn = lambda round_num: [validation_data]
 
   # TODO(b/210890827): Use a polymorphic computation if possible
   @tff.federated_computation(training_process.initialize.type_signature.result,
@@ -271,13 +272,11 @@ def main(argv):
   def evaluation_fn(state, evaluation_data):
     return federated_eval(state.model, evaluation_data)
 
-  evaluation_selection_fn = lambda _: [validation_data]
-
   program_state_manager, metrics_managers = training_utils.create_managers(
       FLAGS.root_output_dir, FLAGS.experiment_name)
   state = tff.simulation.run_training_process(
       training_process=training_process,
-      training_selection_fn=client_selection_fn,
+      training_selection_fn=training_selection_fn,
       total_rounds=FLAGS.total_rounds,
       evaluation_fn=evaluation_fn,
       evaluation_selection_fn=evaluation_selection_fn,
@@ -286,12 +285,9 @@ def main(argv):
       rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
-  test_fn = training_utils.create_test_fn(task)
-  test_metrics = test_fn(state.model)
-
+  test_metrics = federated_eval(state.model, [test_data])
   for metrics_manager in metrics_managers:
     metrics_manager.release(test_metrics, FLAGS.total_rounds + 1)
-
 
 if __name__ == '__main__':
   app.run(main)
