@@ -16,12 +16,10 @@
 import collections
 import functools
 import os.path
-import pprint
 from typing import Callable
 
 from absl import app
 from absl import flags
-from absl import logging
 import tensorflow as tf
 import tensorflow_federated as tff
 
@@ -236,7 +234,7 @@ def main(argv):
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
       build_train_dataset_from_client_id, iterative_process)
 
-  train_client_sampling_fn = data_utils.create_sampling_fn(
+  training_selection_fn = data_utils.create_sampling_fn(
       seed=train_sampling_seed,
       client_ids=train_data.client_ids,
       clients_per_round=FLAGS.clients_per_train_round,
@@ -255,50 +253,47 @@ def main(argv):
     validation_fn = tff.simulation.compose_dataset_computation_with_computation(
         build_validation_dataset_from_client_id, federated_evaluation_fn)
 
-    validation_client_sampling_fn = functools.partial(
+    evaluation_selection_fn = functools.partial(
         tff.simulation.build_uniform_sampling_fn(
             sample_range=validation_data.client_ids,
             replace=False,
             random_seed=FLAGS.base_random_seed),
         size=FLAGS.clients_per_validation_round)
 
-    def round_end_evaluation_fn(state, round_num):
-
-      if round_num % FLAGS.rounds_per_validation == 0:
-        model_weights = iterative_process.get_model_weights(state)  # pytype: disable=attribute-error  # gen-stub-imports
-        round_ids = validation_client_sampling_fn(round_num)
-        validation_metrics = validation_fn(model_weights, round_ids)
-      else:
-        validation_metrics = {}
-      return validation_metrics
+    # TODO(b/210890827): Use a polymorphic computation if possible
+    @tff.federated_computation(
+        training_process.initialize.type_signature.result,
+        tff.type_at_clients(tff.TensorType(tf.string)))
+    def evaluation_fn(state, client_ids):  # pytype: disable=attribute-error  # gen-stub-imports
+      return validation_fn(state.model, client_ids)
 
   else:
 
     full_validation_dataset = task.datasets.eval_preprocess_fn(
         validation_data.create_tf_dataset_from_all_clients())
+    evaluation_selection_fn = lambda round_num: [full_validation_dataset]
 
-    def round_end_evaluation_fn(state, round_num):
-      if round_num % FLAGS.rounds_per_validation == 0:
-        model_weights = state.model
-        validation_metrics = federated_evaluation_fn(model_weights,
-                                                     [full_validation_dataset])
-      else:
-        validation_metrics = {}
-      return validation_metrics
+    # TODO(b/210890827): Use a polymorphic computation if possible
+    @tff.federated_computation(
+        training_process.initialize.type_signature.result,
+        federated_evaluation_fn.type_signature.parameter[1])
+    def evaluation_fn(state, evaluation_data):
+      return federated_evaluation_fn(state.model, evaluation_data)
 
   # Configure and run the training loop
   _write_hparam_flags()
-  checkpoint_manager, metrics_managers = training_utils.configure_managers(
-      FLAGS.root_output_dir,
-      FLAGS.experiment_name,
-      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint)
+  program_state_manager, metrics_managers = training_utils.create_managers(
+      FLAGS.root_output_dir, FLAGS.experiment_name)
 
-  state = tff.simulation.run_simulation(
-      process=training_process,
-      client_selection_fn=train_client_sampling_fn,
+  state = tff.simulation.run_training_process(
+      training_process=training_process,
+      training_selection_fn=training_selection_fn,
       total_rounds=FLAGS.total_rounds,
-      validation_fn=round_end_evaluation_fn,
-      file_checkpoint_manager=checkpoint_manager,
+      evaluation_fn=evaluation_fn,
+      evaluation_selection_fn=evaluation_selection_fn,
+      rounds_per_evaluation=FLAGS.rounds_per_validation,
+      program_state_manager=program_state_manager,
+      rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
   # Perform post-training evaluation
@@ -320,11 +315,8 @@ def main(argv):
     post_training_metrics['validation'] = federated_evaluation_fn(
         state.model, [full_validation_dataset])
 
-  logging.info('Post training metrics:\n %s',
-               pprint.pformat(post_training_metrics))
-
   for metrics_manager in metrics_managers:
-    metrics_manager.save_metrics(post_training_metrics, FLAGS.total_rounds + 1)
+    metrics_manager.release(post_training_metrics, FLAGS.total_rounds + 1)
 
 
 if __name__ == '__main__':
