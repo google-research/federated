@@ -11,16 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""An example training loop lossily compressing the server/client communication.
+r"""An example training loop lossily compressing the server/client communication.
 
 Example command line flags to use to run an experiment:
---client_optimizer=sgd
---client_learning_rate=0.2
---server_optimizer=sgd
---server_learning_rate=1.0
---use_compression=True
---broadcast_quantization_bits=8
---aggregation_quantization_bits=8
+--client_optimizer=sgd \
+--client_learning_rate=0.2 \
+--server_optimizer=sgd \
+--server_learning_rate=1.0 \
+--use_compression=True \
+--broadcast_quantization_bits=8 \
+--aggregation_quantization_bits=8 \
 --use_sparsity_in_aggregation=True
 """
 
@@ -186,15 +186,19 @@ def run_experiment():
       tff.simulation.compose_dataset_computation_with_iterative_process(
           emnist_train.dataset_computation, iterative_process))
 
-  client_selection_fn = functools.partial(
+  training_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(emnist_train.client_ids),
       size=FLAGS.clients_per_round)
 
-  validation_fn = training_utils.create_validation_fn(
-      emnist_task, validation_frequency=FLAGS.rounds_per_eval)
+  test_data = emnist_task.datasets.get_centralized_test_data()
+  federated_eval = tff.learning.build_federated_evaluation(emnist_task.model_fn)
+  evaluation_selection_fn = lambda round_num: [test_data]
 
-  def validation_fn_from_state(state, round_num):
-    return validation_fn(state.model, round_num)
+  # TODO(b/210890827): Use a polymorphic computation if possible
+  @tff.federated_computation(training_process.initialize.type_signature.result,
+                             federated_eval.type_signature.parameter[1])
+  def evaluation_fn(state, evaluation_data):
+    return federated_eval(state.model, evaluation_data)
 
   # Log hyperparameters to CSV
   hparam_dict = utils_impl.lookup_flag_values(utils_impl.get_hparam_flags())
@@ -203,16 +207,17 @@ def run_experiment():
       root_output_dir=FLAGS.root_output_dir,
       experiment_name=FLAGS.experiment_name)
 
-  checkpoint_manager, metrics_managers = training_utils.configure_managers(
-      FLAGS.root_output_dir,
-      FLAGS.experiment_name,
-      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint)
-  tff.simulation.run_simulation(
-      process=training_process,
-      client_selection_fn=client_selection_fn,
-      validation_fn=validation_fn_from_state,
+  program_state_manager, metrics_managers = training_utils.create_managers(
+      FLAGS.root_output_dir, FLAGS.experiment_name)
+  tff.simulation.run_training_process(
+      training_process=training_process,
+      training_selection_fn=training_selection_fn,
       total_rounds=FLAGS.total_rounds,
-      file_checkpoint_manager=checkpoint_manager,
+      evaluation_fn=evaluation_fn,
+      evaluation_selection_fn=evaluation_selection_fn,
+      rounds_per_evaluation=FLAGS.rounds_per_eval,
+      program_state_manager=program_state_manager,
+      rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
 
