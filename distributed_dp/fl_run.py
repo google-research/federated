@@ -261,9 +261,6 @@ def main(argv):
           train_data.client_ids, random_seed=FLAGS.client_datasets_random_seed),
       size=FLAGS.clients_per_round)
 
-  program_state_manager, metrics_managers = training_utils.create_managers(
-      FLAGS.root_output_dir, FLAGS.experiment_name)
-
   test_data = task.datasets.get_centralized_test_data()
   validation_data = test_data.take(FLAGS.num_validation_examples)
   federated_eval = tff.learning.build_federated_evaluation(task.model_fn)
@@ -275,6 +272,9 @@ def main(argv):
     return federated_eval(state.model, evaluation_data)
 
   evaluation_selection_fn = lambda _: [validation_data]
+
+  program_state_manager, metrics_managers = training_utils.create_managers(
+      FLAGS.root_output_dir, FLAGS.experiment_name)
   state = tff.simulation.run_training_process(
       training_process=training_process,
       training_selection_fn=client_selection_fn,
