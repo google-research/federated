@@ -14,6 +14,7 @@
 """Tests for emnist_character."""
 
 from absl.testing import parameterized
+
 import tensorflow as tf
 import tensorflow_federated as tff
 
@@ -55,7 +56,7 @@ class EmnistCharacterClientDataTest(tf.test.TestCase, parameterized.TestCase):
   def test_original_emnist_character_client_data_has_same_client_ids(
       self, only_digits):
     train_cd_orig, unpart_cd_orig = tff.simulation.datasets.emnist.load_data(
-        only_digits=only_digits)
+        only_digits=only_digits, cache_dir=self.get_temp_dir())
     # Assert the only_digits train_cd and val_cd has the same client_ids.
     self.assertCountEqual(train_cd_orig.client_ids, unpart_cd_orig.client_ids)
 

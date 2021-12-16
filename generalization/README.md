@@ -23,10 +23,17 @@ For a more general look at using TensorFlow Federated for research, see
 Some pip packages are required by this library, and may need to be installed:
 
 ```
-!pip install absl-py attrs clu numpy pandas sklearn
-!pip install tensorflow_datasets tensorflow-probability
-!pip uninstall tensorflow keras
-!pip install tf-nightly tfa-nightly tensorflow-federated-nightly
+absl-py
+attrs
+clu
+numpy
+pandas
+sklearn
+tensorflow_datasets
+tensorflow-probability
+tf-nightly
+tfa-nightly
+tensorflow-federated-nightly
 ```
 
 We require [Bazel](https://www.bazel.build/) in order to run the code. Please

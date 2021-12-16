@@ -83,7 +83,6 @@ py_test(
     python_version = "PY3",
     shard_count = 8,
     srcs_version = "PY3",
-    tags = ["nokokoro"],
     deps = [":gmm_embedding"],
 )
 

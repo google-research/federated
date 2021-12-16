@@ -19,8 +19,6 @@ py_test(
     srcs = ["centralized_training_loop_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    # TODO(b/204332597): remove nokokoro tag once `clu` compatability is fixed.
-    tags = ["nokokoro"],
     deps = [
         ":centralized_training_loop",
         ":metric_utils",
@@ -39,8 +37,6 @@ py_test(
     srcs = ["federated_training_loop_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    # TODO(b/204332597): remove nokokoro tag once `clu` compatability is fixed.
-    tags = ["nokokoro"],
     deps = [
         ":federated_training_loop",
         ":metric_utils",
@@ -76,7 +72,6 @@ py_test(
     srcs = ["metric_utils_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["nokokoro"],
     deps = [":metric_utils"],
 )
 

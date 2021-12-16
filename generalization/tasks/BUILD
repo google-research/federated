@@ -47,7 +47,6 @@ py_test(
     shard_count = 5,
     srcs_version = "PY3",
     tags = [
-        "nokokoro",
         "requires-net:external",
     ],
     deps = [":emnist_character"],
