@@ -24,6 +24,7 @@ on some level or a region on the lowest level.
 import dataclasses
 import random
 from typing import List, Any
+from scipy.stats import norm
 
 import numpy as np
 import pygtrie
@@ -32,7 +33,16 @@ from tqdm import tqdm
 DEFAULT_CHILDREN = ['00', '01', '10', '11']
 
 
-def get_default_children(aux_data, split=None):
+def get_default_children(aux_data=False, split=None):
+  """Returns a quad tree first 4 nodes. If aux_data (boolean) provided expands
+  to 2 more bits or a specific pos/neg nodes.
+  Args:
+    aux_data: a boolean to use additional bit for data, e.g. pos/neg.
+    split: specific subset of aux_data (pos/neg).
+
+  Returns:
+    A list of nodes to initialize the tree.
+  """
   if aux_data:
     if split == 'pos':
       return ['001', '011', '101', '111']
@@ -85,16 +95,16 @@ def coordinates_to_binary_path(xy_tuple, depth=10):
   Returns:
     binary version of the coordinate.
   """
+  aux_data = ''
   if len(xy_tuple) == 2:
     x_coord, y_coord = xy_tuple
-    aux_data = False
-    pos = ''
   else:
-    x_coord, y_coord, pos = xy_tuple
+    x_coord, y_coord, aux_data = xy_tuple
   path = ''
   for j in reversed(range(depth)):
-    path += f'{(x_coord >> j) & 1}{(y_coord >> j) & 1}{pos}/'
+    path += f'{(x_coord >> j) & 1}{(y_coord >> j) & 1}{aux_data}/'
   path = path[:-1]
+  
   return path
 
 
@@ -189,7 +199,7 @@ def transform_region_to_coordinates(x_coord,
 
 
 def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold=0,
-                        aux_data=False, count_min=False):
+                        aux_data=False, count_min=None):
   """Using coordinate vector and the tree produce a resulting image.
 
   For each value in the vector it finds the corresponding prefix and plots the
@@ -260,9 +270,9 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold
   return current_image, pos_image, neg_image
 
 
-def update_tree(prefix, tree, tree_prefix_list):
+def append_to_tree(prefix, tree, tree_prefix_list):
   """
-  Update tree with new prefix
+  Append new node to the tree.
   Args:
     prefix: new path, e.g. '10/01/10'
     tree: current tree
@@ -284,9 +294,9 @@ def split_regions(tree_prefix_list,
                   split_threshold,
                   image_bit_level,
                   collapse_threshold=None,
-                  expand_all=False,
                   last_result: AlgResult = None,
-                  count_min=None):
+                  count_min=None,
+                  print_output=False):
   """Modify the tree by splitting and collapsing the nodes.
 
   This implementation collapses and splits nodes of the tree according to
@@ -299,15 +309,15 @@ def split_regions(tree_prefix_list,
       split_threshold: threshold value used to split the nodes.
       image_bit_level: stopping criteria once the final resolution is reached.
       collapse_threshold: threshold value used to collapse the nodes.
-      expand_all: expand all regions,
       last_result: use previous level results to compute conf intervals,
-      count_min: use count-min sketch
+      count_min: use count-min sketch.
+      print_output: print results of splitting.
   Returns:
-      new_tree, new_tree_prefix_list, fresh_expand
+      new_tree, new_tree_prefix_list, num_newly_expanded_nodes
   """
   collapsed = 0
   created = 0
-  fresh_expand = 0
+  num_newly_expanded_nodes = 0
   unchanged = 0
   new_tree_prefix_list = list()
   new_tree = pygtrie.StringTrie()
@@ -315,7 +325,7 @@ def split_regions(tree_prefix_list,
     if count_min:
       count = count_min.query(tree_prefix_list[i])
     else:
-      count = vector_counts[i] if not expand_all else np.inf
+      count = vector_counts[i] if vector_counts else np.inf
     prefix = tree_prefix_list[i]
 
     # check whether the tree has reached the bottom
@@ -326,20 +336,22 @@ def split_regions(tree_prefix_list,
                                                   split_threshold)
     else:
       cond = count > split_threshold
-    if expand_all or cond:
+    if cond:
       for child in DEFAULT_CHILDREN:
         new_prefix = f'{prefix}/{child}'
-        fresh_expand += update_tree(new_prefix, new_tree, new_tree_prefix_list)
+        num_newly_expanded_nodes += append_to_tree(new_prefix, new_tree, new_tree_prefix_list)
     else:
       if collapse_threshold is not None and \
         count <= collapse_threshold and len(prefix) > 2:
         old_prefix = prefix[:-3]
         collapsed += 1
-        created += update_tree(old_prefix, new_tree, new_tree_prefix_list)
+        created += append_to_tree(old_prefix, new_tree, new_tree_prefix_list)
       else:
-        unchanged += update_tree(prefix, new_tree, new_tree_prefix_list)
-
-  return new_tree, new_tree_prefix_list, fresh_expand
+        unchanged += append_to_tree(prefix, new_tree, new_tree_prefix_list)
+  if print_output:
+    print(f'New: {num_newly_expanded_nodes}. Collapsed: {collapsed}. ' + \
+        f'Created from collapsed: {created}. Unchanged: {unchanged}.')
+  return new_tree, new_tree_prefix_list, num_newly_expanded_nodes
 
 
 def split_regions_aux(tree_prefix_list,
@@ -347,9 +359,9 @@ def split_regions_aux(tree_prefix_list,
                   split_threshold,
                   image_bit_level,
                   collapse_threshold=None,
-                  expand_all=False,
                   last_result: AlgResult = None,
-                  count_min=None):
+                  count_min=None,
+                  print_output=False):
   """Use expansion with aux data.
 
   We check both counts for positive and negative attributes for each location.
@@ -360,24 +372,24 @@ def split_regions_aux(tree_prefix_list,
       split_threshold: threshold value used to split the nodes.
       image_bit_level: stopping criteria once the final resolution is reached.
       collapse_threshold: threshold value used to collapse the nodes.
-      expand_all: expand all regions,
       last_result: use previous level results to compute conf intervals,
       count_min: use count-min sketch
+      print_output: print results of splitting
   Returns:
-      new_tree, new_tree_prefix_list, fresh_expand
+      new_tree, new_tree_prefix_list, num_newly_expanded_nodes
   """
   new_tree_prefix_list = list()
   new_tree = pygtrie.StringTrie()
   collapsed = 0
   created = 0
-  fresh_expand = 0
+  num_newly_expanded_nodes = 0
   unchanged = 0
 
   for i in range(0, len(tree_prefix_list), 2):
     if count_min:
       raise ValueError('CountMin is not implemented for Aux data.')
-    neg_count = vector_counts[i] if not expand_all else np.inf
-    pos_count = vector_counts[i + 1] if not expand_all else np.inf
+    neg_count = vector_counts[i] if vector_counts else np.inf
+    pos_count = vector_counts[i + 1] if vector_counts else np.inf
     neg_prefix = tree_prefix_list[i]
     pos_prefix = tree_prefix_list[i + 1]
 
@@ -392,28 +404,30 @@ def split_regions_aux(tree_prefix_list,
       cond = p_cond and n_cond
     else:
       cond = (pos_count > split_threshold and neg_count > split_threshold)
-    if expand_all or cond:
+    if cond:
       neg_child = get_default_children(aux_data=True, split='neg')
       pos_child = get_default_children(aux_data=True, split='pos')
       for j in range(len(pos_child)):
         new_prefix = f'{neg_prefix}/{neg_child[j]}'
-        fresh_expand += update_tree(new_prefix, new_tree, new_tree_prefix_list)
+        num_newly_expanded_nodes += append_to_tree(new_prefix, new_tree, new_tree_prefix_list)
         new_prefix = f'{pos_prefix}/{pos_child[j]}'
-        update_tree(new_prefix, new_tree, new_tree_prefix_list)
+        append_to_tree(new_prefix, new_tree, new_tree_prefix_list)
     else:
       if collapse_threshold is not None and \
           (pos_count < collapse_threshold or neg_count < collapse_threshold) \
           and len(pos_prefix) > 3 and len(neg_prefix) > 3:
         old_prefix = neg_prefix[:-4]
         collapsed += 1
-        created += update_tree(old_prefix, new_tree, new_tree_prefix_list)
+        created += append_to_tree(old_prefix, new_tree, new_tree_prefix_list)
         old_prefix = pos_prefix[:-4]
-        update_tree(old_prefix, new_tree, new_tree_prefix_list)
+        append_to_tree(old_prefix, new_tree, new_tree_prefix_list)
       else:
-        unchanged += update_tree(neg_prefix, new_tree, new_tree_prefix_list)
-        update_tree(pos_prefix, new_tree, new_tree_prefix_list)
-
-  return new_tree, new_tree_prefix_list, fresh_expand
+        unchanged += append_to_tree(neg_prefix, new_tree, new_tree_prefix_list)
+        append_to_tree(pos_prefix, new_tree, new_tree_prefix_list)
+  if print_output:
+    print(f'New: {num_newly_expanded_nodes}. Collapsed: {collapsed}. ' + \
+        f'Created from collapsed: {created}. Unchanged: {unchanged}.')
+  return new_tree, new_tree_prefix_list, num_newly_expanded_nodes
 
 
 def build_from_sample(samples, total_size):
@@ -500,8 +514,6 @@ def convert_to_dataset(image, total_size, value=None):
 
 
 def compute_conf_intervals(sum_vector: np.ndarray, level=95):
-  from scipy.stats import norm
-
   conf_intervals = dict()
   conf_interval_weighted = dict()
   z = norm.ppf(1-(1-level/100)/2)
@@ -521,7 +533,19 @@ def compute_conf_intervals(sum_vector: np.ndarray, level=95):
   return conf_intervals, conf_interval_weighted
 
 
-def create_confidence_interval_condition(last_result, prefix, count, split_threshold):
+def evaluate_confidence_interval_condition(last_result, prefix, count, split_threshold):
+  """Evaluate whether the confidence interval is smaller than the the threshold.
+  We compute confidence interval by comparing a current value in a sub-region
+  with its parent region value from the previous level
+  Args:
+    last_result: a previous level tree results and vector counts
+    prefix: current node prefix.
+    count: current node count.
+    split_threshold: threshold to cutoff confidence interval.
+
+  Returns:
+    whether the node satisfies confidence interval threshold.
+  """
 
   (last_prefix, last_prefix_pos) = last_result.tree.longest_prefix(prefix)
   if last_prefix is None:

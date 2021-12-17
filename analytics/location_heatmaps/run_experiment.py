@@ -32,7 +32,7 @@ import geo_utils
 import mechanisms
 import metrics
 import plotting
-from sketches import get_count_min_sketch
+from sketches import CountMinSketch
 from config import Config
 
 TOPK = 1000
@@ -40,7 +40,7 @@ TOTAL_SIZE = 1024
 
 
 def get_data(path, crop_tuple=(512, 100, 1536, 1124),
-             total_size=1024, save=True):
+             total_size=1024, save=True, dataset_name='dataset.npy'):
   """Download the map image.
 
   Downloads the image from a given path, crops it and transforms into a list
@@ -61,18 +61,14 @@ def get_data(path, crop_tuple=(512, 100, 1536, 1124),
     image = Image.open(f).convert('L')
   image = image.crop(crop_tuple)
   true_image = np.asarray(image)
-  if os.path.isfile('dataset.npy'):
-    dataset = np.load('dataset.npy')
+  if os.path.isfile(dataset_name):
+    dataset = np.load(dataset_name)
   else:
     dataset = geo_utils.convert_to_dataset(true_image, total_size)
     if save:
-      np.save('dataset', dataset)
+      np.save(dataset_name, dataset)
 
   return true_image, dataset
-
-
-def get_split_data(path):
-  dataset = np.load(path)
 
 
 def print_output(text, flag):
@@ -106,8 +102,8 @@ def run_experiment(true_image,
                    start_with_level=0,
                    ignore_start_eps=False,
                    last_result_ci=None,
-                   count_min=False) -> List[geo_utils.AlgResult]:
-  """The main method to run an experiment using TrieHH.
+                   count_min=None) -> List[geo_utils.AlgResult]:
+  """ The main method to run the experiments.
 
   Args:
       true_image: original image for comparison
@@ -136,7 +132,7 @@ def run_experiment(true_image,
       start_with_level: skip first levels and always expand them.
       ignore_start_eps: ignore spending epsilon when using start_with_level.
       last_result_ci: for two label save previous results.
-      count_min: use count-min sketch.
+      count_min: to use count-min sketch use dict: {'depth': 20, 'width': 4000}
 
   Returns:
       A list of per level geo_utls.AlgResult objects.
@@ -167,7 +163,7 @@ def run_experiment(true_image,
   tree, tree_prefix_list = geo_utils.init_tree(config.aux_data)
   per_level_results = list()
   per_level_grid = list()
-  fresh_expand = None
+  num_newly_expanded_nodes = None
   sum_vector = None
   print_output(f'aux_data: {config.aux_data}', config.output_flag)
   process_split = geo_utils.split_regions_aux if aux_data else geo_utils.split_regions
@@ -181,13 +177,15 @@ def run_experiment(true_image,
   # define DP round size
   dp_round_size = config.min_dp_size if config.min_dp_size else config.secagg_round_size
   if config.split_threshold and config.split_threshold_func:
-    raise ValueError('Specify either `threshold` or `threshold_func`.')
+    raise ValueError('Specify either `threshold` xor `threshold_func`.')
   if collapse_threshold and collapse_func:
     raise ValueError(
-      'Specify either `collapse_threshold` or `collapse_func`.')
+      'Specify either `collapse_threshold` xor `collapse_func`.')
+
+  # sample devices that will participate in the algorithm (same across levels):
   samples = np.random.choice(dataset, config.level_sample_size, replace=False)
-  if count_min:
-    count_min_sketch = get_count_min_sketch(depth=20, width=2000)
+  if count_min is not None:
+    count_min_sketch = CountMinSketch(depth=count_min['depth'], width=count_min['width'])
     sensitivity = 20
   else:
     count_min_sketch = None
@@ -217,7 +215,7 @@ def run_experiment(true_image,
       # prevent spilling over the budget
       if remaining_budget:
         # last round, no progress in tree, or cannot run at least two rounds.
-        if i == max_levels - 1 or fresh_expand == 0 \
+        if i == max_levels - 1 or num_newly_expanded_nodes == 0 \
             or remaining_budget < 2 * eps * samples_len:
           print_output(
             'Last round. Spending remaining epsilon budget: ' + \
@@ -227,6 +225,7 @@ def run_experiment(true_image,
       noiser = noise_class(dp_round_size, sensitivity, eps)
       if ignore_start_eps and start_with_level <= i:
         print_output('Ignoring eps spent', flag=output_flag)
+        spent_budget = 0
       else:
         spent_budget += eps * samples_len
 
@@ -242,12 +241,12 @@ def run_experiment(true_image,
 
     # to prevent OOM errors we use vectors of size partial.
     if start_with_level > i:
-      tree, tree_prefix_list, fresh_expand = process_split(
+      tree, tree_prefix_list, num_newly_expanded_nodes = process_split(
         tree_prefix_list=tree_prefix_list,
         vector_counts=None,
-        split_threshold=split_threshold, image_bit_level=10,
+        split_threshold=-np.inf, image_bit_level=10,
         collapse_threshold=collapse_threshold,
-        expand_all=True, count_min=count_min)
+        count_min=count_min, print_output=output_flag)
       print_output(f"Expanding all at the level: {i}.", output_flag)
       continue
 
@@ -287,12 +286,12 @@ def run_experiment(true_image,
     else:
       last_result = per_level_results[i - 1]
 
-    tree, tree_prefix_list, fresh_expand = process_split(
+    tree, tree_prefix_list, num_newly_expanded_nodes = process_split(
       tree_prefix_list=result.tree_prefix_list, vector_counts=result.sum_vector,
       split_threshold=split_threshold, image_bit_level=10,
       collapse_threshold=collapse_threshold,
-      last_result=last_result)
-    if fresh_expand==0:
+      last_result=last_result, print_output=output_flag)
+    if num_newly_expanded_nodes==0:
       break
   if output_flag:
     print(f'Total epsilon-users: {spent_budget:.2f} with ' + \
