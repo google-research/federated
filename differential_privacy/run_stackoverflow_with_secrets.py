@@ -303,9 +303,6 @@ def train_and_eval():
   federated_eval = tff.learning.build_federated_evaluation(task.model_fn)
   evaluation_selection_fn = lambda round_num: [validation_data]
 
-  # TODO(b/210890827): Use a polymorphic computation if possible
-  @tff.federated_computation(training_process.initialize.type_signature.result,
-                             federated_eval.type_signature.parameter[1])
   def evaluation_fn(state, evaluation_data):
     return federated_eval(state.model, evaluation_data)
 

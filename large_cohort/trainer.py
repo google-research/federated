@@ -260,10 +260,6 @@ def main(argv):
             random_seed=FLAGS.base_random_seed),
         size=FLAGS.clients_per_validation_round)
 
-    # TODO(b/210890827): Use a polymorphic computation if possible
-    @tff.federated_computation(
-        training_process.initialize.type_signature.result,
-        tff.type_at_clients(tff.TensorType(tf.string)))
     def evaluation_fn(state, client_ids):  # pytype: disable=attribute-error  # gen-stub-imports
       return validation_fn(state.model, client_ids)
 
@@ -273,10 +269,6 @@ def main(argv):
         validation_data.create_tf_dataset_from_all_clients())
     evaluation_selection_fn = lambda round_num: [full_validation_dataset]
 
-    # TODO(b/210890827): Use a polymorphic computation if possible
-    @tff.federated_computation(
-        training_process.initialize.type_signature.result,
-        federated_evaluation_fn.type_signature.parameter[1])
     def evaluation_fn(state, evaluation_data):
       return federated_evaluation_fn(state.model, evaluation_data)
 

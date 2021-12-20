@@ -111,9 +111,6 @@ def _run_experiment():
   validation_data = emnist_task.datasets.get_centralized_test_data()
   federated_eval = tff.learning.build_federated_evaluation(emnist_task.model_fn)
 
-  # TODO(b/210890827): Use a polymorphic computation if possible
-  @tff.federated_computation(training_process.initialize.type_signature.result,
-                             federated_eval.type_signature.parameter[1])
   def evaluation_fn(state, evaluation_data):
     return federated_eval(state.model, evaluation_data)
 
