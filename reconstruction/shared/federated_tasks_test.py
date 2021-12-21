@@ -14,6 +14,7 @@
 """End-to-end tests for federated reconstruction training tasks."""
 
 import collections
+import csv
 import functools
 import os.path
 from typing import Any, Callable, List, Optional, Tuple
@@ -158,6 +159,15 @@ def evaluation_computation_builder(
       dataset_split_fn=dataset_split_fn)
 
 
+def _read_from_csv(file_name):
+  """Returns a list of fieldnames and a list of metrics from a given CSV."""
+  with tf.io.gfile.GFile(file_name, 'r') as csv_file:
+    reader = csv.DictReader(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+    fieldnames = reader.fieldnames
+    csv_metrics = list(reader)
+  return fieldnames, csv_metrics
+
+
 class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
@@ -203,9 +213,8 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
     results_dir = os.path.join(root_output_dir, 'results', exp_name)
     self.assertTrue(tf.io.gfile.exists(results_dir))
 
-    metrics_manager = tff.simulation.CSVMetricsManager(
-        os.path.join(results_dir, 'experiment.metrics.csv'))
-    fieldnames, metrics = metrics_manager.get_metrics()
+    csv_file_path = os.path.join(results_dir, 'experiment.metrics.csv')
+    fieldnames, metrics = _read_from_csv(csv_file_path)
 
     self.assertIn(
         'train/loss',
