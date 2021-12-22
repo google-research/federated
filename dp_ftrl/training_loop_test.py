@@ -14,6 +14,7 @@
 """Tests for shared training loops."""
 
 import collections
+import csv
 import os
 
 import numpy as np
@@ -52,6 +53,15 @@ def _create_input_spec():
   return _Batch(
       x=tf.TensorSpec(shape=[None, 784], dtype=tf.float32),
       y=tf.TensorSpec(dtype=tf.int64, shape=[None, 1]))
+
+
+def _read_from_csv(file_name):
+  """Returns a list of fieldnames and a list of metrics from a given CSV."""
+  with tf.io.gfile.GFile(file_name, 'r') as csv_file:
+    reader = csv.DictReader(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+    fieldnames = reader.fieldnames
+    csv_metrics = list(reader)
+  return fieldnames, csv_metrics
 
 
 class ExperimentRunnerTest(tf.test.TestCase):
@@ -244,8 +254,7 @@ class ExperimentRunnerTest(tf.test.TestCase):
 
     csv_file = os.path.join(root_output_dir, 'results', experiment_name,
                             'experiment.metrics.csv')
-    metrics_manager = tff.simulation.CSVMetricsManager(csv_file)
-    fieldnames, metrics = metrics_manager.get_metrics()
+    fieldnames, metrics = _read_from_csv(csv_file)
     self.assertLen(metrics, 2)
     self.assertIn('test/loss', fieldnames)
 

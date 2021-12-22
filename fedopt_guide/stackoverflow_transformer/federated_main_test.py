@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import csv
 import os
+
 import tensorflow as tf
 import tensorflow_federated as tff
+
 from fedopt_guide.stackoverflow_transformer import federated_main
 
 
@@ -24,6 +27,15 @@ def iterative_process_builder(model_fn, client_weight_fn=None):
       client_optimizer_fn=lambda: tf.keras.optimizers.SGD(0.1),
       server_optimizer_fn=lambda: tf.keras.optimizers.SGD(1.0),
       client_weighting=client_weight_fn)
+
+
+def _read_from_csv(file_name):
+  """Returns a list of fieldnames and a list of metrics from a given CSV."""
+  with tf.io.gfile.GFile(file_name, 'r') as csv_file:
+    reader = csv.DictReader(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+    fieldnames = reader.fieldnames
+    csv_metrics = list(reader)
+  return fieldnames, csv_metrics
 
 
 class FederatedMainTest(tf.test.TestCase):
@@ -55,9 +67,8 @@ class FederatedMainTest(tf.test.TestCase):
     results_dir = os.path.join(root_output_dir, 'results', exp_name)
     self.assertTrue(tf.io.gfile.exists(results_dir))
 
-    scalar_manager = tff.simulation.CSVMetricsManager(
-        os.path.join(results_dir, 'experiment.metrics.csv'))
-    fieldnames, metrics = scalar_manager.get_metrics()
+    csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
+    fieldnames, metrics = _read_from_csv(csv_file)
 
     self.assertIn(
         'eval/loss',
