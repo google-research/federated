@@ -30,51 +30,42 @@ class IterativeProcessCompatibilityError(TypeError):
   pass
 
 
-def create_if_not_exists(path):
-  try:
-    tf.io.gfile.makedirs(path)
-  except tf.errors.OpError:
-    logging.info('Skipping creation of directory [%s], already exists', path)
-
-
 def _setup_outputs(root_output_dir, experiment_name, hparam_dict):
   """Set up directories for experiment loops, write hyperparameters to disk."""
 
   if not experiment_name:
     raise ValueError('experiment_name must be specified.')
 
-  create_if_not_exists(root_output_dir)
+  program_state_dir = os.path.join(root_output_dir, 'checkpoints',
+                                   experiment_name)
+  program_state_mngr = tff.program.FileProgramStateManager(program_state_dir)
 
-  checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
-  create_if_not_exists(checkpoint_dir)
-  checkpoint_mngr = tff.simulation.FileCheckpointManager(checkpoint_dir)
+  logging_mngr = tff.program.LoggingReleaseManager()
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
-  create_if_not_exists(results_dir)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  metrics_mngr = tff.simulation.CSVMetricsManager(csv_file)
+  metrics_mngr = tff.program.CSVFileReleaseManager(csv_file)
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
-  create_if_not_exists(summary_logdir)
-  tensorboard_mngr = tff.simulation.TensorBoardManager(summary_logdir)
+  tensorboard_mngr = tff.program.TensorboardReleaseManager(summary_logdir)
 
   if hparam_dict:
     summary_writer = tf.summary.create_file_writer(summary_logdir)
-    hparam_dict['metrics_file'] = metrics_mngr.metrics_filename
+    hparam_dict['metrics_file'] = csv_file
     hparams_file = os.path.join(results_dir, 'hparams.csv')
     utils_impl.atomic_write_series_to_csv(hparam_dict, hparams_file)
     with summary_writer.as_default():
       hp.hparams({k: v for k, v in hparam_dict.items() if v is not None})
 
   logging.info('Writing...')
-  logging.info('    checkpoints to: %s', checkpoint_dir)
-  logging.info('    metrics csv to: %s', metrics_mngr.metrics_filename)
+  logging.info('    program state to: %s', program_state_dir)
+  logging.info('    metrics csv to: %s', csv_file)
   logging.info('    summaries to: %s', summary_logdir)
 
-  return checkpoint_mngr, metrics_mngr, tensorboard_mngr
+  return program_state_mngr, [logging_mngr, metrics_mngr, tensorboard_mngr]
 
 
-def _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num):
+def _write_metrics(metrics_mngrs, metrics, round_num):
   """Atomic metrics writer which inlines logic from MetricsHook class."""
   if not isinstance(metrics, dict):
     raise TypeError('metrics should be type `dict`.')
@@ -82,8 +73,8 @@ def _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num):
     raise TypeError('round_num should be type `int`.')
   logging.info('Metrics at round {:d}:\n{!s}'.format(round_num,
                                                      pprint.pformat(metrics)))
-  metrics_mngr.save_metrics(metrics, round_num)
-  tensorboard_mngr.save_metrics(metrics, round_num)
+  for metrics_mngr in metrics_mngrs:
+    metrics_mngr.release(metrics, round_num)
 
 
 def _compute_numpy_l2_difference(model, previous_model):
@@ -187,11 +178,12 @@ def run(iterative_process: tff.templates.IterativeProcess,
   if not hasattr(initial_state, 'model'):
     raise TypeError('The server state must have a model attribute.')
 
-  checkpoint_mngr, metrics_mngr, tensorboard_mngr = _setup_outputs(
-      root_output_dir, experiment_name, hparam_dict)
+  program_state_mngr, metrics_mngrs = _setup_outputs(root_output_dir,
+                                                     experiment_name,
+                                                     hparam_dict)
 
   logging.info('Asking checkpoint manager to load checkpoint.')
-  state, round_num = checkpoint_mngr.load_latest_checkpoint(initial_state)
+  state, round_num = program_state_mngr.load_latest(initial_state)
 
   if state is None:
     logging.info('Initializing experiment from scratch.')
@@ -200,7 +192,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
   else:
     logging.info('Restarted from checkpoint round %d', round_num)
     round_num += 1  # Increment to avoid overwriting current checkpoint
-  metrics_mngr.clear_metrics(round_num)
   current_model = iterative_process.get_model_weights(state)
 
   loop_start_time = time.time()
@@ -227,7 +218,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
     if (round_num % rounds_per_checkpoint == 0 or
         round_num == total_rounds - 1):
       save_checkpoint_start_time = time.time()
-      checkpoint_mngr.save_checkpoint(state, round_num)
+      program_state_mngr.save(state, round_num)
       train_metrics['save_checkpoint_secs'] = (
           time.time() - save_checkpoint_start_time)
 
@@ -240,7 +231,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
       validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
       metrics['eval'] = validation_metrics
 
-    _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num)
+    _write_metrics(metrics_mngrs, metrics, round_num)
     round_num += 1
 
   # Final metrics evaluation once the training has completed
@@ -258,6 +249,6 @@ def run(iterative_process: tff.templates.IterativeProcess,
     test_metrics = test_fn(current_model)
     test_metrics['evaluate_secs'] = time.time() - test_start_time
     metrics['test'] = test_metrics
-  _write_metrics(metrics_mngr, tensorboard_mngr, metrics, total_rounds)
+  _write_metrics(metrics_mngrs, metrics, total_rounds)
 
   return state
