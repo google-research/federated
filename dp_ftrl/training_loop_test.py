@@ -58,7 +58,7 @@ def _create_input_spec():
 def _read_from_csv(file_name):
   """Returns a list of fieldnames and a list of metrics from a given CSV."""
   with tf.io.gfile.GFile(file_name, 'r') as csv_file:
-    reader = csv.DictReader(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+    reader = csv.DictReader(csv_file)
     fieldnames = reader.fieldnames
     csv_metrics = list(reader)
   return fieldnames, csv_metrics
@@ -203,9 +203,9 @@ class ExperimentRunnerTest(tf.test.TestCase):
         experiment_name=experiment_name,
         root_output_dir=root_output_dir)
 
-    ckpt_manager = tff.simulation.FileCheckpointManager(
+    program_state_manager = tff.program.FileProgramStateManager(
         os.path.join(root_output_dir, 'checkpoints', experiment_name))
-    restored_state, restored_round = ckpt_manager.load_latest_checkpoint(
+    restored_state, restored_round = program_state_manager.load_latest(
         final_state)
 
     self.assertEqual(restored_round, 0)

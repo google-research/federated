@@ -28,13 +28,6 @@ from utils import utils_impl
 from tensorboard.plugins.hparams import api as hp
 
 
-def _create_if_not_exists(path):
-  try:
-    tf.io.gfile.makedirs(path)
-  except tf.errors.OpError:
-    logging.info('Skipping creation of directory [%s], already exists', path)
-
-
 def _setup_outputs(root_output_dir: str, experiment_name: str,
                    hparam_dict: Dict[str, Any]):
   """Set up directories for experiment loops, write hyperparameters to disk."""
@@ -42,38 +35,36 @@ def _setup_outputs(root_output_dir: str, experiment_name: str,
   if not experiment_name:
     raise ValueError('experiment_name must be specified.')
 
-  _create_if_not_exists(root_output_dir)
+  program_state_dir = os.path.join(root_output_dir, 'checkpoints',
+                                   experiment_name)
+  program_state_mngr = tff.program.FileProgramStateManager(program_state_dir)
 
-  checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
-  _create_if_not_exists(checkpoint_dir)
-  checkpoint_mngr = tff.simulation.FileCheckpointManager(checkpoint_dir)
+  logging_mngr = tff.program.LoggingReleaseManager()
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
-  _create_if_not_exists(results_dir)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  metrics_mngr = tff.simulation.CSVMetricsManager(csv_file)
+  metrics_mngr = tff.program.CSVFileReleaseManager(csv_file)
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
-  _create_if_not_exists(summary_logdir)
-  tensorboard_mngr = tff.simulation.TensorBoardManager(summary_logdir)
+  tensorboard_mngr = tff.program.TensorboardReleaseManager(summary_logdir)
 
   if hparam_dict:
     summary_writer = tf.summary.create_file_writer(summary_logdir)
-    hparam_dict['metrics_file'] = metrics_mngr.metrics_filename
+    hparam_dict['metrics_file'] = csv_file
     hparams_file = os.path.join(results_dir, 'hparams.csv')
     utils_impl.atomic_write_series_to_csv(hparam_dict, hparams_file)
     with summary_writer.as_default():
       hp.hparams({k: v for k, v in hparam_dict.items() if v is not None})
 
   logging.info('Writing...')
-  logging.info('    checkpoints to: %s', checkpoint_dir)
-  logging.info('    metrics csv to: %s', metrics_mngr.metrics_filename)
+  logging.info('    program state to: %s', program_state_dir)
+  logging.info('    metrics csv to: %s', csv_file)
   logging.info('    summaries to: %s', summary_logdir)
 
-  return checkpoint_mngr, metrics_mngr, tensorboard_mngr
+  return program_state_mngr, [logging_mngr, metrics_mngr, tensorboard_mngr]
 
 
-def _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num):
+def _write_metrics(metrics_mngrs, metrics, round_num):
   """Atomic metrics writer which inlines logic from MetricsHook class."""
   if not isinstance(metrics, dict):
     raise TypeError('metrics should be type `dict`.')
@@ -81,8 +72,8 @@ def _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num):
     raise TypeError('round_num should be type `int`.')
   logging.info('Metrics at round {:d}:\n{!s}'.format(round_num,
                                                      pprint.pformat(metrics)))
-  metrics_mngr.save_metrics(metrics, round_num)
-  tensorboard_mngr.save_metrics(metrics, round_num)
+  for metrics_mngr in metrics_mngrs:
+    metrics_mngr.release(metrics, round_num)
 
 
 def run(
@@ -167,11 +158,12 @@ def run(
   logging.info('Starting iterative_process training loop...')
   initial_state = iterative_process.initialize()
 
-  checkpoint_mngr, metrics_mngr, tensorboard_mngr = _setup_outputs(
-      root_output_dir, experiment_name, hparam_dict)
+  program_state_mngr, metrics_mngrs = _setup_outputs(root_output_dir,
+                                                     experiment_name,
+                                                     hparam_dict)
 
   logging.info('Asking checkpoint manager to load checkpoint.')
-  state, round_num = checkpoint_mngr.load_latest_checkpoint(initial_state)
+  state, round_num = program_state_mngr.load_latest(initial_state)
 
   # TODO(b/172867399): we disable restarting from checkpoint when shuffling
   # client IDs by epochs. Non-trivial amount of change has to be made to make
@@ -186,7 +178,6 @@ def run(
   else:
     logging.info('Restarted from checkpoint round %d', round_num)
     round_num += 1  # Increment to avoid overwriting current checkpoint
-  metrics_mngr.clear_metrics(round_num)
 
   loop_start_time = time.time()
   while epoch < total_epochs and round_num < total_rounds:
@@ -213,7 +204,7 @@ def run(
         round_num == total_rounds - 1):
       save_checkpoint_start_time = time.time()
       try:
-        checkpoint_mngr.save_checkpoint(state, round_num)
+        program_state_mngr.save(state, round_num)
       except Exception:  # pylint: disable=broad-except
         logging.info('Checkpoint saving exception: %s', Exception)
       train_metrics['save_checkpoint_secs'] = (
@@ -234,7 +225,7 @@ def run(
       validation_metrics = validation_fn(state.model)
       validation_metrics['evaluate_secs'] = time.time() - evaluate_start_time
       metrics['eval'] = validation_metrics
-      _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num)
+      _write_metrics(metrics_mngrs, metrics, round_num)
 
     round_num += 1
 
@@ -260,7 +251,7 @@ def run(
     test_metrics = test_fn(state.model)
     test_metrics['evaluate_secs'] = time.time() - test_start_time
     metrics['test'] = test_metrics
-  _write_metrics(metrics_mngr, tensorboard_mngr, metrics, round_num)
+  _write_metrics(metrics_mngrs, metrics, round_num)
 
   return state
 
