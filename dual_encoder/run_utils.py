@@ -23,63 +23,35 @@ import tensorflow_federated as tff
 
 
 def _configure_managers(
-    root_output_dir: str, experiment_name: str, rounds_per_checkpoint: int
-) -> Tuple[tff.simulation.FileCheckpointManager,
-           List[tff.simulation.MetricsManager]]:
-  """Configures checkpoint and metrics managers."""
-  tf.io.gfile.makedirs(root_output_dir)
+    root_output_dir: str, experiment_name: str
+) -> Tuple[tff.program.FileProgramStateManager,
+           List[tff.program.ReleaseManager]]:
+  """Configures program state and metrics managers."""
 
-  checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
-  tf.io.gfile.makedirs(checkpoint_dir)
-  checkpoint_manager = tff.simulation.FileCheckpointManager(
-      checkpoint_dir, step=rounds_per_checkpoint)
+  program_state_dir = os.path.join(root_output_dir, 'checkpoints',
+                                   experiment_name)
+  program_state_manager = tff.program.FileProgramStateManager(program_state_dir)
+
+  logging_release_manager = tff.program.LoggingReleaseManager()
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
-  tf.io.gfile.makedirs(results_dir)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  csv_manager = tff.simulation.CSVMetricsManager(
-      csv_file, save_mode=tff.simulation.SaveMode.WRITE)
+  csv_manager = tff.program.CSVFileReleaseManager(
+      csv_file, save_mode=tff.program.CSVSaveMode.WRITE)
 
   summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
-  tensorboard_manager = tff.simulation.TensorBoardManager(summary_dir)
+  tensorboard_manager = tff.program.TensorboardReleaseManager(summary_dir)
 
   logging.info('Writing...')
-  logging.info('    checkpoints to: %s', checkpoint_dir)
+  logging.info('    program state to: %s', program_state_dir)
   logging.info('    CSV metrics to: %s', csv_file)
   logging.info('    TensorBoard summaries to: %s', summary_dir)
 
-  return checkpoint_manager, [csv_manager, tensorboard_manager]
-
-
-def build_eval_fn(
-    evaluation_computation: tff.Computation,
-    client_datasets_fn: Callable[[int], Any],
-    get_model: Callable[[Any], tff.learning.ModelWeights],
-) -> Callable[[tff.learning.ModelWeights, int], Dict[str, float]]:
-  """Creates an evaluation function for use with `training_loop.run`.
-
-  Args:
-    evaluation_computation: A `tff.Computation` performing evaluation.
-    client_datasets_fn: A function taking in an integer round number and
-      returning the expected input of `evaluation_computation`. For
-      evaluation, the round number passed is always 0, so this function should
-      typically return a different result each time it is called with the same
-      argument, e.g. if it is sampling a subset of users from the evaluation
-      set.
-    get_model: A callable accepting the current server state, and returning a
-      `tff.learning.ModelWeights` to be used for evaluation.
-
-  Returns:
-    An evaluation function accepting as input a `tff.learning.ModelWeights` and
-    an integer `round_num`, and returning a dictionary of evaluation metrics.
-  """
-
-  def eval_fn(state: Any, round_num: int) -> Dict[str, float]:
-    model = get_model(state)
-    sampled_data = client_datasets_fn(round_num)
-    return evaluation_computation(model, sampled_data)
-
-  return eval_fn
+  return program_state_manager, [
+      logging_release_manager,
+      csv_manager,
+      tensorboard_manager,
+  ]
 
 
 def client_datasets_fn_from_tf_datasets(
@@ -147,22 +119,22 @@ def train_and_eval(
   val_client_datasets_fn = client_datasets_fn_from_tf_datasets(
       test_datasets, clients_per_round=num_clients_per_round_eval)
 
-  # Create final evaluation functions to pass to `training_loop`.
-  val_fn = build_eval_fn(
-      evaluation_computation=evaluator,
-      client_datasets_fn=val_client_datasets_fn,
-      get_model=trainer.get_model_weights)  # pytype: disable=attribute-error  # gen-stub-imports
+  def evaluation_fn(state: Any, sampled_data) -> Dict[str, float]:
+    model = trainer.get_model_weights(state)
+    return evaluator(model, sampled_data)
 
-  checkpoint_manager, metrics_managers = _configure_managers(
-      root_output_dir, experiment_name, rounds_per_checkpoint)
+  program_state_manager, metrics_managers = _configure_managers(
+      root_output_dir, experiment_name)
 
-  logging.info('Starting training loop.')
-  state = tff.simulation.run_simulation(
-      process=trainer,
-      client_selection_fn=train_client_datasets_fn,
+  state = tff.simulation.run_training_process(
+      training_process=trainer,
+      training_selection_fn=train_client_datasets_fn,
       total_rounds=num_rounds,
-      validation_fn=val_fn,
-      file_checkpoint_manager=checkpoint_manager,
+      evaluation_fn=evaluation_fn,
+      evaluation_selection_fn=val_client_datasets_fn,
+      rounds_per_evaluation=1,
+      program_state_manager=program_state_manager,
+      rounds_per_saving_program_state=rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
   return state
