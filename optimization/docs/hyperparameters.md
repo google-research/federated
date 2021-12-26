@@ -180,7 +180,6 @@ Fed...                | Adagrad | Adam | Yogi | AvgM | Avg
 --------------------- | ------- | ---- | ---- | ---- | ---
 cifar100_image        | -1      | 0    | 0    | 0    | 0.5
 emnist_autoencoder    | -1.5    | -1.5 | -1.5 | 0    | 0
-shakespeare_character | -1      | -2.5 | -2.5 | -0.5 | 0
 shakespeare_character | -0.5    | -2   | -2   | -0.5 | 0
 stackoverflow_word    | -1.5    | -2   | -2   | 0    | 0
 stackoverflow_tag     | 1       | -0.5 | -0.5 | 0    | 0
@@ -191,7 +190,6 @@ Fed...                | Adagrad | Adam | Yogi
 --------------------- | ------- | ---- | ----
 cifar100_image        | -2      | -1   | -1
 emnist_autoencoder    | -3      | -3   | -3
-shakespeare_character | -2      | -4   | -4
 shakespeare_character | -1      | -3   | -3
 stackoverflow_word    | -4      | -5   | -5
 stackoverflow_tag     | -2      | -5   | -5
