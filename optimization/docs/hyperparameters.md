@@ -21,13 +21,13 @@ used when running experiments in
 
 **Cross-task hyperparameters**
 
-Hyperparameter              | Flag                   | Value
---------------------------- | ---------------------- | ---------------
-Number of clients per round | `clients_per_round`    | See table below
-Number of client epochs     | `client_epochs`        | 1
-Client sampling seed        | `client_datasets_seed` | 1
-Total rounds                | `total_rounds`         | See table below
-Batch size                  | `client_batch_size`    | See table below
+Hyperparameter              | Flag                          | Value
+--------------------------- | ----------------------------- | ---------------
+Number of clients per round | `clients_per_round`           | See table below
+Number of client epochs     | `client_epochs_per_round`     | 1
+Client sampling seed        | `client_datasets_random_seed` | 1
+Total rounds                | `total_rounds`                | See table below
+Batch size                  | `client_batch_size`           | See table below
 
 **Default values**
 
@@ -47,15 +47,16 @@ Next, we list task-specific hyperparameters, and the suggested starting values
 
 **CIFAR-100 Image Classification**
 
-Hyperparameter  | Flag                       | Value
---------------- | -------------------------- | -----
-Image crop size | `cifar100_image_crop_size` | 24
+Hyperparameter    | Flag                         | Value
+----------------- | ---------------------------- | -----
+Image crop width  | `cifar100_image_crop_width`  | 24
+Image crop height | `cifar100_image_crop_height` | 24
 
 **EMNIST Character Recognition**
 
-Hyperparameter | Flag                     | Value
--------------- | ------------------------ | -----
-Model type     | `emnist_character_model` | cnn
+Hyperparameter | Flag                        | Value
+-------------- | --------------------------- | -----
+Model type     | `emnist_character_model_id` | cnn
 
 **Shakespeare Character Prediction**
 
@@ -70,7 +71,7 @@ Hyperparameter          | Flag                                 | Value
 Vocabulary size         | `stackoverflow_word_vocab_size`      | 10000
 Sequence length         | `stackoverflow_word_sequence_length` | 20
 Validation set size     | `num_validation_examples`            | 10000
-Max examples per client | `max_elements_per_user`              | 1000
+Max examples per client | `max_elements_per_client`            | 1000
 
 **Stack Overflow TP**
 
@@ -79,7 +80,7 @@ Hyperparameter          | Flag                                | Value
 Vocabulary size         | `stackoverflow_tag_word_vocab_size` | 10000
 Number of labels        | `stackoverflow_tag_tag_vocab_size`  | 500
 Validation set size     | `num_validation_examples`           | 10000
-Max examples per client | `max_elements_per_user`             | 1000
+Max examples per client | `max_elements_per_client`           | 1000
 
 ## Configuring optimizers
 
