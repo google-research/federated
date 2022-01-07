@@ -3,6 +3,8 @@
 This directory contains code for partially local federated learning with
 reconstruction, as introduced in
 ["Federated Reconstruction: Partially Local Federated Learning"](https://arxiv.org/abs/2102.03448).
+For a high-level description, see the
+[Google AI Blog post](https://ai.googleblog.com/2021/12/a-scalable-approach-for-partially-local.html).
 The library includes general-purpose utilities for partially local federated
 learning as well as experimental code for the paper.
 
