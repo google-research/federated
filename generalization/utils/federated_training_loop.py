@@ -24,38 +24,34 @@ import tensorflow_federated as tff
 from generalization.utils import metric_utils
 
 MetricsType = MutableMapping[str, Any]
-FileCheckpointManager = tff.simulation.FileCheckpointManager
-MetricsManager = tff.simulation.MetricsManager
 EvalFnType = Callable[[Any, int], MetricsType]
 
 
-def _load_initial_checkpoint(
+def _load_initial_program_state(
     template_state: Any,
-    file_checkpoint_manager: FileCheckpointManager) -> Tuple[Any, int]:
-  """Loads a server state and starting round number from a checkpoint manager.
+    program_state_manager: tff.program.ProgramStateManager) -> Tuple[Any, int]:
+  """Loads a server state and starting round number from a program state manager.
 
   This method loads a starting state for the iterative process and a starting
   round number indicating the first round to begin the entire training
-  process. If a checkpoint is found, the starting state is set to the checkpoint
-  state, and the next round to run is set to the round directly after the
-  checkpoint round.
+  process. If program state is found, the starting state is set to the program
+  state, and the next round to run is set to the round directly after the round.
 
-  If no checkpoint is found, the starting state is set to `template_state` and
-  the starting round is set to `0`.
+  If no program state is found, the starting state is set to `template_state`
+  and the starting round is set to `0`.
 
   Args:
-    template_state: A nested structure to use as a template when reconstructing
-      a checkpoint.
-    file_checkpoint_manager: A `tff.simulation.FileCheckpointManager` used to
-      load a checkpoint.
+    template_state: A nested structure to use as a template when loading program
+      state.
+    program_state_manager: A `tff.program.ProgramStateManager` used to load
+      program state.
 
   Returns:
     A tuple of `(state, start_round)`, where `state` matches the Python
     structure in `initial_state`, and `start_round` is a nonnegative integer
     indicating the round at which training starts.
   """
-  ckpt_state, ckpt_round = file_checkpoint_manager.load_latest_checkpoint(
-      template_state)
+  ckpt_state, ckpt_round = program_state_manager.load_latest(template_state)
   if ckpt_state is None:
     start_state = template_state
     start_round = 0
@@ -96,34 +92,33 @@ def _compute_eval_metrics(state: Any, round_num: int, eval_fn: EvalFnType,
 
 
 def _create_on_loop_start_fn(
-    file_checkpoint_manager: Optional[FileCheckpointManager] = None,
-    metrics_managers: Optional[List[MetricsManager]] = None,
+    program_state_manager: Optional[tff.program.ProgramStateManager] = None,
+    metrics_managers: Optional[List[tff.program.ReleaseManager]] = None,
     part_train_eval_fn: Optional[EvalFnType] = None,
     part_val_fn: Optional[EvalFnType] = None,
     unpart_fn: Optional[EvalFnType] = None):
   """Creates a pre-loop callback function.
 
   This pre-loop callback performs a number of tasks depending on its input
-  arguments. In its full generality, the callback will attempt to load a
-  starting state and round number from a checkpoint, and clear all metrics saved
-  after that starting round.
+  arguments. In its full generality, the callback will attempt to load the
+  program state and round number.
 
-  If no checkpoint is available, we assume that no training has occurred, in
+  If no program state is available, we assume that no training has occurred, in
   which case we perform pre-training tasks. These include (in order, depending
   on the input arguments) computing validation, metrics on the starting state,
   saving those validation metrics via metrics managers, and saving an initial
-  checkpoint. Note that if the validation and metrics writing occurs, we use a
-  round number of `0`, which is reserved for pre-training tasks.
+  program state. Note that if the validation and metrics writing occurs, we use
+  a round number of `0`, which is reserved for pre-training tasks.
 
   Once the tasks above (or some subset of the tasks, depending on which
   arguments are supplied) are completed, the pre-loop callback returns the
   starting state and round number for training.
 
   Args:
-    file_checkpoint_manager: An optional `tff.simulation.FileCheckpointManager`
-      used to load an initial checkpoint, and save an initial checkpoint if no
-      such checkpoint is found.
-    metrics_managers: An optional list of `tff.simulation.MetricsManager`
+    program_state_manager: An optional `tff.program.ProgramStateManager`
+      used to load an initial program state, and save an initial program state
+      if no such program state is found.
+    metrics_managers: An optional list of `tff.program.ReleaseManager`
       instances used to save initial validation metrics. Note that this occurs
       only if `unpart_fn` is not `None.
     part_train_eval_fn: An optional callable accepting the current state of the
@@ -147,21 +142,18 @@ def _create_on_loop_start_fn(
     metrics_managers = []
 
   def on_loop_start(initial_state):
-    """Attempts to load a checkpoint before resuming training."""
+    """Attempts to load program state before resuming training."""
 
-    if file_checkpoint_manager is not None:
-      start_state, start_round = _load_initial_checkpoint(
-          initial_state, file_checkpoint_manager)
+    if program_state_manager is not None:
+      start_state, start_round = _load_initial_program_state(
+          initial_state, program_state_manager)
     else:
       start_state = initial_state
       start_round = 0
 
-    for metrics_mngr in metrics_managers:
-      metrics_mngr.clear_metrics(start_round)
-
     if start_round == 0:
       # Perform pre-training actions, including computing initial validation
-      # metrics and saving an initial checkpoint.
+      # metrics and saving an initial program state.
       metrics = collections.OrderedDict()
 
       for eval_fn, prefix in ((part_train_eval_fn,
@@ -174,10 +166,10 @@ def _create_on_loop_start_fn(
 
       if metrics:
         for metrics_mngr in metrics_managers:
-          metrics_mngr.save_metrics(metrics, 0)
+          metrics_mngr.release(metrics, 0)
 
-      if file_checkpoint_manager is not None:
-        file_checkpoint_manager.save_checkpoint(start_state, round_num=0)
+      if program_state_manager is not None:
+        program_state_manager.save(start_state, 0)
       start_round = 1
 
     return start_state, start_round
@@ -186,8 +178,9 @@ def _create_on_loop_start_fn(
 
 
 def _create_on_round_end_fn(
-    file_checkpoint_manager: Optional[FileCheckpointManager] = None,
-    metrics_managers: Optional[List[MetricsManager]] = None,
+    program_state_manager: Optional[tff.program.ProgramStateManager] = None,
+    rounds_per_saving_program_state: int = 1,
+    metrics_managers: Optional[List[tff.program.ReleaseManager]] = None,
     part_train_eval_fn: Optional[EvalFnType] = None,
     part_val_fn: Optional[EvalFnType] = None,
     unpart_fn: Optional[EvalFnType] = None):
@@ -196,13 +189,15 @@ def _create_on_round_end_fn(
   In its full generality, this on-round-end callback computes validation metrics
   on the state of an iterative process at a given round number, updates an
   input mapping of metrics with these validation metrics, saves the metrics
-  via `tff.simulation.MetricsManager` objects, and saves a checkpoint via a
-  `tff.simulation.FileCheckpointManager`.
+  via `tff.program.ReleaseManager` objects, and saves program state via a
+  `tff.program.ProgramStateManager`.
 
   Args:
-    file_checkpoint_manager: An optional `tff.simulation.FileCheckpointManager`
-      used to save a checkpoint. If `None`, no checkpoint saving occurs.
-    metrics_managers: An optional list of `tff.simulation.MetricsManager`
+    program_state_manager: An optional `tff.program.ProgramStateManager`
+      used to save a program state. If `None`, no saving occurs.
+    rounds_per_saving_program_state: The number of training rounds to run
+      between saving program state.
+    metrics_managers: An optional list of `tff.program.ReleaseManager`
       instances used to save metrics.
     part_train_eval_fn: An optional callable accepting the current state of the
       iterative process (ie. the first output argument of
@@ -238,10 +233,11 @@ def _create_on_round_end_fn(
             _compute_eval_metrics(state, round_num, eval_fn, prefix))
 
     for metrics_mngr in metrics_managers:
-      metrics_mngr.save_metrics(round_metrics, round_num)
+      metrics_mngr.release(round_metrics, round_num)
 
-    if file_checkpoint_manager is not None:
-      file_checkpoint_manager.save_checkpoint(state, round_num)
+    if program_state_manager is not None:
+      if round_num % rounds_per_saving_program_state == 0:
+        program_state_manager.save(state, round_num)
 
     return state, round_metrics
 
@@ -249,11 +245,9 @@ def _create_on_round_end_fn(
 
 
 def _record_test_metrics(
-    final_state: tff.learning.framework.ServerState,
-    total_rounds: int,
+    final_state: tff.learning.framework.ServerState, total_rounds: int,
     test_fn: Optional[EvalFnType],
-    metrics_managers: Optional[List[MetricsManager]],
-) -> None:
+    metrics_managers: Optional[List[tff.program.ReleaseManager]]):
   """Record test metrics at the end of training.
 
   Args:
@@ -262,8 +256,8 @@ def _record_test_metrics(
     test_fn: An optional callable accepting the current state of the iterative
       process (ie. the first output argument of `iterative_process.next`), and
       returning a mapping of test metrics.
-    metrics_managers: An optional list of `tff.simulation.MetricsManager`
-      objects used to save training metrics throughout the simulation.
+    metrics_managers: An optional list of `tff.program.ReleaseManager` objects
+      used to save training metrics throughout the simulation.
   """
 
   if metrics_managers is None:
@@ -277,7 +271,7 @@ def _record_test_metrics(
     logging.info('Final test metrics:\n %s', pprint.pformat(test_final_metrics))
 
     for metrics_manager in metrics_managers:
-      metrics_manager.save_metrics(test_final_metrics, total_rounds + 1)
+      metrics_manager.release(test_final_metrics, total_rounds + 1)
 
 
 def _run_simulation_with_callbacks(
@@ -308,8 +302,8 @@ def _run_simulation_with_callbacks(
 
   This method uses up to two callbacks. The first, `on_loop_start`, accepts the
   initial state of `process`, and returns a starting `state` and `round_num` for
-  the training loop. The callback can be used for things such as loading
-  checkpoints.
+  the training loop. The callback can be used for things such as loading program
+  states.
 
   The second callback, `on_round_end` is called after each training step. It
   accepts the output state and metrics of `process.next`, and the current round
@@ -321,7 +315,7 @@ def _run_simulation_with_callbacks(
   `process.next`. For example, the `on_round_end` callback can be used to
   mutate state according to the training metrics, enabling various kinds of
   adaptive simulations. If your simulation does not require such mutation, we
-  recommend `tff.simulation.run_simulation` instead.
+  recommend `tff.simulation.run_training_process` instead.
 
   Args:
     process: A `tff.templates.IterativeProcess` instance to run. Must meet the
@@ -366,9 +360,6 @@ def _run_simulation_with_callbacks(
       logging.info('running round end callback')
       state, round_metrics = on_round_end(state, round_num, round_metrics)
 
-    logging.info('Output metrics at round {:d}:\n{!s}'.format(
-        round_num, pprint.pformat(round_metrics)))
-
   return state
 
 
@@ -381,8 +372,9 @@ def run_simulation(
     part_val_fn: Optional[EvalFnType] = None,
     unpart_fn: Optional[EvalFnType] = None,
     test_fn: Optional[EvalFnType] = None,
-    file_checkpoint_manager: Optional[FileCheckpointManager] = None,
-    metrics_managers: Optional[List[MetricsManager]] = None,
+    program_state_manager: Optional[tff.program.ProgramStateManager] = None,
+    rounds_per_saving_program_state: int = 1,
+    metrics_managers: Optional[List[tff.program.ReleaseManager]] = None
 ) -> tff.learning.framework.ServerState:
   """Runs a federated training simulation for a given iterative process.
 
@@ -409,7 +401,7 @@ def run_simulation(
   `unpart_fn` (if not `None`), add these to the metrics created by
   `process.next` (prefixing with `tff.simulation.VALIDATION_METRICS_KEY`), save
   the combined metrics using the `metrics_managers` (if not `None`), and save a
-  checkpoint via `file_checkpoint_manager` (if not `None`).
+  program state via `program_state_manager` (if not `None`).
 
   Args:
     process: A `tff.templates.IterativeProcess` instance to run.
@@ -430,22 +422,25 @@ def run_simulation(
     test_fn: An optional callable accepting the current state of the iterative
       process (ie. the first output argument of `iterative_process.next`) and
       the current round number, and returning a mapping of test metrics.
-    file_checkpoint_manager: An optional `tff.simulation.FileCheckpointManager`
-      used to periodically save checkpoints of the iterative process state.
-    metrics_managers: An optional list of `tff.simulation.MetricsManager`
+    program_state_manager: An optional `tff.program.ProgramStateManager`
+      used to periodically save program state of the iterative process state.
+    rounds_per_saving_program_state: The number of training rounds to run
+      between saving program state.
+    metrics_managers: An optional list of `tff.program.ReleaseManager`
       objects used to save training metrics throughout the simulation.
 
   Returns:
     The `state` of the iterative process after training.
   """
   on_loop_start = _create_on_loop_start_fn(
-      file_checkpoint_manager,
+      program_state_manager,
       metrics_managers,
       part_train_eval_fn,
       part_val_fn,
       unpart_fn,
   )
-  on_round_end = _create_on_round_end_fn(file_checkpoint_manager,
+  on_round_end = _create_on_round_end_fn(program_state_manager,
+                                         rounds_per_saving_program_state,
                                          metrics_managers, part_train_eval_fn,
                                          part_val_fn, unpart_fn)
   final_state = _run_simulation_with_callbacks(process, client_selection_fn,

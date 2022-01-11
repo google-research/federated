@@ -98,15 +98,14 @@ class EpochTimerCallback(tf.keras.callbacks.Callback):
     logs[EPOCH_TIME_KEY] = elapsed_time
 
 
-class MetricWriterManager(tff.simulation.MetricsManager):
-  """A `tff.simulation.MetricsManager` that wraps a `MetricWriter` instance."""
+class MetricWriterManager(tff.program.ReleaseManager):
+  """A `tff.program.ReleaseManager` that wraps a `MetricWriter` instance."""
 
   def __init__(self, metric_writer: metric_writers.MetricWriter):
     self._writer = metric_writer
 
-  def save_metrics(self, metrics: Mapping[str, Any], round_num: int):
-    self._writer.write_scalars(
-        step=round_num, scalars=_flatten_nested_dict(metrics))
+  def release(self, value: Mapping[str, Any], key: int):
+    self._writer.write_scalars(step=key, scalars=_flatten_nested_dict(value))
 
 
 class MetricWriterCallback(tf.keras.callbacks.Callback):
@@ -167,11 +166,9 @@ def write_hparams(hparam_dict: Dict[str, Any], root_output_dir: str,
 
 
 def configure_default_managers(
-    root_output_dir: str,
-    experiment_name: str,
-    rounds_per_checkpoint: int,
-) -> Tuple[tff.simulation.FileCheckpointManager,
-           List[tff.simulation.MetricsManager]]:
+    root_output_dir: str, experiment_name: str
+) -> Tuple[tff.program.FileProgramStateManager,
+           List[tff.program.ReleaseManager]]:
   """Configures checkpoint and metrics managers for federated experiments.
 
   Args:
@@ -180,25 +177,25 @@ def configure_default_managers(
       subdirectories of this directory.
     experiment_name: A unique identifier for the current training simulation,
       used to create appropriate subdirectories of `root_output_dir`.
-    rounds_per_checkpoint: How often to write checkpoints.
 
   Returns:
-    A `tff.simulation.FileCheckpointManager`, and a list of
-    `tff.simulation.MetricsManager` instances.
+    A `tff.program.FileProgramStateManager`, and a list of
+    `tff.program.ReleaseManager` instances.
   """
   checkpoint_dir, results_dir, summary_dir = _make_output_dirs(
       root_output_dir, experiment_name)
 
-  checkpoint_manager = tff.simulation.FileCheckpointManager(
-      checkpoint_dir, step=rounds_per_checkpoint)
+  checkpoint_manager = tff.program.FileProgramStateManager(checkpoint_dir)
 
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
 
-  metric_managers = [tff.simulation.CSVMetricsManager(csv_file)]
-
-  metric_managers.append(
+  metric_managers = [
+      tff.program.LoggingReleaseManager(),
+      tff.program.CSVFileReleaseManager(csv_file),
       MetricWriterManager(
-          metric_writers.create_default_writer(logdir=summary_dir)))
+          metric_writers.create_default_writer(logdir=summary_dir))
+  ]
+
   logging.info('Writing...')
   logging.info('    checkpoints to: %s', checkpoint_dir)
   logging.info('    CSV metrics to: %s', csv_file)

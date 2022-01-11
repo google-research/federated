@@ -27,14 +27,13 @@ from generalization.utils import metric_utils
 class LoadInitialCheckpointTest(parameterized.TestCase):
 
   def test_returns_input_state_and_zero_if_checkpoint_is_none(self):
-    file_checkpoint_manager = mock.create_autospec(
-        tff.simulation.FileCheckpointManager)
-    file_checkpoint_manager.load_latest_checkpoint.return_value = (None, 10)
+    program_state_manager = mock.create_autospec(
+        tff.program.FileProgramStateManager)
+    program_state_manager.load_latest.return_value = (None, 10)
     input_state = 'input_state'
-    state, round_num = federated_training_loop._load_initial_checkpoint(
-        input_state, file_checkpoint_manager)
-    file_checkpoint_manager.load_latest_checkpoint.assert_called_once_with(
-        input_state)
+    state, round_num = federated_training_loop._load_initial_program_state(
+        input_state, program_state_manager)
+    program_state_manager.load_latest.assert_called_once_with(input_state)
     self.assertEqual(input_state, state)
     self.assertEqual(round_num, 0)
 
@@ -45,16 +44,13 @@ class LoadInitialCheckpointTest(parameterized.TestCase):
       ('checkpoint_round_4', 2, 2),
   )
   def test_checkpoint_not_none(self, state, round_num):
-    file_checkpoint_manager = mock.create_autospec(
-        tff.simulation.FileCheckpointManager)
-    file_checkpoint_manager.load_latest_checkpoint.return_value = (state,
-                                                                   round_num -
-                                                                   1)
+    program_state_manager = mock.create_autospec(
+        tff.program.FileProgramStateManager)
+    program_state_manager.load_latest.return_value = (state, round_num - 1)
     input_state = 'input_state'
-    actual_state, actual_round = federated_training_loop._load_initial_checkpoint(
-        input_state, file_checkpoint_manager)
-    file_checkpoint_manager.load_latest_checkpoint.assert_called_once_with(
-        input_state)
+    actual_state, actual_round = federated_training_loop._load_initial_program_state(
+        input_state, program_state_manager)
+    program_state_manager.load_latest.assert_called_once_with(input_state)
 
     self.assertEqual(actual_state, state)
     self.assertEqual(actual_round, round_num)
@@ -102,7 +98,7 @@ class ComputeEvalMetricsTest(parameterized.TestCase):
 
 class BuildOnLoopStartFnTest(parameterized.TestCase):
 
-  @mock.patch.object(federated_training_loop, '_load_initial_checkpoint')
+  @mock.patch.object(federated_training_loop, '_load_initial_program_state')
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_no_input_args(self, mock_compute_eval_metrics,
                                     mock_initialize):
@@ -117,53 +113,53 @@ class BuildOnLoopStartFnTest(parameterized.TestCase):
     self.assertEqual(actual_state, expected_state)
     self.assertEqual(actual_round, expected_round)
 
-  @mock.patch.object(federated_training_loop, '_load_initial_checkpoint')
+  @mock.patch.object(federated_training_loop, '_load_initial_program_state')
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_only_checkpoint_manager_and_zero_checkpoint_round(
       self, mock_compute_eval_metrics, mock_initialize):
-    file_checkpoint_manager = mock.create_autospec(
-        tff.simulation.FileCheckpointManager)
+    program_state_manager = mock.create_autospec(
+        tff.program.FileProgramStateManager)
     expected_state = 'state'
     expected_round = 1
     mock_initialize.return_value = (expected_state, expected_round - 1)
     on_loop_start_fn = federated_training_loop._create_on_loop_start_fn(
-        file_checkpoint_manager=file_checkpoint_manager)
+        program_state_manager=program_state_manager)
     on_loop_start_input = 'input'
     actual_state, actual_round = on_loop_start_fn(on_loop_start_input)
     mock_initialize.assert_called_once_with(on_loop_start_input,
-                                            file_checkpoint_manager)
+                                            program_state_manager)
     mock_compute_eval_metrics.assert_not_called()
-    file_checkpoint_manager.save_checkpoint.assert_called_once_with(
-        expected_state, expected_round - 1)
+    program_state_manager.save.assert_called_once_with(expected_state,
+                                                       expected_round - 1)
     self.assertEqual(actual_state, expected_state)
     self.assertEqual(actual_round, expected_round)
 
-  @mock.patch.object(federated_training_loop, '_load_initial_checkpoint')
+  @mock.patch.object(federated_training_loop, '_load_initial_program_state')
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_only_checkpoint_manager_and_non_zero_checkpoint_round(
       self, mock_compute_eval_metrics, mock_initialize):
-    file_checkpoint_manager = mock.create_autospec(
-        tff.simulation.FileCheckpointManager)
+    program_state_manager = mock.create_autospec(
+        tff.program.FileProgramStateManager)
     expected_state = 'state'
     expected_round = 3
     mock_initialize.return_value = (expected_state, expected_round)
     on_loop_start_fn = federated_training_loop._create_on_loop_start_fn(
-        file_checkpoint_manager=file_checkpoint_manager)
+        program_state_manager=program_state_manager)
     on_loop_start_input = 'input'
     actual_state, actual_round = on_loop_start_fn(on_loop_start_input)
     mock_initialize.assert_called_once_with(on_loop_start_input,
-                                            file_checkpoint_manager)
+                                            program_state_manager)
     mock_compute_eval_metrics.assert_not_called()
-    file_checkpoint_manager.save_checkpoint.assert_not_called()
+    program_state_manager.save.assert_not_called()
     self.assertEqual(actual_state, expected_state)
     self.assertEqual(actual_round, expected_round)
 
-  @mock.patch.object(federated_training_loop, '_load_initial_checkpoint')
+  @mock.patch.object(federated_training_loop, '_load_initial_program_state')
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_only_metrics_managers(self, mock_compute_eval_metrics,
                                             mock_initialize):
-    metric_manager1 = mock.create_autospec(tff.simulation.MetricsManager)
-    metric_manager2 = mock.create_autospec(tff.simulation.MetricsManager)
+    metric_manager1 = mock.create_autospec(tff.program.ReleaseManager)
+    metric_manager2 = mock.create_autospec(tff.program.ReleaseManager)
     metrics_managers = [metric_manager1, metric_manager2]
     on_loop_start_fn = federated_training_loop._create_on_loop_start_fn(
         metrics_managers=metrics_managers)
@@ -175,8 +171,7 @@ class BuildOnLoopStartFnTest(parameterized.TestCase):
     expected_state = on_loop_start_input
     expected_round = 1
     for metr_mngr in metrics_managers:
-      metr_mngr.clear_metrics.assert_called_once_with(expected_round - 1)
-      metr_mngr.save_metrics.assert_not_called()
+      metr_mngr.release.assert_not_called()
     self.assertEqual(actual_state, expected_state)
     self.assertEqual(actual_round, expected_round)
 
@@ -184,7 +179,7 @@ class BuildOnLoopStartFnTest(parameterized.TestCase):
       ('train_train_eval={},train_val={},val={}'.format(*eval_fn_bools),
        *eval_fn_bools)
       for eval_fn_bools in itertools.product([False, True], repeat=3))
-  @mock.patch.object(federated_training_loop, '_load_initial_checkpoint')
+  @mock.patch.object(federated_training_loop, '_load_initial_program_state')
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_only_eval_fns(self, use_part_train_eval_fn,
                                     use_part_val_fn, use_unpart_fn,
@@ -217,13 +212,13 @@ class BuildOnLoopStartFnTest(parameterized.TestCase):
     self.assertEqual(actual_state, expected_state)
     self.assertEqual(actual_round, expected_round)
 
-  @mock.patch.object(federated_training_loop, '_load_initial_checkpoint')
+  @mock.patch.object(federated_training_loop, '_load_initial_program_state')
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_metrics_managers_and_unpart_fn(self,
                                                      mock_compute_eval_metrics,
                                                      mock_initialize):
-    metric_manager1 = mock.create_autospec(tff.simulation.MetricsManager)
-    metric_manager2 = mock.create_autospec(tff.simulation.MetricsManager)
+    metric_manager1 = mock.create_autospec(tff.program.ReleaseManager)
+    metric_manager2 = mock.create_autospec(tff.program.ReleaseManager)
     metrics_managers = [metric_manager1, metric_manager2]
     unpart_fn = mock.MagicMock()
     metrics = collections.OrderedDict(metric1=2)
@@ -241,33 +236,32 @@ class BuildOnLoopStartFnTest(parameterized.TestCase):
         metric_utils.UNPART_METRICS_PREFIX)
 
     for metr_mngr in metrics_managers:
-      metr_mngr.clear_metrics.assert_called_once_with(0)
-      metr_mngr.save_metrics.assert_called_once_with(metrics, 0)
+      metr_mngr.release.assert_called_once_with(metrics, 0)
     self.assertEqual(actual_state, expected_state)
     self.assertEqual(actual_round, expected_round)
 
-  @mock.patch.object(federated_training_loop, '_load_initial_checkpoint')
+  @mock.patch.object(federated_training_loop, '_load_initial_program_state')
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_non_zero_checkpoint_and_eval_fns(
       self, mock_compute_eval_metrics, mock_initialize):
-    file_checkpoint_manager = mock.create_autospec(
-        tff.simulation.FileCheckpointManager)
+    program_state_manager = mock.create_autospec(
+        tff.program.FileProgramStateManager)
     part_train_eval_fn, part_val_fn, unpart_fn = mock.MagicMock(
     ), mock.MagicMock(), mock.MagicMock()
     expected_state = 'state'
     expected_round = 2
     mock_initialize.return_value = (expected_state, expected_round)
     on_loop_start_fn = federated_training_loop._create_on_loop_start_fn(
-        file_checkpoint_manager=file_checkpoint_manager,
+        program_state_manager=program_state_manager,
         part_train_eval_fn=part_train_eval_fn,
         part_val_fn=part_val_fn,
         unpart_fn=unpart_fn)
     on_loop_start_input = 'input'
     actual_state, actual_round = on_loop_start_fn(on_loop_start_input)
     mock_initialize.assert_called_once_with(on_loop_start_input,
-                                            file_checkpoint_manager)
+                                            program_state_manager)
     mock_compute_eval_metrics.assert_not_called()
-    file_checkpoint_manager.save_checkpoint.assert_not_called()
+    program_state_manager.save.assert_not_called()
     self.assertEqual(actual_state, expected_state)
     self.assertEqual(actual_round, expected_round)
 
@@ -287,25 +281,24 @@ class CreateOnRoundEndTest(absltest.TestCase):
 
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_only_checkpoint_manager(self, mock_compute_eval_metrics):
-    file_checkpoint_manager = mock.create_autospec(
-        tff.simulation.FileCheckpointManager)
+    program_state_manager = mock.create_autospec(
+        tff.program.FileProgramStateManager)
     on_round_end_fn = federated_training_loop._create_on_round_end_fn(
-        file_checkpoint_manager=file_checkpoint_manager)
+        program_state_manager=program_state_manager)
     state = 'state'
     round_num = 1
     metrics = {'metric': 1}
     actual_state, actual_metrics = on_round_end_fn(state, round_num, metrics)
     mock_compute_eval_metrics.assert_not_called()
-    file_checkpoint_manager.load_latest_checkpoint.assert_not_called()
-    file_checkpoint_manager.save_checkpoint.assert_called_once_with(
-        state, round_num)
+    program_state_manager.load_latest.assert_not_called()
+    program_state_manager.save.assert_called_once_with(state, round_num)
     self.assertEqual(actual_state, state)
     self.assertEqual(actual_metrics, metrics)
 
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_only_metrics_managers(self, mock_compute_eval_metrics):
-    mock_metrics_manager1 = mock.create_autospec(tff.simulation.MetricsManager)
-    mock_metrics_manager2 = mock.create_autospec(tff.simulation.MetricsManager)
+    mock_metrics_manager1 = mock.create_autospec(tff.program.ReleaseManager)
+    mock_metrics_manager2 = mock.create_autospec(tff.program.ReleaseManager)
     metrics_managers = [mock_metrics_manager1, mock_metrics_manager2]
     on_round_end_fn = federated_training_loop._create_on_round_end_fn(
         metrics_managers=metrics_managers)
@@ -315,9 +308,7 @@ class CreateOnRoundEndTest(absltest.TestCase):
     actual_state, actual_metrics = on_round_end_fn(state, round_num, metrics)
     mock_compute_eval_metrics.assert_not_called()
     for mock_metrics_manager in metrics_managers:
-      mock_metrics_manager.clear_metrics.assert_not_called()
-      mock_metrics_manager.save_metrics.assert_called_once_with(
-          metrics, round_num)
+      mock_metrics_manager.release.assert_called_once_with(metrics, round_num)
     self.assertEqual(actual_state, state)
     self.assertEqual(actual_metrics, metrics)
 
@@ -340,8 +331,8 @@ class CreateOnRoundEndTest(absltest.TestCase):
   @mock.patch.object(federated_training_loop, '_compute_eval_metrics')
   def test_calls_with_unpart_fn_and_metrics_managers(self,
                                                      mock_compute_eval_metrics):
-    mock_metrics_manager1 = mock.create_autospec(tff.simulation.MetricsManager)
-    mock_metrics_manager2 = mock.create_autospec(tff.simulation.MetricsManager)
+    mock_metrics_manager1 = mock.create_autospec(tff.program.ReleaseManager)
+    mock_metrics_manager2 = mock.create_autospec(tff.program.ReleaseManager)
     metrics_managers = [mock_metrics_manager1, mock_metrics_manager2]
     unpart_fn = mock.MagicMock()
     mock_compute_eval_metrics.return_value = {'unpart_metric': 2}
@@ -356,8 +347,7 @@ class CreateOnRoundEndTest(absltest.TestCase):
         state, round_num, unpart_fn, metric_utils.UNPART_METRICS_PREFIX)
     expected_metrics = {'metric': 1, 'unpart_metric': 2}
     for mock_metrics_manager in metrics_managers:
-      mock_metrics_manager.clear_metrics.assert_not_called()
-      mock_metrics_manager.save_metrics.assert_called_once_with(
+      mock_metrics_manager.release.assert_called_once_with(
           expected_metrics, round_num)
     self.assertEqual(actual_state, state)
     self.assertEqual(actual_metrics, expected_metrics)
@@ -383,7 +373,7 @@ class RunSimulationTest(parameterized.TestCase):
                                            total_rounds)
     mock_create_on_loop_start.assert_called_once_with(None, None, None, None,
                                                       None)
-    mock_create_on_round_end.assert_called_once_with(None, None, None, None,
+    mock_create_on_round_end.assert_called_once_with(None, 1, None, None, None,
                                                      None)
     mock_run_simulation_with_callbacks.assert_called_once_with(
         process, client_selection_fn, total_rounds, on_loop_start, on_round_end)
@@ -397,7 +387,7 @@ class RunSimulationTest(parameterized.TestCase):
   @mock.patch.object(federated_training_loop, '_create_on_round_end_fn')
   @mock.patch.object(federated_training_loop, '_create_on_loop_start_fn')
   def test_run_simulation_passes_named_optional_arguments_correctly(
-      self, file_checkpoint_manager, metrics_managers, part_train_eval_fn,
+      self, program_state_manager, metrics_managers, part_train_eval_fn,
       part_val_fn, unpart_fn, test_fn, mock_create_on_loop_start,
       mock_create_on_round_end, mock_run_simulation_with_callbacks,
       mock_record_test_metrics):
@@ -419,14 +409,14 @@ class RunSimulationTest(parameterized.TestCase):
         part_val_fn=part_val_fn,
         unpart_fn=unpart_fn,
         test_fn=test_fn,
-        file_checkpoint_manager=file_checkpoint_manager,
+        program_state_manager=program_state_manager,
         metrics_managers=metrics_managers,
     )
-    mock_create_on_loop_start.assert_called_once_with(file_checkpoint_manager,
+    mock_create_on_loop_start.assert_called_once_with(program_state_manager,
                                                       metrics_managers,
                                                       part_train_eval_fn,
                                                       part_val_fn, unpart_fn)
-    mock_create_on_round_end.assert_called_once_with(file_checkpoint_manager,
+    mock_create_on_round_end.assert_called_once_with(program_state_manager, 1,
                                                      metrics_managers,
                                                      part_train_eval_fn,
                                                      part_val_fn, unpart_fn)

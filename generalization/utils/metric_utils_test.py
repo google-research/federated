@@ -109,39 +109,48 @@ class ConfigureManagersTest(tf.test.TestCase):
   def test_checkpoint_manager_saves_to_correct_dir(self):
     root_output_dir = self.get_temp_dir()
     experiment_name = 'test'
-    checkpoint_manager, _ = metric_utils.configure_default_managers(
-        root_output_dir, experiment_name, rounds_per_checkpoint=1)
-    self.assertIsInstance(checkpoint_manager,
-                          tff.simulation.FileCheckpointManager)
+    program_state_manager, _ = metric_utils.configure_default_managers(
+        root_output_dir, experiment_name)
+    self.assertIsInstance(program_state_manager,
+                          tff.program.FileProgramStateManager)
 
     checkpoint_path = os.path.join(root_output_dir, 'checkpoints',
                                    experiment_name)
     test_state = _create_scalar_metrics()
-    checkpoint_manager.save_checkpoint(test_state, 1)
-    self.assertCountEqual(tf.io.gfile.listdir(checkpoint_path), ['ckpt_1'])
+    program_state_manager.save(test_state, 1)
+    self.assertCountEqual(
+        tf.io.gfile.listdir(checkpoint_path), ['program_state_1'])
+
+  def test_logging_manager_exists(self):
+    root_output_dir = self.get_temp_dir()
+    experiment_name = 'test'
+    _, metrics_managers = metric_utils.configure_default_managers(
+        root_output_dir, experiment_name)
+    logging_manager = metrics_managers[0]
+    self.assertIsInstance(logging_manager, tff.program.LoggingReleaseManager)
 
   def test_csv_manager_saves_to_correct_dir(self):
     root_output_dir = self.get_temp_dir()
     experiment_name = 'test'
     _, metrics_managers = metric_utils.configure_default_managers(
-        root_output_dir, experiment_name, rounds_per_checkpoint=50)
-    csv_manager = metrics_managers[0]
-    self.assertIsInstance(csv_manager, tff.simulation.CSVMetricsManager)
+        root_output_dir, experiment_name)
+    csv_manager = metrics_managers[1]
+    self.assertIsInstance(csv_manager, tff.program.CSVFileReleaseManager)
 
     expected_metrics_file = os.path.join(root_output_dir, 'results',
                                          experiment_name,
                                          'experiment.metrics.csv')
-    self.assertEqual(csv_manager._metrics_file, expected_metrics_file)
+    self.assertEqual(csv_manager._file_path, expected_metrics_file)
 
   def test_default_writer_saves_to_correct_dir(self):
     root_output_dir = self.get_temp_dir()
     experiment_name = 'test'
     _, metrics_managers = metric_utils.configure_default_managers(
-        root_output_dir, experiment_name, rounds_per_checkpoint=50)
-    default_writer_manager = metrics_managers[1]
+        root_output_dir, experiment_name)
+    default_writer_manager = metrics_managers[2]
 
     summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
-    default_writer_manager.save_metrics(_create_scalar_metrics(), 0)
+    default_writer_manager.release(_create_scalar_metrics(), 0)
 
     self.assertTrue(tf.io.gfile.exists(summary_dir))
     self.assertLen(tf.io.gfile.listdir(summary_dir), 1)

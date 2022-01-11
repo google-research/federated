@@ -79,13 +79,11 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
 
     root_output_dir = self.get_temp_dir()
     exp_name = 'test_run_federated'
-    rounds_per_checkpoint = 1
+    rounds_per_saving_program_state = 1
     total_rounds = 1
 
-    checkpoint_manager, metric_managers = metric_utils.configure_default_managers(
-        root_output_dir=root_output_dir,
-        experiment_name=exp_name,
-        rounds_per_checkpoint=rounds_per_checkpoint)
+    program_state_manager, metric_managers = metric_utils.configure_default_managers(
+        root_output_dir=root_output_dir, experiment_name=exp_name)
 
     federated_training_loop.run_simulation(
         process=runner_spec.iterative_process,
@@ -95,7 +93,8 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
         part_val_fn=runner_spec.part_val_fn,
         unpart_fn=runner_spec.unpart_fn,
         test_fn=runner_spec.test_fn,
-        file_checkpoint_manager=checkpoint_manager,
+        program_state_manager=program_state_manager,
+        rounds_per_saving_program_state=rounds_per_saving_program_state,
         metrics_managers=metric_managers,
     )
 

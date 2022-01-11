@@ -379,7 +379,7 @@ def configure_training_federated(
 
   This method will load and pre-process datasets and construct a model used for
   the task. It then uses `iterative_process_builder` to create an iterative
-  process compatible with `tff.simulation.run_simulation`.
+  process compatible with `tff.simulation.run_training_process`.
 
   Args:
     task_spec: A `TaskSpecFederated` instance for creating federated training

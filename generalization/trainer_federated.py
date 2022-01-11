@@ -282,9 +282,7 @@ def main(argv):
                              FLAGS.root_output_dir, FLAGS.experiment_name)
 
   checkpoint_manager, metrics_managers = metric_utils.configure_default_managers(
-      FLAGS.root_output_dir,
-      FLAGS.experiment_name,
-      rounds_per_checkpoint=FLAGS.rounds_per_checkpoint)
+      FLAGS.root_output_dir, FLAGS.experiment_name)
 
   logging.info('Starting `federated_training_loop.run_simulation`.')
   federated_training_loop.run_simulation(
@@ -295,7 +293,8 @@ def main(argv):
       part_val_fn=runner_spec.part_val_fn,
       unpart_fn=runner_spec.unpart_fn,
       test_fn=runner_spec.test_fn,
-      file_checkpoint_manager=checkpoint_manager,
+      program_state_manager=checkpoint_manager,
+      rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers,
   )
 
