@@ -90,20 +90,6 @@ class CreateManagersTest(parameterized.TestCase):
 
 class TrainingUtilsTest(tf.test.TestCase):
 
-  def test_checkpoint_manager_saves_to_correct_dir(self):
-    root_output_dir = self.get_temp_dir()
-    experiment_name = 'test'
-    checkpoint_manager, _ = training_utils.configure_managers(
-        root_output_dir, experiment_name, rounds_per_checkpoint=1)
-    self.assertIsInstance(checkpoint_manager,
-                          tff.simulation.FileCheckpointManager)
-
-    checkpoint_path = os.path.join(root_output_dir, 'checkpoints',
-                                   experiment_name)
-    test_state = create_scalar_metrics()
-    checkpoint_manager.save_checkpoint(test_state, 1)
-    self.assertCountEqual(tf.io.gfile.listdir(checkpoint_path), ['ckpt_1'])
-
   def test_write_hparams_to_csv_writes_to_correct_file(self):
     root_output_dir = self.get_temp_dir()
     experiment_name = 'test'

@@ -74,49 +74,6 @@ def create_managers(
   ]
 
 
-def configure_managers(
-    root_output_dir: str,
-    experiment_name: str,
-    rounds_per_checkpoint: int = 50,
-    csv_metrics_manager_save_mode: tff.simulation.SaveMode = tff.simulation
-    .SaveMode.APPEND
-) -> Tuple[tff.simulation.FileCheckpointManager,
-           List[tff.simulation.MetricsManager]]:
-  """Configures checkpoint and metrics managers.
-
-  Args:
-    root_output_dir: A string representing the root output directory for the
-      training simulation. All metrics and checkpoints will be logged to
-      subdirectories of this directory.
-    experiment_name: A unique identifier for the current training simulation,
-      used to create appropriate subdirectories of `root_output_dir`.
-    rounds_per_checkpoint: How often to write checkpoints.
-    csv_metrics_manager_save_mode: A SaveMode specifying the save mode for
-      CSVMetricsManager.
-
-  Returns:
-    A `tff.simulation.FileCheckpointManager`, and a list of
-    `tff.simulation.MetricsManager` instances.
-  """
-  checkpoint_dir = os.path.join(root_output_dir, 'checkpoints', experiment_name)
-  checkpoint_manager = tff.simulation.FileCheckpointManager(
-      checkpoint_dir, step=rounds_per_checkpoint)
-
-  results_dir = os.path.join(root_output_dir, 'results', experiment_name)
-  csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  csv_manager = tff.simulation.CSVMetricsManager(
-      csv_file, save_mode=csv_metrics_manager_save_mode)
-
-  summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
-  tensorboard_manager = tff.simulation.TensorBoardManager(summary_dir)
-
-  logging.info('Writing...')
-  logging.info('    checkpoints to: %s', checkpoint_dir)
-  logging.info('    CSV metrics to: %s', csv_file)
-  logging.info('    TensorBoard summaries to: %s', summary_dir)
-  return checkpoint_manager, [csv_manager, tensorboard_manager]
-
-
 def write_hparams_to_csv(hparam_dict: Dict[str, Any], root_output_dir: str,
                          experiment_name: str) -> None:
   """Writes a dictionary of hyperparameters to a CSV file.
