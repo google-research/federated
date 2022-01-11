@@ -241,37 +241,29 @@ def run_federated(
       tf_test_datasets, clients_per_round=clients_per_round)
 
   # Create final evaluation functions to pass to `training_loop`.
-  val_fn = federated_trainer_utils.build_eval_fn(
-      evaluation_computation=evaluation_computation,
-      client_datasets_fn=val_client_datasets_fn,
-      get_model=training_process.get_model_weights)  # pytype: disable=attribute-error  # gen-stub-imports
+  def val_fn(state, sampled_data):
+    model = training_process.get_model_weights(state)
+    return evaluation_computation(model, sampled_data)
+
   test_fn = federated_trainer_utils.build_eval_fn(
       evaluation_computation=evaluation_computation,
       client_datasets_fn=test_client_datasets_fn,
       get_model=training_process.get_model_weights)  # pytype: disable=attribute-error  # gen-stub-imports
   test_fn = functools.partial(test_fn, round_num=0)
 
-  def round_end_evaluation_fn(state, round_num):
-    if round_num % rounds_per_eval == 0:
-      validation_metrics = val_fn(state, round_num)
-    else:
-      validation_metrics = {}
-    return validation_metrics
-
-  checkpoint_manager, metrics_managers = training_utils.configure_managers(
-      root_output_dir, experiment_name, rounds_per_checkpoint)
-
-  logging.info('Starting training loop.')
-  state = tff.simulation.run_simulation(
-      process=training_process,
-      client_selection_fn=train_client_datasets_fn,
+  program_state_manager, metrics_managers = training_utils.create_managers(
+      root_output_dir, experiment_name)
+  state = tff.simulation.run_training_process(
+      training_process=training_process,
+      training_selection_fn=train_client_datasets_fn,
       total_rounds=total_rounds,
-      validation_fn=round_end_evaluation_fn,
-      file_checkpoint_manager=checkpoint_manager,
+      evaluation_fn=val_fn,
+      evaluation_selection_fn=val_client_datasets_fn,
+      rounds_per_evaluation=rounds_per_eval,
+      program_state_manager=program_state_manager,
+      rounds_per_saving_program_state=rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
   test_metrics = test_fn(state)
-  logging.info('Test metrics:\n %s', test_metrics)
-
   for metrics_manager in metrics_managers:
-    metrics_manager.save_metrics(test_metrics, total_rounds + 1)
+    metrics_manager.release(test_metrics, total_rounds + 1)
