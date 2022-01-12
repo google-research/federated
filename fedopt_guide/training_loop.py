@@ -44,7 +44,8 @@ def _setup_outputs(root_output_dir, experiment_name, hparam_dict):
 
   results_dir = os.path.join(root_output_dir, 'results', experiment_name)
   csv_file = os.path.join(results_dir, 'experiment.metrics.csv')
-  metrics_mngr = tff.program.CSVFileReleaseManager(csv_file)
+  metrics_mngr = tff.program.CSVFileReleaseManager(
+      file_path=csv_file, key_fieldname='round_num')
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
   tensorboard_mngr = tff.program.TensorboardReleaseManager(summary_logdir)

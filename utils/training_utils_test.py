@@ -82,7 +82,9 @@ class CreateManagersTest(parameterized.TestCase):
     csv_file_path = os.path.join(root_dir, 'results', experiment_name,
                                  'experiment.metrics.csv')
     mock_csv_file_release_manager.assert_called_once_with(
-        file_path=csv_file_path, save_mode=csv_save_mode)
+        file_path=csv_file_path,
+        save_mode=csv_save_mode,
+        key_fieldname='round_num')
     summary_dir = os.path.join(root_dir, 'logdir', experiment_name)
     mock_tensorboard_release_manager.assert_called_once_with(
         summary_dir=summary_dir)

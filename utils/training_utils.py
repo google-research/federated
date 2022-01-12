@@ -57,7 +57,9 @@ def create_managers(
   csv_file_path = os.path.join(root_dir, 'results', experiment_name,
                                'experiment.metrics.csv')
   csv_file_release_manager = tff.program.CSVFileReleaseManager(
-      file_path=csv_file_path, save_mode=csv_save_mode)
+      file_path=csv_file_path,
+      save_mode=csv_save_mode,
+      key_fieldname='round_num')
 
   summary_dir = os.path.join(root_dir, 'logdir', experiment_name)
   tensorboard_release_manager = tff.program.TensorboardReleaseManager(

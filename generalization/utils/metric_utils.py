@@ -191,7 +191,8 @@ def configure_default_managers(
 
   metric_managers = [
       tff.program.LoggingReleaseManager(),
-      tff.program.CSVFileReleaseManager(csv_file),
+      tff.program.CSVFileReleaseManager(
+          file_path=csv_file, key_fieldname='round_num'),
       MetricWriterManager(
           metric_writers.create_default_writer(logdir=summary_dir))
   ]
