@@ -192,8 +192,8 @@ class ClientOutput(object):
   -   `client_weight`: Weight to be used in a weighted mean when
       aggregating `weights_delta`.
   -   `model_output`: A structure matching
-      `tff.learning.Model.report_local_outputs`, reflecting the results of
-      training on the input dataset.
+      `tff.learning.Model.report_local_unfinalized_metrics`, reflecting the
+      results of training on the input dataset.
   -   `optimizer_output`: Additional metrics or other outputs defined by the
       optimizer.
   -   `additional_output`: A dictionary of additional outputs that may contain
@@ -577,9 +577,9 @@ def client_update(model,
     client_single_data_pass_fn: A function for taking a single pass over the
       client data to update the model and compute necessary outputs.
     client_weight_fn: Optional function that takes the output of
-      `model.report_local_outputs` and returns a tensor that provides the weight
-      in the federated average of model deltas. If not provided, the default is
-      the total number of examples processed on device.
+      `model.report_local_unfinalized_metrics` and returns a tensor that
+      provides the weight in the federated average of model deltas. If not
+      provided, the default is the total number of examples processed on device.
 
   Returns:
     A 'ClientOutput`.
@@ -613,7 +613,7 @@ def client_update(model,
   # Check for non-finite weights.
   weights_delta, has_non_finite_weight = (
       tensor_utils.zero_all_if_any_non_finite(updates.weights_delta))
-  model_output = model.report_local_outputs()
+  model_output = model.report_local_unfinalized_metrics()
   optimizer_output = collections.OrderedDict(num_examples=num_examples)
   weights_delta_zeros_percent = _compute_zeros_percentage(weights_delta)
 
@@ -766,9 +766,9 @@ def build_fed_pa_process(
     server_lr: A scalar learning rate or a function that accepts a float
       `round_num` argument and returns a learning rate.
     client_weight_fn: Optional function that takes the output of
-      `model.report_local_outputs` and returns a tensor that provides the weight
-      in the federated average of model deltas. If not provided, the default is
-      the total number of examples processed on device.
+      `model.report_local_unfinalized_metrics` and returns a tensor that
+      provides the weight in the federated average of model deltas. If not
+      provided, the default is the total number of examples processed on device.
     mask_zeros_in_client_updates: A boolean indicating whether to average deltas
       with zero masking that affects the denominator in the average elementwise.
 
@@ -785,6 +785,10 @@ def build_fed_pa_process(
     server_lr_schedule = lambda round_num: server_lr
 
   placeholder_model = model_fn()
+  unfinalized_metrics_type = tff.framework.type_from_tensors(
+      placeholder_model.report_local_unfinalized_metrics())
+  metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
+      placeholder_model.metric_finalizers(), unfinalized_metrics_type)
 
   server_init_tf = build_server_init_fn(
       model_fn,
@@ -842,8 +846,7 @@ def build_fed_pa_process(
       federated_dataset: A federated `tf.Dataset` with placement `tff.CLIENTS`.
 
     Returns:
-      A tuple of updated `ServerState` and the result of
-      `tff.learning.Model.federated_output_computation`.
+      A tuple of updated `ServerState` and aggregated metrics.
     """
     # Run computation on the clients.
     client_model = tff.federated_broadcast(server_state.model)
@@ -866,8 +869,7 @@ def build_fed_pa_process(
                                      (server_state, model_delta))
 
     # Aggregate model outputs that contain local metrics and various statistics.
-    aggregated_outputs = placeholder_model.federated_output_computation(
-        client_outputs.model_output)
+    aggregated_outputs = metrics_aggregation_fn(client_outputs.model_output)
     aggregated_outputs_type = typing.cast(tff.FederatedType,
                                           aggregated_outputs.type_signature)
     additional_outputs = tff.federated_mean(

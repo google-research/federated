@@ -163,6 +163,11 @@ class ModelDeltaProcessTest(tf.test.TestCase, parameterized.TestCase):
 
     with tf.Graph().as_default():
       test_model_for_types = _uncompiled_model_builder()
+      unfinalized_metrics_type = tff.framework.type_from_tensors(
+          test_model_for_types.report_local_unfinalized_metrics())
+      metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
+          test_model_for_types.metric_finalizers(), unfinalized_metrics_type)
+      metrics_type = metrics_aggregation_fn.type_signature.result
 
     server_state_type = tff.FederatedType(
         fed_avg_local_adaptivity.ServerState(
@@ -172,7 +177,6 @@ class ModelDeltaProcessTest(tf.test.TestCase, parameterized.TestCase):
                     test_model_for_types.non_trainable_variables)),
             optimizer_state=(tf.int64,),
             round_num=tf.float32), tff.SERVER)
-    metrics_type = test_model_for_types.federated_output_computation.type_signature.result
 
     expected_parameter_type = collections.OrderedDict(
         server_state=server_state_type,

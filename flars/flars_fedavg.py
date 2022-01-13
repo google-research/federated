@@ -39,8 +39,8 @@ class ClientOutput(object):
   -   `weights_delta_weight`: Weight to be used in a weighted mean when
       aggregating `weights_delta`.
   -   `model_output`: A structure matching
-      `tff.learning.Model.report_local_outputs`, reflecting the results of
-      training on the input dataset.
+      `tff.learning.Model.report_local_unfinalized_metrics`, reflecting the
+      results of training on the input dataset.
   -   `optimizer_output`: structure containing tensors used by the optimizer.
   """
   weights_delta = attr.ib()
@@ -180,7 +180,7 @@ def client_update(model, optimizer, dataset, initial_weights):
   return ClientOutput(
       weights_delta,
       weights_delta_weight,
-      model_output=model.report_local_outputs(),
+      model_output=model.report_local_unfinalized_metrics(),
       optimizer_output=collections.OrderedDict(
           num_examples=batch_weight_sum,
           flat_grads_norm_sum=flat_grads_norm_sum))
@@ -288,14 +288,15 @@ def build_client_update_fn(model_fn, client_optimizer_fn, tf_dataset_type,
 
 
 def build_run_one_round_fn(server_update_fn, client_update_fn,
-                           dummy_model_for_metadata,
-                           federated_server_state_type, federated_dataset_type):
+                           metrics_aggregation_fn, federated_server_state_type,
+                           federated_dataset_type):
   """Builds a `tff.federated_computation` for a round of training.
 
   Args:
     server_update_fn: A function for updates in the server.
     client_update_fn: A function for updates in the clients.
-    dummy_model_for_metadata: A dummy `tff.learning.Model`.
+    metrics_aggregation_fn: A function that aggregates the (client-placed)
+      result of `tff.learning.Model.report_local_unfinalized_metrics()`.
     federated_server_state_type: type_signature of federated server state.
     federated_dataset_type: type_signature of federated dataset.
 
@@ -313,8 +314,7 @@ def build_run_one_round_fn(server_update_fn, client_update_fn,
       federated_dataset: A federated `tf.Dataset` with placement `tff.CLIENTS`.
 
     Returns:
-      A tuple of updated `ServerState` and the result of
-      `tff.learning.Model.federated_output_computation`.
+      A tuple of updated `ServerState` and aggregated metrics.
     """
     client_model = tff.federated_broadcast(server_state.model)
 
@@ -332,8 +332,7 @@ def build_run_one_round_fn(server_update_fn, client_update_fn,
     server_state = tff.federated_map(
         server_update_fn, (server_state, round_model_delta, round_grads_norm))
 
-    aggregated_outputs = dummy_model_for_metadata.federated_output_computation(
-        client_outputs.model_output)
+    aggregated_outputs = metrics_aggregation_fn(client_outputs.model_output)
     if isinstance(aggregated_outputs.type_signature, tff.StructType):
       aggregated_outputs = tff.federated_zip(aggregated_outputs)
 
@@ -360,10 +359,14 @@ def build_federated_averaging_process(
     A `tff.templates.IterativeProcess`.
   """
   with tf.Graph().as_default():
-    dummy_model_for_metadata = model_fn()
+    placeholder_model = model_fn()
+    unfinalized_metrics_type = tff.framework.type_from_tensors(
+        placeholder_model.report_local_unfinalized_metrics())
+    metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
+        placeholder_model.metric_finalizers(), unfinalized_metrics_type)
   type_signature_grads_norm = tuple(
-      weight.dtype for weight in tf.nest.flatten(
-          dummy_model_for_metadata.trainable_variables))
+      weight.dtype
+      for weight in tf.nest.flatten(placeholder_model.trainable_variables))
 
   server_init_tf = build_server_init_fn(model_fn, server_optimizer_fn)
 
@@ -373,7 +376,7 @@ def build_federated_averaging_process(
                                             server_state_type.model,
                                             type_signature_grads_norm)
 
-  tf_dataset_type = tff.SequenceType(dummy_model_for_metadata.input_spec)
+  tf_dataset_type = tff.SequenceType(placeholder_model.input_spec)
   client_update_fn = build_client_update_fn(model_fn, client_optimizer_fn,
                                             tf_dataset_type,
                                             server_state_type.model)
@@ -381,7 +384,7 @@ def build_federated_averaging_process(
   federated_server_state_type = tff.type_at_server(server_state_type)
   federated_dataset_type = tff.type_at_clients(tf_dataset_type)
   run_one_round_tff = build_run_one_round_fn(server_update_fn, client_update_fn,
-                                             dummy_model_for_metadata,
+                                             metrics_aggregation_fn,
                                              federated_server_state_type,
                                              federated_dataset_type)
 

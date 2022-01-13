@@ -78,9 +78,7 @@ def build_q_ffl_process(
       of `initialize`, and `{B*}@CLIENTS` represents the client datasets, where
       `B` is the type of a single batch. This computation returns a
       `tff.learning.framework.ServerState` representing the updated server state
-      and metrics that are the result of
-      `tff.learning.Model.federated_output_computation` during client training
-      and any other metrics from broadcast and aggregation processes.
+      and metrics computed during training.
 
   The iterative process also has the following method not inherited from
   `tff.templates.IterativeProcess`:
@@ -118,10 +116,10 @@ def build_q_ffl_process(
       currently necessary to set this flag to True for performant GPU
       simulations.
     output_to_loss_fn: An optional callable that takes the result of
-      `model_fn().report_local_outputs()` and returns a scalar tensor
-      representing the loss of the model. If set to `None`, this method will
-      assume that the loss will attempt to be extracted
-      `model_fn().report_local_outputs()['loss']`.
+      `model_fn().report_local_unfinalized_metrics()` and returns a scalar
+      tensor representing the loss of the model. If set to `None`, this method
+      will assume that the loss will attempt to be extracted
+      `model_fn().report_local_unfinalized_metrics()['loss']`.
 
   Returns:
     A `tff.templates.IterativeProcess`.

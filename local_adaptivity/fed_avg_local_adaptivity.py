@@ -186,8 +186,8 @@ class ClientOutput(object):
   -   `client_weight`: Weight to be used in a weighted mean when
       aggregating `weights_delta`.
   -   `model_output`: A structure matching
-      `tff.learning.Model.report_local_outputs`, reflecting the results of
-      training on the input dataset.
+      `tff.learning.Model.report_local_unfinalized_metrics`, reflecting the
+      results of training on the input dataset.
   -   `local_cor_states`: Local correction to be aggregated for global
       correction.
   """
@@ -220,9 +220,10 @@ def create_client_update_fn():
       initial_weights: A `tff.learning.ModelWeights` from server.
       client_optimizer: A `tf.keras.optimizer.Optimizer` object.
       client_weight_fn: Optional function that takes the output of
-        `model.report_local_outputs` and returns a tensor that provides the
-        weight in the federated average of model deltas. If not provided, the
-        default is the total number of examples processed on device.
+        `model.report_local_unfinalized_metrics` and returns a tensor that
+        provides the weight in the federated average of model deltas. If not
+        provided, the default is the total number of examples processed on
+        device.
 
     Returns:
       A 'ClientOutput`.
@@ -258,7 +259,7 @@ def create_client_update_fn():
                                                avg_local_states,
                                                cum_local_states)
 
-    aggregated_outputs = model.report_local_outputs()
+    aggregated_outputs = model.report_local_unfinalized_metrics()
     weights_delta = tf.nest.map_structure(
         lambda a, b, c: tf.math.divide_no_nan(a - b, c),
         model_weights.trainable, initial_weights.trainable, cum_local_states)
@@ -332,9 +333,9 @@ def build_fed_avg_process(
       returns a `tf.keras.optimizers.Optimizer` instance.
     server_lr: A scalar learning rate.
     client_weight_fn: Optional function that takes the output of
-      `model.report_local_outputs` and returns a tensor that provides the weight
-      in the federated average of model deltas. If not provided, the default is
-      the total number of examples processed on device.
+      `model.report_local_unfinalized_metrics` and returns a tensor that
+      provides the weight in the federated average of model deltas. If not
+      provided, the default is the total number of examples processed on device.
     correction: A string that specifies the type of correction method when
        applying local adaptive optimizers. It must be either `local` or `joint`.
        The default is`joint`.
@@ -343,7 +344,11 @@ def build_fed_avg_process(
     A `tff.templates.IterativeProcess`.
   """
 
-  dummy_model = model_fn()
+  placeholder_model = model_fn()
+  unfinalized_metrics_type = tff.framework.type_from_tensors(
+      placeholder_model.report_local_unfinalized_metrics())
+  metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
+      placeholder_model.metric_finalizers(), unfinalized_metrics_type)
 
   client_optimizer = client_optimizer_fn(client_lr)
 
@@ -356,8 +361,8 @@ def build_fed_avg_process(
   server_state_type = server_init_tf.type_signature.result
   model_weights_type = server_state_type.model
 
-  tf_dataset_type = tff.SequenceType(dummy_model.input_spec)
-  model_input_type = tff.SequenceType(dummy_model.input_spec)
+  tf_dataset_type = tff.SequenceType(placeholder_model.input_spec)
+  model_input_type = tff.SequenceType(placeholder_model.input_spec)
 
   @tff.tf_computation(model_input_type, model_weights_type)
   def client_update_fn(tf_dataset, initial_model_weights):
@@ -396,8 +401,7 @@ def build_fed_avg_process(
       federated_dataset: A federated `tf.Dataset` with placement `tff.CLIENTS`.
 
     Returns:
-      A tuple of updated `ServerState` and the result of
-      `tff.learning.Model.federated_output_computation`.
+      A tuple of updated `ServerState` and aggregated metrics.
     """
     client_model = tff.federated_broadcast(server_state.model)
 
@@ -419,8 +423,7 @@ def build_fed_avg_process(
     else:
       raise TypeError('Correction method must be local or joint.')
 
-    aggregated_outputs = dummy_model.federated_output_computation(
-        client_outputs.model_output)
+    aggregated_outputs = metrics_aggregation_fn(client_outputs.model_output)
     if aggregated_outputs.type_signature.is_struct():
       aggregated_outputs = tff.federated_zip(aggregated_outputs)
 

@@ -133,11 +133,11 @@ class ClientOutput(object):
     client_weight: Weight to be used in a weighted mean when aggregating
       the `weights_delta`.
     initial_model_output: A structure matching
-      `tff.learning.Model.report_local_outputs`, reflecting the results of
-      evaluating on the input dataset (before training).
+      `tff.learning.Model.report_local_unfinalized_metrics`, reflecting the
+      results of evaluating on the input dataset (before training).
     model_output: A structure matching
-      `tff.learning.Model.report_local_outputs`, reflecting the results of
-      training on the input dataset.
+      `tff.learning.Model.report_local_unfinalized_metrics`, reflecting the
+      results of training on the input dataset.
     optimizer_output: Additional metrics or other outputs defined by the
       optimizer.
   """
@@ -155,7 +155,7 @@ def get_client_output(model, dataset, weights):
   tf.nest.map_structure(lambda v, t: v.assign(t), model_weights, weights)
   for batch in dataset:
     model.forward_pass(batch)
-  return model.report_local_outputs()
+  return model.report_local_unfinalized_metrics()
 
 
 @tf.function
@@ -172,9 +172,9 @@ def client_update(model,
     initial_weights: A `tff.learning.Model.weights` from server.
     client_optimizer: A `tf.keras.optimizer.Optimizer` object.
     client_weight_fn: Optional function that takes the output of
-      `model.report_local_outputs` and returns a tensor that provides the weight
-      in the federated average of model deltas. If not provided, the default is
-      the total number of examples processed on device.
+      `model.report_local_unfinalized_metrics` and returns a tensor that
+      provides the weight in the federated average of model deltas. If not
+      provided, the default is the total number of examples processed on device.
 
   Returns:
     A 'ClientOutput`.
@@ -195,7 +195,7 @@ def client_update(model,
     num_examples += tf.shape(output.predictions)[0]
     grad_sums = tf.nest.map_structure(tf.add, grad_sums, grads)
 
-  aggregated_outputs = model.report_local_outputs()
+  aggregated_outputs = model.report_local_unfinalized_metrics()
 
   if client_weight_fn is None:
     client_weight = tf.cast(num_examples, dtype=tf.float32)
@@ -264,15 +264,19 @@ def build_fed_avg_process(
     server_optimizer_fn: A function that accepts a `learning_rate` argument and
       returns a `tf.keras.optimizers.Optimizer` instance.
     client_weight_fn: Optional function that takes the output of
-      `model.report_local_outputs` and returns a tensor that provides the weight
-      in the federated average of model deltas. If not provided, the default is
-      the total number of examples processed on device.
+      `model.report_local_unfinalized_metrics` and returns a tensor that
+      provides the weight in the federated average of model deltas. If not
+      provided, the default is the total number of examples processed on device.
 
   Returns:
     A `tff.templates.IterativeProcess`.
   """
 
-  dummy_model = model_fn()
+  placeholder_model = model_fn()
+  unfinalized_metrics_type = tff.framework.type_from_tensors(
+      placeholder_model.report_local_unfinalized_metrics())
+  metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
+      placeholder_model.metric_finalizers(), unfinalized_metrics_type)
   client_monitor = client_lr_callback.monitor
   server_monitor = server_lr_callback.monitor
 
@@ -282,8 +286,8 @@ def build_fed_avg_process(
   server_state_type = server_init_tf.type_signature.result
   model_weights_type = server_state_type.model
 
-  tf_dataset_type = tff.SequenceType(dummy_model.input_spec)
-  model_input_type = tff.SequenceType(dummy_model.input_spec)
+  tf_dataset_type = tff.SequenceType(placeholder_model.input_spec)
+  model_input_type = tff.SequenceType(placeholder_model.input_spec)
 
   client_lr_type = server_state_type.client_lr_callback.learning_rate
   client_monitor_value_type = server_state_type.client_lr_callback.best
@@ -328,9 +332,7 @@ def build_fed_avg_process(
       federated_dataset: A federated `tf.Dataset` with placement `tff.CLIENTS`.
 
     Returns:
-      A tuple of updated `ServerState` and the result of
-      `tff.learning.Model.federated_output_computation` before and during local
-      client training.
+      A tuple of updated `ServerState` and aggregated metrics.
     """
     client_model = tff.federated_broadcast(server_state.model)
     client_lr = tff.federated_broadcast(
@@ -343,13 +345,12 @@ def build_fed_avg_process(
     aggregated_gradients = tff.federated_mean(
         client_outputs.accumulated_gradients, weight=client_weight)
 
-    initial_aggregated_outputs = dummy_model.federated_output_computation(
+    initial_aggregated_outputs = metrics_aggregation_fn(
         client_outputs.initial_model_output)
     if isinstance(initial_aggregated_outputs.type_signature, tff.StructType):
       initial_aggregated_outputs = tff.federated_zip(initial_aggregated_outputs)
 
-    aggregated_outputs = dummy_model.federated_output_computation(
-        client_outputs.model_output)
+    aggregated_outputs = metrics_aggregation_fn(client_outputs.model_output)
     if isinstance(aggregated_outputs.type_signature, tff.StructType):
       aggregated_outputs = tff.federated_zip(aggregated_outputs)
     client_monitor_value = initial_aggregated_outputs[client_monitor]

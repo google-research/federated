@@ -220,13 +220,14 @@ def create_client_update_fn():
         optimizer.
       client_optimizer: A `tf.keras.optimizer.Optimizer` object.
       client_model_weight_fn: Optional function that takes the output of
-        `model.report_local_outputs` and returns a tensor that provides the
-        weight in the federated average of model deltas. If not provided, the
-        default is the total number of examples processed on device.
+        `model.report_local_unfinalized_metrics` and returns a tensor that
+        provides the weight in the federated average of model deltas. If not
+        provided, the default is the total number of examples processed on
+        device.
       client_opt_weight_fn: Optional function that takes the output of
-        `model.report_local_outputs` and returns a tensor that provides the
-        weight in the federated average of the optimizer states. If not
-        provided, the default is a uniform weighting.
+        `model.report_local_unfinalized_metrics` and returns a tensor that
+        provides the weight in the federated average of the optimizer states.
+        If not provided, the default is a uniform weighting.
 
     Returns:
       A 'ClientOutput`.
@@ -250,8 +251,7 @@ def create_client_update_fn():
       client_optimizer.apply_gradients(grads_and_vars)
       num_examples += tf.shape(output.predictions)[0]
 
-    aggregated_outputs = model.report_local_outputs()
-
+    aggregated_outputs = model.report_local_unfinalized_metrics()
     weights_delta = tf.nest.map_structure(lambda a, b: a - b,
                                           model_weights.trainable,
                                           initial_weights.trainable)
@@ -359,13 +359,14 @@ def build_iterative_process(
     optimizer_aggregation: What type of aggregation to use for the client
       optimizer states. Must be a member of ['mean', 'sum', 'min', 'max'].
     client_model_weight_fn: Optional function that takes the output of
-      `model.report_local_outputs` and returns a tensor that provides the weight
-      in the federated average of the client models. If not provided, the
-      default is the total number of examples processed on device.
+      `model.report_local_unfinalized_metrics` and returns a tensor that
+      provides the weight in the federated average of the client models. If not
+      provided, the default is the total number of examples processed on device.
     client_opt_weight_fn: Optional function that takes the output of
-      `model.report_local_outputs` and returns a tensor that provides the weight
-      in the federated average of the client optimizer states. If not provided,
-      the default is the total number of examples processed on device.
+      `model.report_local_unfinalized_metrics` and returns a tensor that
+      provides the weight in the federated average of the client optimizer
+      states. If not provided, the default is the total number of examples
+      processed on device.
 
   Returns:
     A `tff.templates.IterativeProcess`.
@@ -381,6 +382,10 @@ def build_iterative_process(
   optimizer_aggregator = build_aggregator(optimizer_aggregation)
 
   placeholder_model = model_fn()
+  unfinalized_metrics_type = tff.framework.type_from_tensors(
+      placeholder_model.report_local_unfinalized_metrics())
+  metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
+      placeholder_model.metric_finalizers(), unfinalized_metrics_type)
 
   server_init_tf = build_server_init_fn(
       model_fn,
@@ -445,8 +450,7 @@ def build_iterative_process(
       federated_dataset: A federated `tf.Dataset` with placement `tff.CLIENTS`.
 
     Returns:
-      A tuple of updated `ServerState` and the result of
-      `tff.learning.Model.federated_output_computation`.
+      A tuple of updated `ServerState` and aggregated metrics.
     """
     client_model = tff.federated_broadcast(server_state.model)
     client_optimizer_state = tff.federated_broadcast(
@@ -478,8 +482,7 @@ def build_iterative_process(
         server_update_fn,
         (server_state, model_delta, client_optimizer_state_delta))
 
-    aggregated_outputs = placeholder_model.federated_output_computation(
-        client_outputs.model_output)
+    aggregated_outputs = metrics_aggregation_fn(client_outputs.model_output)
     if aggregated_outputs.type_signature.is_struct():
       aggregated_outputs = tff.federated_zip(aggregated_outputs)
 
