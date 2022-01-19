@@ -256,8 +256,8 @@ class MovielensDataGenTest(absltest.TestCase):
                                               num_local_epochs=1))
 
     self.assertLen(test_dataset_per_user, 2)
-    self.assertLen(list(test_dataset_per_user[0].as_numpy_iterator()), 2)
-    self.assertLen(list(test_dataset_per_user[1].as_numpy_iterator()), 1)
+    self.assertLen(list(test_dataset_per_user[0].as_numpy_iterator()), 1)
+    self.assertEmpty(list(test_dataset_per_user[1].as_numpy_iterator()))
 
   def test_create_tf_datasets_num_local_epochs(self):
     test_examples_per_user = (
@@ -275,17 +275,67 @@ class MovielensDataGenTest(absltest.TestCase):
   def test_create_client_datasets(self):
     test_client_datasets = (
         movielens_data_gen.create_client_datasets(
-            self.ratings_df,
+            ratings_df=self.ratings_df,
             min_timeline_len=2,
             max_context_len=3,
             max_examples_per_user=0,
             pad_id=0,
             shuffle_across_users=False,
             batch_size=2,
-            num_local_epochs=1))
+            num_local_epochs=2))
     self.assertLen(test_client_datasets, 2)
-    self.assertLen(list(test_client_datasets[0].as_numpy_iterator()), 2)
+    self.assertLen(list(test_client_datasets[0].as_numpy_iterator()), 3)
     self.assertLen(list(test_client_datasets[1].as_numpy_iterator()), 1)
+
+  def test_client_dataset_preprocess_fn(self):
+    test_examples_per_user = (
+        movielens_data_gen.generate_examples_per_user(self.timelines, 2, 3, 0))
+    preprocess_fn = movielens_data_gen.client_dataset_preprocess_fn(
+        batch_size=2, num_local_epochs=2)
+    test_client_data = (
+        movielens_data_gen.build_client_data_from_examples_per_user_dict(
+            test_examples_per_user).preprocess(preprocess_fn))
+    test_client_tf_datasets = []
+    for client_id in sorted(test_client_data.client_ids):
+      test_client_tf_datasets.append(
+          test_client_data.create_tf_dataset_for_client(client_id))
+
+    self.assertLen(test_client_data.client_ids, 2)
+    self.assertLen(list(test_client_tf_datasets[0].as_numpy_iterator()), 3)
+    self.assertLen(list(test_client_tf_datasets[1].as_numpy_iterator()), 1)
+
+  def test_build_client_data_from_exampels_per_user_dict(self):
+    test_examples_per_user = (
+        movielens_data_gen.generate_examples_per_user(self.timelines, 2, 3, 0))
+    test_client_data = (
+        movielens_data_gen.build_client_data_from_examples_per_user_dict(
+            test_examples_per_user))
+    test_client_tf_datasets = []
+    for client_id in test_client_data.client_ids:
+      test_client_tf_datasets.append(
+          test_client_data.create_tf_dataset_for_client(client_id))
+
+    self.assertLen(test_client_data.client_ids, 2)
+    self.assertLen(list(test_client_tf_datasets[0].as_numpy_iterator()), 3)
+    self.assertLen(list(test_client_tf_datasets[1].as_numpy_iterator()), 1)
+
+  def test_build_client_data(self):
+    test_client_data = (
+        movielens_data_gen.build_client_data(
+            ratings_df=self.ratings_df,
+            min_timeline_len=2,
+            max_context_len=3,
+            max_examples_per_user=0,
+            pad_id=0,
+            shuffle_across_users=False))
+    test_client_tf_datasets = []
+    for client_id in test_client_data.client_ids:
+      test_client_tf_datasets.append(
+          test_client_data.create_tf_dataset_for_client(client_id))
+
+    self.assertLen(test_client_data.client_ids, 2)
+    self.assertLen(list(test_client_tf_datasets[0].as_numpy_iterator()), 3)
+    self.assertLen(list(test_client_tf_datasets[1].as_numpy_iterator()), 1)
 
 
 if __name__ == '__main__':

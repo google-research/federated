@@ -20,11 +20,13 @@ import collections
 import functools
 import os
 import random
+from typing import Callable, Dict, List, Optional, Tuple
 
 from absl import app
 from absl import flags
 import pandas as pd
 import tensorflow as tf
+import tensorflow_federated as tff
 
 # MovieLens 1M constants.
 _NUM_MOVIE_IDS = 3952
@@ -55,7 +57,7 @@ flags.DEFINE_integer("max_context_length", 10,
                      "contexts get padded to this length.")
 
 
-def read_ratings(data_dir, tmp_dir=_LOCAL_DIR):
+def read_ratings(data_dir: str, tmp_dir: str = _LOCAL_DIR) -> pd.DataFrame:
   """Read movielens ratings data into dataframe."""
   if not tf.io.gfile.exists(os.path.join(tmp_dir, _RATINGS_FILE_NAME)):
     tf.io.gfile.copy(
@@ -69,17 +71,19 @@ def read_ratings(data_dir, tmp_dir=_LOCAL_DIR):
   return ratings_df
 
 
-def split_ratings_df(ratings_df,
-                     train_fraction=0.8,
-                     val_fraction=0.1):
+def split_ratings_df(
+    ratings_df: pd.DataFrame,
+    train_fraction: float = 0.8,
+    val_fraction: float = 0.1
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
   """Split per-user rating DataFrame into train/val/test by user id.
 
   Args:
-    ratings_df: Pandas DataFrame containing ratings data with
-        ["UserID", "MovieID", "Rating", "Timestamp"] columns. The "UserID" and
-        "MovieID" in [1, num_unique_ids].
-    train_fraction: The approximate fraction of users be in the train set.
-      The actual number will be rounded to the nearest integer.
+    ratings_df: Pandas DataFrame containing ratings data with ["UserID",
+      "MovieID", "Rating", "Timestamp"] columns. The "UserID" and "MovieID" in
+      [1, num_unique_ids].
+    train_fraction: The approximate fraction of users be in the train set. The
+      actual number will be rounded to the nearest integer.
     val_fraction: The approximate fraction of users be in the validation set.
       The actual number will be rounded to the nearest integer.
 
@@ -115,7 +119,7 @@ def split_ratings_df(ratings_df,
   return train_ratings_df, val_ratings_df, test_ratings_df
 
 
-def convert_to_timelines(ratings_df):
+def convert_to_timelines(ratings_df: pd.DataFrame) -> Dict[int, List[int]]:
   """Convert ratings_df to user timelines."""
   timelines = collections.defaultdict(list)
   # Sort per-user timeline by ascending timestamp
@@ -126,7 +130,9 @@ def convert_to_timelines(ratings_df):
   return timelines
 
 
-def generate_examples_from_a_single_timeline(timeline, max_context_len, pad_id):
+def generate_examples_from_a_single_timeline(
+    timeline: List[int], max_context_len: int,
+    pad_id: int) -> List[tf.train.Example]:
   """Convert a single user timeline to `tf.train.Example`s.
 
   Convert a single user timeline to `tf.train.Example`s by adding all possible
@@ -161,13 +167,16 @@ def generate_examples_from_a_single_timeline(timeline, max_context_len, pad_id):
   return examples
 
 
-def generate_examples_from_timelines(timelines,
-                                     min_timeline_len=3,
-                                     max_context_len=100,
-                                     pad_id=_PAD_ID,
-                                     train_fraction=0.8,
-                                     val_fraction=0.1,
-                                     seed=None):
+def generate_examples_from_timelines(
+    timelines: Dict[int, List[int]],
+    min_timeline_len: int = 3,
+    max_context_len: int = 100,
+    pad_id: int = _PAD_ID,
+    train_fraction: float = 0.8,
+    val_fraction: float = 0.1,
+    seed: Optional[int] = None
+) -> Tuple[List[tf.train.Example], List[tf.train.Example],
+           List[tf.train.Example]]:
   """Convert user timelines to `tf.train.Example`s.
 
   Convert user timelines to `tf.train.Example`s by adding all possible
@@ -221,18 +230,20 @@ def generate_examples_from_timelines(timelines,
   return train_examples, val_examples, test_examples
 
 
-def write_tfrecords(tf_examples, filename):
+def write_tfrecords(tf_examples: List[tf.train.Example], filename: str):
   """Write `tf.train.Example`s to tfrecord file."""
   with tf.io.TFRecordWriter(filename) as file_writer:
     for example in tf_examples:
       file_writer.write(example)
 
 
-def generate_examples_per_user(timelines,
-                               min_timeline_len=3,
-                               max_context_len=100,
-                               pad_id=_PAD_ID,
-                               max_examples_per_user=None):
+def generate_examples_per_user(
+    timelines: Dict[int, List[int]],
+    min_timeline_len: int = 3,
+    max_context_len: int = 100,
+    pad_id: int = _PAD_ID,
+    max_examples_per_user: Optional[int] = None
+) -> Dict[int, List[tf.train.Example]]:
   """Convert user timelines to `tf.train.Example`s for each user.
 
   Args:
@@ -269,7 +280,9 @@ def generate_examples_per_user(timelines,
   return examples_per_user
 
 
-def shuffle_examples_across_users(examples_per_user, seed=None):
+def shuffle_examples_across_users(
+    examples_per_user: Dict[int, List[tf.train.Example]],
+    seed: Optional[int] = None) -> Dict[int, List[tf.train.Example]]:
   """Randomly shuffle the data across users.
 
     This function randomly shuffles the data across users while maintaining
@@ -316,7 +329,9 @@ def shuffle_examples_across_users(examples_per_user, seed=None):
   return shuffled_examples_per_user
 
 
-def decode_example(serialized_proto, use_example_weight=True):
+def decode_example(
+    serialized_proto: str,
+    use_example_weight: bool = True) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
   """Decode single serialized example."""
   name_to_features = dict(
       context=tf.io.VarLenFeature(tf.int64),
@@ -342,10 +357,11 @@ def decode_example(serialized_proto, use_example_weight=True):
   return output
 
 
-def create_tf_datasets(examples_per_user,
-                       batch_size=1,
-                       num_local_epochs=1,
-                       use_example_weight=True):
+def create_tf_datasets(
+    examples_per_user: Dict[int, List[tf.train.Example]],
+    batch_size: int = 1,
+    num_local_epochs: int = 1,
+    use_example_weight: bool = True) -> List[tf.data.Dataset]:
   """Create TF Datasets containing per user movie id timeline examples.
 
   Args:
@@ -372,29 +388,30 @@ def create_tf_datasets(examples_per_user,
             decode_example,
             use_example_weight=use_example_weight),
         num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    d = d.batch(batch_size)
     d = d.repeat(num_local_epochs)
+    d = d.batch(batch_size, drop_remainder=True)
     d = d.prefetch(_PREFETCH_BUFFER_SIZE)
     datasets_per_user.append(d)
   return datasets_per_user
 
 
-def create_client_datasets(ratings_df,
-                           *,  # Callers pass below args by name.
-                           min_timeline_len=3,
-                           max_context_len=100,
-                           max_examples_per_user=None,
-                           pad_id=_PAD_ID,
-                           shuffle_across_users=False,
-                           batch_size=1,
-                           num_local_epochs=1,
-                           use_example_weight=True):
+def create_client_datasets(
+    *,  # Callers pass below args by name.
+    ratings_df: pd.DataFrame,
+    min_timeline_len: int = 3,
+    max_context_len: int = 100,
+    max_examples_per_user: Optional[int] = None,
+    pad_id: int = _PAD_ID,
+    shuffle_across_users: bool = False,
+    batch_size: int = 1,
+    num_local_epochs: int = 1,
+    use_example_weight: bool = True) -> List[tf.data.Dataset]:
   """Create TF Datasets containing per user movie id examples from ratings_df.
 
   Args:
-    ratings_df: Pandas DataFrame containing ratings data with
-        ["UserID", "MovieID", "Rating", "Timestamp"] columns. The "UserID" and
-        "MovieID" values are in the range [1, num_unique_ids].
+    ratings_df: Pandas DataFrame containing ratings data with ["UserID",
+      "MovieID", "Rating", "Timestamp"] columns. The "UserID" and "MovieID"
+      values are in the range [1, num_unique_ids].
     min_timeline_len: The minimum timeline length to construct examples.
       Timeline with length less than this number are filtered out.
     max_context_len: The maximum length of context signals in an example. All
@@ -432,6 +449,97 @@ def create_client_datasets(ratings_df,
                                 num_local_epochs=num_local_epochs,
                                 use_example_weight=use_example_weight)
   return datasets
+
+
+def client_dataset_preprocess_fn(
+    batch_size: int = 1,
+    num_local_epochs: int = 1,
+    use_example_weight: bool = True
+) -> Callable[[tf.data.Dataset], tf.data.Dataset]:
+  """A preprocess function applied to each client's data.
+
+  Given a `tff.simulation.datasets.ClientData` client_data, an example usage is
+  `client_data.preprocess(preprocess_fn=client_dataset_preprocess_fn)`.
+
+  Args:
+    batch_size: The number of `tf.train.Example`s in a batch in the output
+      `tf.data.Dataset`.
+    num_local_epochs: Repeat the dataset the given number of times, effectively
+      simulating multiple local epochs on the client.
+    use_example_weight: If True, the format of the generated example is
+      (features, example weight). Otherwise, the example format is (features,
+      label). Here, features is {'context', 'label'}.
+
+  Returns:
+    A callable performing the preprocessing described above.
+  """
+  if num_local_epochs < 1:
+    raise ValueError("num_epochs must be a positive integer.")
+
+  def preprocess_fn(dataset):
+    d = dataset.shuffle(_SHUFFLE_BUFFER_SIZE)
+    d = d.map(
+        functools.partial(
+            decode_example, use_example_weight=use_example_weight),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    d = d.repeat(num_local_epochs)
+    d = d.batch(batch_size, drop_remainder=True)
+    d = d.prefetch(_PREFETCH_BUFFER_SIZE)
+    return d
+
+  return preprocess_fn
+
+
+def build_client_data_from_examples_per_user_dict(
+    examples_per_user: Dict[int, List[tf.train.Example]]
+) -> tff.simulation.datasets.ClientData:
+  tensor_slices_dict = dict()
+  for user_id, examples in examples_per_user.items():
+    tensor_slices_dict[str(user_id)] = examples
+  return tff.simulation.datasets.TestClientData(tensor_slices_dict)
+
+
+def build_client_data(
+    *,  # Callers pass below args by name.
+    ratings_df: pd.DataFrame,
+    min_timeline_len: int = 3,
+    max_context_len: int = 100,
+    max_examples_per_user: Optional[int] = None,
+    pad_id: int = _PAD_ID,
+    shuffle_across_users: bool = False) -> tff.simulation.datasets.ClientData:
+  """Create a `tff.simulation.datasets.ClientData` for federated simulation.
+
+  Args:
+    ratings_df: Pandas DataFrame containing ratings data with ["UserID",
+      "MovieID", "Rating", "Timestamp"] columns. The "UserID" and "MovieID"
+      values are in the range [1, num_unique_ids].
+    min_timeline_len: The minimum timeline length to construct examples.
+      Timeline with length less than this number are filtered out.
+    max_context_len: The maximum length of context signals in an example. All
+      the contexts get padded to this length.
+    max_examples_per_user: If not None, it limit the maximum number of examples
+      being generated for each user. If being set to 0 or None, it will also be
+      ignored.
+    pad_id: The value being used to pad the context signals.
+    shuffle_across_users: If it is true, calling `shuffle_examples_across_users`
+      and randomly shuffle the data across users.
+
+  Returns:
+    client_data: A `tff.simulation.datasets.ClientData` for simulation.
+  """
+
+  timelines = convert_to_timelines(ratings_df)
+  examples = generate_examples_per_user(
+      timelines=timelines,
+      min_timeline_len=min_timeline_len,
+      max_context_len=max_context_len,
+      pad_id=pad_id,
+      max_examples_per_user=max_examples_per_user)
+  if shuffle_across_users:
+    examples = shuffle_examples_across_users(examples)
+  client_data = build_client_data_from_examples_per_user_dict(examples)
+
+  return client_data
 
 
 def main(_):
