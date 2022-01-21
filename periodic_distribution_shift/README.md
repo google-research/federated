@@ -67,8 +67,8 @@ given in the XManager scripts.
 
 ```
 # on EMNIST
-bazel run trainer_periodic_shift -- \
---task emnist_character --experiment_name=test \
+bazel run main_trainer -- \
+--task emnist_character --experiment_name test \
 --client_optimizer sgd --client_learning_rate 1e-3 \
 --server_optimizer adam --server_learning_rate 0.1 --server_adam_epsilon 1e-4 \
 --clients_per_round 10 --client_epochs_per_round 1 \
@@ -83,8 +83,8 @@ bazel run trainer_periodic_shift -- \
 --shift_fn linear --aggregated_kmeans
 
 # on CIFAR
-bazel run trainer_periodic_shift -- \
---task cifar100_10 --experiment_name=test \
+bazel run main_trainer -- \
+--task cifar100_10 --experiment_name test \
 --client_optimizer sgd --client_learning_rate 1e-3 \
 --server_optimizer adam --server_learning_rate 0.1 --server_adam_epsilon 1e-4 \
 --clients_per_round 10 --client_epochs_per_round 1 \
@@ -100,7 +100,7 @@ bazel run trainer_periodic_shift -- \
 --alsologtostderr
 
 # on Stack Overflow
-bazel run trainer_periodic_shift -- \
+bazel run main_trainer -- \
 --task stackoverflow_word  --experiment_name test \
 --client_optimizer sgd --client_learning_rate 0.01 \
 --server_optimizer adam --server_learning_rate 0.01 --server_adam_epsilon 1e-5 \
