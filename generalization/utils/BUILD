@@ -72,10 +72,6 @@ py_test(
     srcs = ["metric_utils_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = [
-        "nokokoro",
-        "notap",
-    ],
     deps = [":metric_utils"],
 )
 

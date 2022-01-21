@@ -39,7 +39,6 @@ py_test(
     srcs_version = "PY3",
     tags = [
         "nokokoro",
-        "notap",
         "requires-net:external",
     ],
     deps = [
@@ -89,7 +88,6 @@ py_test(
     srcs_version = "PY3",
     tags = [
         "nokokoro",
-        "notap",
         "requires-net:external",
     ],
     deps = [
