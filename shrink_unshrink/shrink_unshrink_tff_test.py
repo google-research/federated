@@ -79,7 +79,7 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
         simple_fedavg_tf.ClientOutput(
             weights_delta,
             client_weight=1.0,
-            model_output=client_model.report_local_outputs(),
+            model_output=client_model.report_local_unfinalized_metrics(),
             round_num=0,
             shrink_unshrink_dynamic_info=simple_fedavg_tf
             .create_left_maskval_to_projmat_dict(
@@ -191,7 +191,7 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
         simple_fedavg_tf.ClientOutput(
             weights_delta,
             client_weight=1.0,
-            model_output=client_model.report_local_outputs(),
+            model_output=client_model.report_local_unfinalized_metrics(),
             round_num=0,
             shrink_unshrink_dynamic_info=simple_fedavg_tf
             .create_left_maskval_to_projmat_dict(
@@ -287,7 +287,7 @@ class ShrinkUnshrinkTffTest(tf.test.TestCase):
         simple_fedavg_tf.ClientOutput(
             weights_delta,
             client_weight=1.0,
-            model_output=client_model.report_local_outputs(),
+            model_output=client_model.report_local_unfinalized_metrics(),
             round_num=0) for i in range(6)
     ]
     # pylint:enable=g-complex-comprehension

@@ -105,6 +105,7 @@ py_test(
 
 py_test(
     name = "shrink_unshrink_tff_test",
+    size = "large",
     srcs = ["shrink_unshrink_tff_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",

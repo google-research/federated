@@ -103,7 +103,7 @@ class DummyClientComputation(tff.learning.framework.ClientDeltaFn):
     # containing a mean of all the examples in the local dataset. Note: this
     # works for a linear model only (as in the example above)
     weights_delta = [example_vector_sum / tf.cast(num_examples_sum, tf.float32)]
-    aggregated_outputs = model.report_local_outputs()
+    aggregated_outputs = model.report_local_unfinalized_metrics()
     weights_delta, has_non_finite_delta = (
         tensor_utils.zero_all_if_any_non_finite(weights_delta))
     weights_delta_weight = tf.cast(num_examples_sum, tf.float32)

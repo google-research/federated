@@ -25,7 +25,7 @@ Communication-Efficient Learning of Deep Networks from Decentralized Data
 """
 
 import collections
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, OrderedDict, Union
 
 import attr
 import tensorflow as tf
@@ -122,8 +122,8 @@ class ClientOutput(object):
   -   `client_weight`: Weight to be used in a weighted mean when
       aggregating `weights_delta`.
   -   `model_output`: A structure matching
-      `tff.learning.Model.report_local_outputs`, reflecting the results of
-      training on the input dataset.
+      `tff.learning.Model.report_local_unfinalized_metrics`, reflecting the
+      results of training on the input dataset.
   -   `optimizer_output`: Additional metrics or other outputs defined by the
       optimizer.
   """
@@ -156,9 +156,10 @@ def create_client_update_fn():
       initial_weights: A `tff.learning.ModelWeights` from server.
       client_optimizer: A `tf.keras.optimizer.Optimizer` object.
       client_weight_fn: Optional function that takes the output of
-        `model.report_local_outputs` and returns a tensor that provides the
-        weight in the federated average of model deltas. If not provided, the
-        default is the total number of examples processed on device.
+        `model.report_local_unfinalized_metrics` and returns a tensor that
+        provides the weight in the federated average of model deltas. If not
+        provided, the default is the total number of examples processed on
+        device.
 
     Returns:
       A 'ClientOutput`.
@@ -177,7 +178,7 @@ def create_client_update_fn():
       client_optimizer.apply_gradients(grads_and_vars)
       num_examples += tf.shape(output.predictions)[0]
 
-    aggregated_outputs = model.report_local_outputs()
+    aggregated_outputs = model.report_local_unfinalized_metrics()
     weights_delta = tf.nest.map_structure(lambda a, b: a - b,
                                           model_weights.trainable,
                                           initial_weights.trainable)
@@ -236,6 +237,9 @@ def build_fed_avg_process(
     server_optimizer_fn: OptimizerBuilder = tf.keras.optimizers.SGD,
     server_lr: Union[float, LRScheduleFn] = 1.0,
     client_weight_fn: Optional[ClientWeightFn] = None,
+    metrics_aggregator: Callable[[
+        OrderedDict[str, Callable[[Any], Any]], tff.types.StructWithPythonType
+    ], tff.Computation] = tff.learning.metrics.sum_then_finalize
 ) -> tff.templates.IterativeProcess:
   """Builds the TFF computations for optimization using federated averaging.
 
@@ -250,9 +254,18 @@ def build_fed_avg_process(
     server_lr: A scalar learning rate or a function that accepts a float
       `round_num` argument and returns a learning rate.
     client_weight_fn: Optional function that takes the output of
-      `model.report_local_outputs` and returns a tensor that provides the weight
-      in the federated average of model deltas. If not provided, the default is
-      the total number of examples processed on device.
+      `model.report_local_unfinalized_metrics` and returns a tensor that
+      provides the weight in the federated average of model deltas. If not
+      provided, the default is the total number of examples processed on device.
+    metrics_aggregator: A function that takes in the metric finalizers (i.e.,
+      `tff.learning.Model.metric_finalizers()`) and a
+      `tff.types.StructWithPythonType` of the unfinalized metrics (i.e., the TFF
+      type of `tff.learning.Model.report_local_unfinalized_metrics()`), and
+      returns a federated TFF computation of the following type signature
+      `local_unfinalized_metrics@CLIENTS -> aggregated_metrics@SERVER`. Default
+      is `tff.learning.metrics.sum_then_finalize`, which returns a federated TFF
+      computation that sums the unfinalized metrics from `CLIENTS`, and then
+      applies the corresponding metric finalizers at `SERVER`.
 
   Returns:
     A `tff.templates.IterativeProcess`.
@@ -308,8 +321,7 @@ def build_fed_avg_process(
       federated_dataset: A federated `tf.Dataset` with placement `tff.CLIENTS`.
 
     Returns:
-      A tuple of updated `ServerState` and the result of
-      `tff.learning.Model.federated_output_computation`.
+      A tuple of updated `ServerState` and the result of aggregated metrics.
     """
     client_model = tff.federated_broadcast(server_state.model)
     client_round_num = tff.federated_broadcast(server_state.round_num)
@@ -324,7 +336,11 @@ def build_fed_avg_process(
     server_state = tff.federated_map(server_update_fn,
                                      (server_state, model_delta))
 
-    aggregated_outputs = placeholder_model.federated_output_computation(
+    unfinalized_metrics_type = tff.types.type_from_tensors(
+        placeholder_model.report_local_unfinalized_metrics())
+    federated_metrics_aggregation = metrics_aggregator(
+        placeholder_model.metric_finalizers(), unfinalized_metrics_type)
+    aggregated_outputs = federated_metrics_aggregation(
         client_outputs.model_output)
     if aggregated_outputs.type_signature.is_struct():
       aggregated_outputs = tff.federated_zip(aggregated_outputs)

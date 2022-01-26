@@ -143,11 +143,23 @@ class MnistModel(tff.learning.Model):
 
   @tf.function
   def report_local_outputs(self):
-    return get_local_mnist_metrics(self._variables)
+    raise NotImplementedError(
+        'Do not implement. `report_local_outputs` and '
+        '`federated_output_computation` are deprecated and will be removed '
+        'in 2022Q1. You should use `report_local_unfinalized_metrics` and '
+        '`metric_finalizers` instead. The cross-client metrics aggregation '
+        'should be specified as the `metrics_aggregator` argument when you '
+        'build a training process or evaluation computation using this model.')
 
   @property
   def federated_output_computation(self):
-    return aggregate_mnist_metrics_across_clients
+    raise NotImplementedError(
+        'Do not implement. `report_local_outputs` and '
+        '`federated_output_computation` are deprecated and will be removed '
+        'in 2022Q1. You should use `report_local_unfinalized_metrics` and '
+        '`metric_finalizers` instead. The cross-client metrics aggregation '
+        'should be specified as the `metrics_aggregator` argument when you '
+        'build a training process or evaluation computation using this model.')
 
   @tf.function
   def report_local_unfinalized_metrics(
@@ -312,7 +324,8 @@ class ClientTest(tf.test.TestCase):
       outputs = client_update(model, optimizer, client_data(), client_data(),
                               tf.constant(False),
                               attacked_fedavg._get_weights(model))
-      losses.append(outputs.model_output['loss'].numpy())
+      loss_finalizer = model.metric_finalizers()['loss']
+      losses.append(loss_finalizer(outputs.model_output['loss']))
 
     self.assertAllEqual(outputs.optimizer_output['num_examples'].numpy(), 2)
     self.assertLess(losses[1], losses[0])

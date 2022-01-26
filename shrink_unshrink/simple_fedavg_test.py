@@ -371,7 +371,8 @@ class ClientTest(tf.test.TestCase):
           model_weights=model.weights, round_num=r)
       outputs = simple_fedavg_tf.client_update(model, client_data(),
                                                server_message, optimizer)
-      losses.append(outputs.model_output['loss'])
+      loss_finalizer = model.metric_finalizers()['loss']
+      losses.append(loss_finalizer(outputs.model_output['loss']))
 
     self.assertAllEqual(int(outputs.client_weight.numpy()), 2)
     self.assertLess(losses[1], losses[0])

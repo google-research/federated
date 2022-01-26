@@ -134,8 +134,8 @@ class ClientOutput(object):
   -   `client_weight`: Weight to be used in a weighted mean when
       aggregating `weights_delta`.
   -   `model_output`: A structure matching
-      `tff.learning.Model.report_local_outputs`, reflecting the results of
-      training on the input dataset.
+      `tff.learning.Model.report_local_unfinalized_metrics`, reflecting the
+      results of training on the input dataset.
   """
   weights_delta = attr.ib()
   client_weight = attr.ib()
@@ -348,7 +348,7 @@ def client_update(model,
     num_examples += batch_size
     loss_sum += outputs.loss * tf.cast(batch_size, WEIGHT_DENOM_TYPE)
 
-  aggregated_outputs = model.report_local_outputs()
+  aggregated_outputs = model.report_local_unfinalized_metrics()
   weights_delta = tf.nest.map_structure(lambda a, b: a - b,
                                         model_weights.trainable,
                                         initial_weights.trainable)

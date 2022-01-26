@@ -26,7 +26,7 @@ Communication-Efficient Learning of Deep Networks from Decentralized Data
     https://arxiv.org/abs/1602.05629
 """
 
-from typing import Union
+from typing import Any, Callable, OrderedDict, Union
 
 from absl import logging
 import tensorflow as tf
@@ -68,7 +68,10 @@ def build_federated_shrink_unshrink_process(
     server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
     client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
     oja_hyperparameter=1.0,
-    debugging=False):
+    debugging=False,
+    metrics_aggregator: Callable[[
+        OrderedDict[str, Callable[[Any], Any]], tff.types.StructWithPythonType
+    ], tff.Computation] = tff.learning.metrics.sum_then_finalize):
   """Builds the TFF computations for optimization using federated averaging.
 
   Args:
@@ -90,12 +93,25 @@ def build_federated_shrink_unshrink_process(
       algorithms.
     debugging: A boolean which if True returns the shrink and unshrink functions
       for testing/debugging purposes.
+    metrics_aggregator: A function that takes in the metric finalizers (i.e.,
+      `tff.learning.Model.metric_finalizers()`) and a
+      `tff.types.StructWithPythonType` of the unfinalized metrics (i.e., the TFF
+      type of `tff.learning.Model.report_local_unfinalized_metrics()`), and
+      returns a federated TFF computation of the following type signature
+      `local_unfinalized_metrics@CLIENTS -> aggregated_metrics@SERVER`. Default
+      is `tff.learning.metrics.sum_then_finalize`, which returns a federated TFF
+      computation that sums the unfinalized metrics from `CLIENTS`, and then
+      applies the corresponding metric finalizers at `SERVER`.
 
   Returns:
     A `tff.templates.IterativeProcess`.
   """
   whimsy_client_model = client_model_fn()
   whimsy_server_model = server_model_fn()
+  unfinalized_metrics_type = tff.types.type_from_tensors(
+      whimsy_server_model.report_local_unfinalized_metrics())
+  metrics_aggregation_computation = metrics_aggregator(
+      whimsy_server_model.metric_finalizers(), unfinalized_metrics_type)
 
   @tff.tf_computation
   def shrink_unshrink_server_info_init():
@@ -191,7 +207,7 @@ def build_federated_shrink_unshrink_process(
     server_state = unshrink(server_state, client_outputs)
 
     # the following code is not amenable with KerasModelWrapper
-    aggregated_outputs = whimsy_server_model.federated_output_computation(
+    aggregated_outputs = metrics_aggregation_computation(
         client_outputs.model_output)
     if aggregated_outputs.type_signature.is_struct():
       aggregated_outputs = tff.federated_zip(aggregated_outputs)
@@ -226,7 +242,10 @@ def build_federated_shrink_unshrink_process_with_client_id(
     server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
     client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
     oja_hyperparameter=1.0,
-    debugging=False):
+    debugging=False,
+    metrics_aggregator: Callable[[
+        OrderedDict[str, Callable[[Any], Any]], tff.types.StructWithPythonType
+    ], tff.Computation] = tff.learning.metrics.sum_then_finalize):
   """Builds the TFF computations for optimization using federated averaging.
 
   Args:
@@ -253,12 +272,25 @@ def build_federated_shrink_unshrink_process_with_client_id(
       algorithms.
     debugging: A boolean which if True returns the shrink and unshrink functions
       for testing/debugging purposes
+    metrics_aggregator: A function that takes in the metric finalizers (i.e.,
+      `tff.learning.Model.metric_finalizers()`) and a
+      `tff.types.StructWithPythonType` of the unfinalized metrics (i.e., the TFF
+      type of `tff.learning.Model.report_local_unfinalized_metrics()`), and
+      returns a federated TFF computation of the following type signature
+      `local_unfinalized_metrics@CLIENTS -> aggregated_metrics@SERVER`. Default
+      is `tff.learning.metrics.sum_then_finalize`, which returns a federated TFF
+      computation that sums the unfinalized metrics from `CLIENTS`, and then
+      applies the corresponding metric finalizers at `SERVER`.
 
   Returns:
     A `tff.templates.IterativeProcess`. If debugging==True, the constructed
     shrink and unshrink functions are returned as well.
   """
   whimsy_server_model = server_model_fn()
+  unfinalized_metrics_type = tff.types.type_from_tensors(
+      whimsy_server_model.report_local_unfinalized_metrics())
+  metrics_aggregation_computation = metrics_aggregator(
+      whimsy_server_model.metric_finalizers(), unfinalized_metrics_type)
 
   @tff.tf_computation
   def shrink_unshrink_server_info_init():
@@ -350,7 +382,7 @@ def build_federated_shrink_unshrink_process_with_client_id(
     server_state = unshrink(server_state, client_outputs)
 
     # the following code is not amenable with KerasModelWrapper
-    aggregated_outputs = whimsy_server_model.federated_output_computation(
+    aggregated_outputs = metrics_aggregation_computation(
         client_outputs.model_output)
     if aggregated_outputs.type_signature.is_struct():
       aggregated_outputs = tff.federated_zip(aggregated_outputs)
