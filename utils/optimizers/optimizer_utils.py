@@ -407,6 +407,7 @@ def warmup_and_decay_schedule_builder(base_value, warmup_steps, decay_fn):
   else:
 
     def warmup_and_decay_fn(round_num):
+      round_num = tf.cast(round_num, tf.float32)
       warmedup_value = base_value * (round_num + 1) / warmup_steps
       return tf.cond(
           tf.less(round_num, warmup_steps), lambda: warmedup_value,
@@ -433,9 +434,11 @@ def exp_decay_schedule_builder(base_value, decay_steps, decay_rate, staircase):
   """
   if staircase:
     def exp_decay_fn(round_num):
+      round_num = tf.cast(round_num, tf.float32)
       return base_value * tf.pow(decay_rate, round_num // decay_steps)
   else:
     def exp_decay_fn(round_num):
+      round_num = tf.cast(round_num, tf.float32)
       return base_value * tf.pow(decay_rate, round_num / decay_steps)
 
   return exp_decay_fn
@@ -458,9 +461,11 @@ def inv_lin_schedule_builder(base_value, decay_steps, decay_rate, staircase):
   """
   if staircase:
     def inv_lin_decay_fn(round_num):
+      round_num = tf.cast(round_num, tf.float32)
       return base_value / (1.0 + decay_rate * (round_num // decay_steps))
   else:
     def inv_lin_decay_fn(round_num):
+      round_num = tf.cast(round_num, tf.float32)
       return base_value / (1.0 + decay_rate * (round_num / decay_steps))
 
   return inv_lin_decay_fn
@@ -483,9 +488,11 @@ def inv_sqrt_schedule_builder(base_value, decay_steps, decay_rate, staircase):
   """
   if staircase:
     def inv_sqrt_decay_fn(round_num):
+      round_num = tf.cast(round_num, tf.float32)
       return base_value / tf.sqrt(1.0 + decay_rate * (round_num // decay_steps))
   else:
     def inv_sqrt_decay_fn(round_num):
+      round_num = tf.cast(round_num, tf.float32)
       return base_value / tf.sqrt(1.0 + decay_rate * (round_num / decay_steps))
 
   return inv_sqrt_decay_fn

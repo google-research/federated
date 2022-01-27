@@ -14,10 +14,8 @@
 """Runs federated training on various tasks using a generalized form of FedAvg.
 
 Specifically, we create (according to flags) an iterative processes that allows
-for client and server learning rate schedules, as well as various client and
-server optimization methods. For more details on the learning rate scheduling
-and optimization methods, see `shared/optimizer_utils.py`. For details on the
-iterative process, see `shared/fed_avg_schedule.py`.
+for client learning rate schedules, as well as various client and server
+optimization methods.
 """
 
 import functools
@@ -26,7 +24,6 @@ from absl import app
 from absl import flags
 import tensorflow_federated as tff
 
-from optimization import fed_avg_schedule
 from utils import task_utils
 from utils import training_utils
 from utils import utils_impl
@@ -38,7 +35,6 @@ with utils_impl.record_hparam_flags() as optimizer_flags:
   optimizer_utils.define_optimizer_flags('client')
   optimizer_utils.define_optimizer_flags('server')
   optimizer_utils.define_lr_schedule_flags('client')
-  optimizer_utils.define_lr_schedule_flags('server')
 
 with utils_impl.record_hparam_flags() as shared_flags:
   # Federated training hyperparameters
@@ -58,7 +54,6 @@ with utils_impl.record_hparam_flags() as shared_flags:
   flags.DEFINE_string(
       'experiment_name', None, 'The name of this experiment. Will be append to '
       '--root_output_dir to separate experiment results.')
-  flags.mark_flag_as_required('experiment_name')
   flags.DEFINE_string('root_output_dir', '/tmp/fed_opt/',
                       'Root directory for writing experiment output.')
   flags.DEFINE_integer('total_rounds', 200, 'Number of total training rounds.')
@@ -71,6 +66,10 @@ with utils_impl.record_hparam_flags() as shared_flags:
       'are used.')
   flags.DEFINE_integer('rounds_per_checkpoint', 50,
                        'How often to checkpoint the global model.')
+
+  flags.DEFINE_bool(
+      'use_synthetic_data', False, 'If set to True, this uses '
+      'synthetic data, and is only suitable for debugging.')
 
 with utils_impl.record_hparam_flags() as task_flags:
   task_utils.define_task_flags()
@@ -102,26 +101,26 @@ def main(argv):
 
   client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
   server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
-  client_lr_schedule = optimizer_utils.create_lr_schedule_from_flags('client')
-  server_lr_schedule = optimizer_utils.create_lr_schedule_from_flags('server')
+  client_learning_rate_fn = optimizer_utils.create_lr_schedule_from_flags(
+      'client')
 
   train_client_spec = tff.simulation.baselines.ClientSpec(
       num_epochs=FLAGS.client_epochs_per_round,
       batch_size=FLAGS.client_batch_size,
       max_elements=FLAGS.max_elements_per_client)
-  task = task_utils.create_task_from_flags(train_client_spec)
-  iterative_process = fed_avg_schedule.build_fed_avg_process(
+  task = task_utils.create_task_from_flags(
+      train_client_spec, use_synthetic_data=FLAGS.use_synthetic_data)
+  learning_process = tff.learning.algorithms.build_weighted_fed_avg_with_optimizer_schedule(
       model_fn=task.model_fn,
+      client_learning_rate_fn=client_learning_rate_fn,
       client_optimizer_fn=client_optimizer_fn,
-      client_lr=client_lr_schedule,
-      server_optimizer_fn=server_optimizer_fn,
-      server_lr=server_lr_schedule,
-      client_weight_fn=None)
+      server_optimizer_fn=server_optimizer_fn)
   train_data = task.datasets.train_data.preprocess(
       task.datasets.train_preprocess_fn)
   training_process = (
       tff.simulation.compose_dataset_computation_with_iterative_process(
-          train_data.dataset_computation, iterative_process))
+          train_data.dataset_computation, learning_process))
+  training_process.get_model_weights = learning_process.get_model_weights
 
   training_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
@@ -134,7 +133,8 @@ def main(argv):
   evaluation_selection_fn = lambda round_num: [validation_data]
 
   def evaluation_fn(state, evaluation_data):
-    return federated_eval(state.model, evaluation_data)
+    return federated_eval(
+        training_process.get_model_weights(state), evaluation_data)
 
   program_state_manager, metrics_managers = training_utils.create_managers(
       FLAGS.root_output_dir, FLAGS.experiment_name)
@@ -150,10 +150,12 @@ def main(argv):
       rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
-  test_metrics = federated_eval(state.model, [test_data])
+  test_metrics = evaluation_fn(state, [test_data])
   for metrics_manager in metrics_managers:
     metrics_manager.release(test_metrics, FLAGS.total_rounds + 1)
 
 
 if __name__ == '__main__':
+  flags.mark_flag_as_required('experiment_name')
+  flags.mark_flag_as_required('task')
   app.run(main)
