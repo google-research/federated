@@ -49,7 +49,7 @@ with utils_impl.record_hparam_flags() as training_flags:
   flags.DEFINE_integer('train_batch_size', 10, 'Batch size on train clients.')
 
   # Training algorithm configuration
-  flags.DEFINE_enum('train_algorithm', 'fedavg', ['fedavg', 'fedsgd'],
+  flags.DEFINE_enum('train_algorithm', 'fedopt', ['fedopt', 'fedsgd'],
                     'Which training algorithm to use.')
   flags.DEFINE_bool(
       'example_weighting', True, 'Whether to use example weighting when '
@@ -122,7 +122,7 @@ def _create_train_algorithm(
         model_fn=model_fn,
         server_optimizer_fn=server_optimizer_fn,
         model_aggregator=model_aggregator)
-  elif FLAGS.train_algorithm == 'fedavg':
+  elif FLAGS.train_algorithm == 'fedopt':
     client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags(
         'client')
     if FLAGS.example_weighting:
