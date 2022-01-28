@@ -68,7 +68,7 @@ class WarmupTest(tf.test.TestCase, parameterized.TestCase):
       warmup_schedule = warmup.WarmupSchedule(max_learning_rate, warmup_steps)
       return tf.keras.optimizers.SGD(warmup_schedule)
 
-    fed_sgd_process = tff.learning.build_federated_sgd_process(
+    fed_sgd_process = tff.learning.algorithms.build_fed_sgd(
         tff_model_fn, server_optimizer_fn)
     state = fed_sgd_process.initialize()
 
@@ -79,9 +79,10 @@ class WarmupTest(tf.test.TestCase, parameterized.TestCase):
 
     for _ in range(10):
       keras_model.fit(dataset)
-      state, _ = fed_sgd_process.next(state, [dataset])
+      fed_sgd_output = fed_sgd_process.next(state, [dataset])
+      state = fed_sgd_output.state
       keras_model_weights = keras_model.weights[0].numpy()
-      tff_model_weights = state.model.trainable[0]
+      tff_model_weights = fed_sgd_process.get_model_weights(state).trainable[0]
       self.assertAllClose(keras_model_weights, tff_model_weights, rtol=1e-6)
 
 

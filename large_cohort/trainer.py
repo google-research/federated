@@ -179,11 +179,10 @@ def _create_iterative_process(
 
   elif FLAGS.iterative_process == 'FedSGD':
 
-    return tff.learning.build_federated_sgd_process(
+    return tff.learning.algorithms.build_fed_sgd(
         model_fn=model_fn,
         server_optimizer_fn=server_optimizer_fn,
-        client_weighting=client_weighting,
-        model_update_aggregation_factory=model_update_aggregation_factory)  # pytype: disable=bad-return-type  # gen-stub-imports
+        model_aggregator=model_update_aggregation_factory)  # pytype: disable=bad-return-type  # gen-stub-imports
 
 
 def main(argv):
