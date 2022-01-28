@@ -65,6 +65,11 @@ def _build_unbalanced_client_data() -> tff.simulation.datasets.ClientData:
 
 class PseudoClientDataTest(tf.test.TestCase, parameterized.TestCase):
 
+  def setUp(self):
+    super().setUp()
+    if tf.config.list_logical_devices('GPU'):
+      self.skipTest('skip GPU test')
+
   @parameterized.named_parameters(
       ('test_case_1', 1),
       ('test_case_2', 2),
@@ -131,8 +136,6 @@ class PseudoClientDataTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(list(dataset.as_numpy_iterator()), list(range(i)))
 
   def test_create_dataset_from_all_clients_equals_original(self):
-    if tf.config.list_logical_devices('GPU'):
-      self.skipTest('skip GPU test')
     base_client_data = _build_unbalanced_client_data()
     extended_client_data = pseudo_client_data.create_pseudo_client_data(
         base_client_data, examples_per_pseudo_client=2)
