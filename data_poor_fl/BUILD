@@ -15,6 +15,9 @@ py_binary(
 py_library(
     name = "global_trainer_lib",
     srcs = ["global_trainer.py"],
+    data = [
+        "//data_poor_fl:emnist_train_num_examples.csv",
+    ],
     srcs_version = "PY3",
     deps = [
         ":pseudo_client_data",

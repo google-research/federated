@@ -14,13 +14,15 @@
 """Runs global training on EMNIST with varying levels of data paucity."""
 
 import functools
-from typing import Callable
+import math
+from typing import Callable, List
 
 from absl import app
 from absl import flags
-from absl import logging
+import pandas as pd
 import tensorflow as tf
 import tensorflow_federated as tff
+
 
 from data_poor_fl import pseudo_client_data
 from utils import training_utils
@@ -138,6 +140,22 @@ def _create_train_algorithm(
                      'FLAGS.train_algorithm')
 
 
+def _get_pseudo_client_ids(examples_per_pseudo_clients: int,
+                           base_client_examples_df: pd.DataFrame,
+                           separator: str = '-') -> List[str]:
+  """Generates a list of pseudo-client ids."""
+  pseudo_client_ids = []
+  for _, row in base_client_examples_df.iterrows():
+    num_pseudo_clients = math.ceil(row.num_examples /
+                                   examples_per_pseudo_clients)
+    client_id = row.client_id
+    expanded_client_ids = [
+        client_id + separator + str(i) for i in range(num_pseudo_clients)
+    ]
+    pseudo_client_ids += expanded_client_ids
+  return pseudo_client_ids
+
+
 def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Expected no command-line arguments, '
@@ -160,11 +178,19 @@ def main(argv):
 
   # Creating pseudo-clients
   base_train_data = task.datasets.train_data
-  logging.info('Creating pseudo-clients. This can take some time, generally '
-               'around 5 minutes.')
+  if not FLAGS.use_synthetic_data:
+    csv_file_path = 'data_poor_fl/emnist_train_num_examples.csv'
+    with open(csv_file_path) as csv_file:
+      train_client_example_counts = pd.read_csv(csv_file)
+    pseudo_client_ids = _get_pseudo_client_ids(FLAGS.examples_per_pseudo_client,
+                                               train_client_example_counts)
+  else:
+    pseudo_client_ids = None
+
   extended_train_data = pseudo_client_data.create_pseudo_client_data(
       base_train_data,
-      examples_per_pseudo_client=FLAGS.examples_per_pseudo_client)
+      examples_per_pseudo_client=FLAGS.examples_per_pseudo_client,
+      pseudo_client_ids=pseudo_client_ids)
   training_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
           extended_train_data.client_ids, random_seed=FLAGS.base_random_seed),

@@ -16,11 +16,20 @@ import tempfile
 
 from absl.testing import absltest
 from absl.testing import flagsaver
+import pandas as pd
 
 from data_poor_fl import global_trainer
 
 
 class GlobalTrainerTest(absltest.TestCase):
+
+  def test_pseudo_client_id_generation(self):
+    data = dict(client_id=['A', 'B'], num_examples=[3, 5])
+    df = pd.DataFrame(data=data)
+    actual_pseudo_client_ids = global_trainer._get_pseudo_client_ids(
+        examples_per_pseudo_clients=2, base_client_examples_df=df)
+    expected_pseudo_client_ids = ['A-0', 'A-1', 'B-0', 'B-1', 'B-2']
+    self.assertEqual(actual_pseudo_client_ids, expected_pseudo_client_ids)
 
   @flagsaver.flagsaver(
       root_output_dir=tempfile.mkdtemp(),
