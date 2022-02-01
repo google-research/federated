@@ -141,7 +141,7 @@ def run_federated(
         keras_metrics.MaskedCategoricalAccuracy(
             name='accuracy_no_oov_or_eos',
             masked_tokens=[pad_token, eos_token] + oov_tokens),
-        keras_metrics.NumBatchesCounter(),
+        tff.learning.metrics.NumBatchesCounter(),
         keras_metrics.NumTokensCounter(masked_tokens=[pad_token])
     ]
 

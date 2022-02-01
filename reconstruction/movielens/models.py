@@ -349,8 +349,8 @@ def get_metrics_fn(
   def metrics_fn() -> List[tf.keras.metrics.Metric]:
     return [
         ReconstructionAccuracyMetric(accuracy_threshold),
-        NumExamplesCounter(),
-        NumBatchesCounter()
+        tff.learning.metrics.NumExamplesCounter(),
+        tff.learning.metrics.NumBatchesCounter()
     ]
 
   return metrics_fn
@@ -500,33 +500,3 @@ class ReconstructionAccuracyMetric(tf.keras.metrics.Mean):
     config = {'threshold': self.threshold}
     base_config = super().get_config()
     return dict(list(base_config.items()) + list(config.items()))
-
-
-class NumExamplesCounter(tf.keras.metrics.Sum):
-  """A custom sum that counts the number of examples seen.
-
-  `sample_weight` is unused since this is just a counter.
-  """
-
-  def __init__(self,
-               name: str = 'num_examples',
-               **kwargs):
-    super().__init__(name=name, **kwargs)
-
-  def update_state(self, y_true, y_pred, sample_weight=None):
-    return super().update_state(tf.shape(y_pred)[0])
-
-
-class NumBatchesCounter(tf.keras.metrics.Sum):
-  """A custom sum that counts the number of batches seen.
-
-  `sample_weight` is unused since this is just a counter.
-  """
-
-  def __init__(self,
-               name: str = 'num_batches',
-               **kwargs):
-    super().__init__(name=name, **kwargs)
-
-  def update_state(self, y_true, y_pred, sample_weight=None):
-    return super().update_state(1)

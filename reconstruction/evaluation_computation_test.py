@@ -18,6 +18,7 @@ import collections
 from absl.testing import parameterized
 import attr
 import tensorflow as tf
+import tensorflow_federated as tff
 
 from reconstruction import evaluation_computation
 from reconstruction import keras_utils
@@ -108,19 +109,6 @@ def keras_linear_model_fn():
       input_spec=input_spec)
 
 
-class NumExamplesCounter(tf.keras.metrics.Sum):
-  """A `tf.keras.metrics.Metric` that counts the number of examples seen.
-
-  This metric counts label examples.
-  """
-
-  def __init__(self, name: str = 'num_examples_total', dtype=tf.float32):  # pylint: disable=useless-super-delegation
-    super().__init__(name, dtype)
-
-  def update_state(self, y_true, y_pred, sample_weight=None):
-    return super().update_state(tf.shape(y_true)[0])
-
-
 class NumOverCounter(tf.keras.metrics.Sum):
   """A `tf.keras.metrics.Metric` that counts examples greater than a constant.
 
@@ -167,7 +155,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       return tf.keras.losses.MeanSquaredError()
 
     def metrics_fn():
-      return [NumExamplesCounter(), NumOverCounter(5.0)]
+      return [tff.learning.metrics.NumExamplesCounter(), NumOverCounter(5.0)]
 
     dataset_split_fn = reconstruction_utils.build_dataset_split_fn()
 
@@ -182,7 +170,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
         '(<server_model_weights=<trainable=<float32[1,1]>,'
         'non_trainable=<>>@SERVER,federated_dataset={<x=float32[?,1],'
         'y=float32[?,1]>*}@CLIENTS> -> '
-        '<loss=float32,num_examples_total=float32,num_over=float32>@SERVER)')
+        '<loss=float32,num_examples=int64,num_over=float32>@SERVER)')
 
     result = evaluate(
         collections.OrderedDict([
@@ -190,9 +178,9 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
             ('non_trainable', []),
         ]), create_client_data())
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(result.keys(), expected_keys)
-    self.assertAlmostEqual(result['num_examples_total'], 6.0)
+    self.assertAlmostEqual(result['num_examples'], 6.0)
     self.assertAlmostEqual(result['num_over'], 3.0)
 
   @parameterized.named_parameters(('non_keras_model', LinearModel),
@@ -203,7 +191,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       return tf.keras.losses.MeanSquaredError()
 
     def metrics_fn():
-      return [NumExamplesCounter(), NumOverCounter(5.0)]
+      return [tff.learning.metrics.NumExamplesCounter(), NumOverCounter(5.0)]
 
     evaluate = evaluation_computation.build_federated_reconstruction_evaluation(
         model_fn,
@@ -215,7 +203,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
         '(<server_model_weights=<trainable=<float32[1,1]>,'
         'non_trainable=<>>@SERVER,federated_dataset={<x=float32[?,1],'
         'y=float32[?,1]>*}@CLIENTS> -> '
-        '<loss=float32,num_examples_total=float32,num_over=float32>@SERVER)')
+        '<loss=float32,num_examples=int64,num_over=float32>@SERVER)')
 
     result = evaluate(
         collections.OrderedDict([
@@ -223,9 +211,9 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
             ('non_trainable', []),
         ]), create_client_data())
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(result.keys(), expected_keys)
-    self.assertAlmostEqual(result['num_examples_total'], 2.0)
+    self.assertAlmostEqual(result['num_examples'], 2.0)
     self.assertAlmostEqual(result['num_over'], 1.0)
 
   @parameterized.named_parameters(('non_keras_model', LinearModel),
@@ -236,7 +224,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       return tf.keras.losses.MeanSquaredError()
 
     def metrics_fn():
-      return [NumExamplesCounter(), NumOverCounter(5.0)]
+      return [tff.learning.metrics.NumExamplesCounter(), NumOverCounter(5.0)]
 
     dataset_split_fn = reconstruction_utils.build_dataset_split_fn(
         recon_epochs_max=2,
@@ -255,7 +243,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
         '(<server_model_weights=<trainable=<float32[1,1]>,'
         'non_trainable=<>>@SERVER,federated_dataset={<x=float32[?,1],'
         'y=float32[?,1]>*}@CLIENTS> -> '
-        '<loss=float32,num_examples_total=float32,num_over=float32>@SERVER)')
+        '<loss=float32,num_examples=int64,num_over=float32>@SERVER)')
 
     result = evaluate(
         collections.OrderedDict([
@@ -263,9 +251,9 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
             ('non_trainable', []),
         ]), create_client_data())
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(result.keys(), expected_keys)
-    self.assertAlmostEqual(result['num_examples_total'], 14.0)
+    self.assertAlmostEqual(result['num_examples'], 14.0)
     self.assertAlmostEqual(result['num_over'], 7.0)
 
   @parameterized.named_parameters(('non_keras_model', LinearModel),
@@ -276,7 +264,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       return tf.keras.losses.MeanSquaredError()
 
     def metrics_fn():
-      return [NumExamplesCounter(), NumOverCounter(5.0)]
+      return [tff.learning.metrics.NumExamplesCounter(), NumOverCounter(5.0)]
 
     dataset_split_fn = reconstruction_utils.build_dataset_split_fn()
 
@@ -292,7 +280,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
         '(<server_model_weights=<trainable=<float32[1,1]>,'
         'non_trainable=<>>@SERVER,federated_dataset={<x=float32[?,1],'
         'y=float32[?,1]>*}@CLIENTS> -> '
-        '<loss=float32,num_examples_total=float32,num_over=float32>@SERVER)')
+        '<loss=float32,num_examples=int64,num_over=float32>@SERVER)')
 
     result = evaluate(
         collections.OrderedDict([
@@ -300,13 +288,13 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
             ('non_trainable', []),
         ]), create_client_data())
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(result.keys(), expected_keys)
     # Now have an expectation for loss since the local bias is initialized at 0
     # and not reconstructed. MSE is (y - 1 * x)^2 for each example, for a mean
     # of (4^2 + 4^2 + 5^2 + 4^2 + 3^2 + 6^2) / 6 = 59/3.
     self.assertAlmostEqual(result['loss'], 19.666666)
-    self.assertAlmostEqual(result['num_examples_total'], 6.0)
+    self.assertAlmostEqual(result['num_examples'], 6.0)
     self.assertAlmostEqual(result['num_over'], 3.0)
 
   @parameterized.named_parameters(('non_keras_model', LinearModel),
@@ -317,7 +305,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       return tf.keras.losses.MeanSquaredError()
 
     def metrics_fn():
-      return [NumExamplesCounter(), NumOverCounter(5.0)]
+      return [tff.learning.metrics.NumExamplesCounter(), NumOverCounter(5.0)]
 
     # Ensure reconstruction is skipped if `recon_dataset` is empty. This also
     # ensures `round_num` is 0 for evaluation and loss doesn't change if
@@ -336,7 +324,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
         '(<server_model_weights=<trainable=<float32[1,1]>,'
         'non_trainable=<>>@SERVER,federated_dataset={<x=float32[?,1],'
         'y=float32[?,1]>*}@CLIENTS> -> '
-        '<loss=float32,num_examples_total=float32,num_over=float32>@SERVER)')
+        '<loss=float32,num_examples=int64,num_over=float32>@SERVER)')
 
     result = evaluate(
         collections.OrderedDict([
@@ -344,13 +332,13 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
             ('non_trainable', []),
         ]), create_client_data())
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(result.keys(), expected_keys)
     # Now have an expectation for loss since the local bias is initialized at 0
     # and not reconstructed. MSE is (y - 1 * x)^2 for each example, for a mean
     # of (4^2 + 4^2 + 5^2 + 4^2 + 3^2 + 6^2) / 6 = 59/3
     self.assertAlmostEqual(result['loss'], 19.666666)
-    self.assertAlmostEqual(result['num_examples_total'], 12.0)
+    self.assertAlmostEqual(result['num_examples'], 12.0)
     self.assertAlmostEqual(result['num_over'], 6.0)
 
   @parameterized.named_parameters(('non_keras_model', LinearModel),
@@ -396,7 +384,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       return tf.keras.losses.MeanSquaredError()
 
     def metrics_fn():
-      return [NumExamplesCounter(), NumOverCounter(5.0)]
+      return [tff.learning.metrics.NumExamplesCounter(), NumOverCounter(5.0)]
 
     dataset_split_fn = reconstruction_utils.build_dataset_split_fn(
         recon_epochs_max=2,
@@ -421,14 +409,14 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
         'data={<x=float32[?,1],y=float32[?,1]>*}@CLIENTS> -> '
         '<<model=<trainable=<float32[1,1]>,non_trainable=<>>,'
         'optimizer_state=<>,round_num=int64,aggregator_state=<>>@SERVER,'
-        '<loss=float32,num_examples_total=float32,num_over=float32>@SERVER>)')
+        '<loss=float32,num_examples=int64,num_over=float32>@SERVER>)')
 
     state = evaluator.initialize()
     state, metrics = evaluator.next(state, create_client_data())
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(metrics.keys(), expected_keys)
-    self.assertAlmostEqual(metrics['num_examples_total'], 14.0)
+    self.assertAlmostEqual(metrics['num_examples'], 14.0)
     self.assertAlmostEqual(metrics['num_over'], 7.0)
 
   @parameterized.named_parameters(('non_keras_model', LinearModel),
@@ -439,7 +427,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       return tf.keras.losses.MeanSquaredError()
 
     def metrics_fn():
-      return [NumExamplesCounter(), NumOverCounter(5.0)]
+      return [tff.learning.metrics.NumExamplesCounter(), NumOverCounter(5.0)]
 
     dataset_split_fn = reconstruction_utils.build_dataset_split_fn(
         recon_epochs_max=0, post_recon_epochs=2)
@@ -461,14 +449,14 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
         'data={<x=float32[?,1],y=float32[?,1]>*}@CLIENTS> -> '
         '<<model=<trainable=<float32[1,1]>,non_trainable=<>>,'
         'optimizer_state=<>,round_num=int64,aggregator_state=<>>@SERVER,'
-        '<loss=float32,num_examples_total=float32,num_over=float32>@SERVER>)')
+        '<loss=float32,num_examples=int64,num_over=float32>@SERVER>)')
 
     state = evaluator.initialize()
     state, metrics = evaluator.next(state, create_client_data())
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(metrics.keys(), expected_keys)
-    self.assertAlmostEqual(metrics['num_examples_total'], 12.0)
+    self.assertAlmostEqual(metrics['num_examples'], 12.0)
     self.assertAlmostEqual(metrics['num_over'], 6.0)
 
     # Without reconstruction and with an initialized model, we can expect an
@@ -485,12 +473,12 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
 
     state, metrics = evaluator.next(state, create_client_data())
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(metrics.keys(), expected_keys)
     # MSE is (y - 1 * x)^2 for each example, for a mean of
     # (4^2 + 4^2 + 5^2 + 4^2 + 3^2 + 6^2) / 6 = 59/3.
     self.assertAlmostEqual(metrics['loss'], 19.666666)
-    self.assertAlmostEqual(metrics['num_examples_total'], 12.0)
+    self.assertAlmostEqual(metrics['num_examples'], 12.0)
     self.assertAlmostEqual(metrics['num_over'], 6.0)
 
   @parameterized.named_parameters(('non_keras_model', LinearModel),
@@ -502,7 +490,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       return tf.keras.losses.MeanSquaredError()
 
     def metrics_fn():
-      return [NumExamplesCounter(), NumOverCounter(5.0)]
+      return [tff.learning.metrics.NumExamplesCounter(), NumOverCounter(5.0)]
 
     dataset_split_fn = reconstruction_utils.build_dataset_split_fn(
         recon_epochs_max=0, post_recon_epochs=2, split_dataset=True)
@@ -524,14 +512,14 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
         'data={<x=float32[?,1],y=float32[?,1]>*}@CLIENTS> -> '
         '<<model=<trainable=<float32[1,1]>,non_trainable=<>>,'
         'optimizer_state=<>,round_num=int64,aggregator_state=<>>@SERVER,'
-        '<loss=float32,num_examples_total=float32,num_over=float32>@SERVER>)')
+        '<loss=float32,num_examples=int64,num_over=float32>@SERVER>)')
 
     state = evaluator.initialize()
     state, metrics = evaluator.next(state, create_client_data()[1:])
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(metrics.keys(), expected_keys)
-    self.assertAlmostEqual(metrics['num_examples_total'], 2.0)
+    self.assertAlmostEqual(metrics['num_examples'], 2.0)
     self.assertAlmostEqual(metrics['num_over'], 0.0)
 
     # Without reconstruction and with an initialized model, we can expect an
@@ -548,11 +536,11 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
 
     state, metrics = evaluator.next(state, create_client_data()[1:])
 
-    expected_keys = ['loss', 'num_examples_total', 'num_over']
+    expected_keys = ['loss', 'num_examples', 'num_over']
     self.assertCountEqual(metrics.keys(), expected_keys)
     # MSE is (y - 1 * x)^2 for each example, for a mean of 3^2 / 1 = 9.
     self.assertAlmostEqual(metrics['loss'], 9.0)
-    self.assertAlmostEqual(metrics['num_examples_total'], 2.0)
+    self.assertAlmostEqual(metrics['num_examples'], 2.0)
     self.assertAlmostEqual(metrics['num_over'], 0.0)
 
 

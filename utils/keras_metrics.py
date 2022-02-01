@@ -27,26 +27,6 @@ def _apply_mask(y_true, sample_weight, masked_tokens, dtype):
   return sample_weight
 
 
-class NumBatchesCounter(tf.keras.metrics.Sum):
-  """A `tf.keras.metrics.Metric` that counts the number of batches seen."""
-
-  def __init__(self, name: str = 'num_batches', dtype=tf.int64):  # pylint: disable=useless-super-delegation
-    super().__init__(name, dtype)
-
-  def update_state(self, y_true, y_pred, sample_weight=None):
-    return super().update_state(1)
-
-
-class NumExamplesCounter(tf.keras.metrics.Sum):
-  """A `tf.keras.metrics.Metric` that counts the number of examples seen."""
-
-  def __init__(self, name: str = 'num_examples', dtype=tf.int64):  # pylint: disable=useless-super-delegation
-    super().__init__(name, dtype)
-
-  def update_state(self, y_true, y_pred, sample_weight=None):
-    return super().update_state(tf.shape(y_pred)[0])
-
-
 class NumTokensCounter(tf.keras.metrics.Sum):
   """A `tf.keras.metrics.Metric` that counts tokens seen after masking."""
 

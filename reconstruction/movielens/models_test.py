@@ -788,42 +788,6 @@ class ModelsTest(absltest.TestCase):
 
     tf.debugging.assert_near(expected_accuracy, accuracy)
 
-  def test_num_examples_counter(self):
-    metric = models.NumExamplesCounter()
-
-    y_true = tf.constant([[1.0], [2.0], [3.0], [4.0], [1.0], [2.0]],
-                         dtype=tf.float32)
-    y_pred = tf.constant([[0.61], [2.2], [3.41], [4.39], [9.0], [9.0]],
-                         dtype=tf.float32)
-    metric.update_state(y_true, y_pred)
-
-    y_true = tf.constant([1.0, 2.0, 4.0], dtype=tf.float32)
-    y_pred = tf.constant([.52, .42, .31], dtype=tf.float32)
-    metric.update_state(y_true, y_pred)
-
-    num_examples = metric.result()
-    expected_num_examples = 9.0
-
-    tf.debugging.assert_near(expected_num_examples, num_examples)
-
-  def test_num_batches_counter(self):
-    metric = models.NumBatchesCounter()
-
-    y_true = tf.constant([[1.0], [2.0], [3.0], [4.0], [1.0], [2.0]],
-                         dtype=tf.float32)
-    y_pred = tf.constant([[0.61], [2.2], [3.41], [4.39], [9.0], [9.0]],
-                         dtype=tf.float32)
-    metric.update_state(y_true, y_pred)
-
-    y_true = tf.constant([1.0, 2.0, 5.0], dtype=tf.float32)
-    y_pred = tf.constant([.52, .42, .31], dtype=tf.float32)
-    metric.update_state(y_true, y_pred)
-
-    num_batches = metric.result()
-    expected_num_batches = 2.0
-
-    tf.debugging.assert_near(expected_num_batches, num_batches)
-
 
 if __name__ == '__main__':
   absltest.main()
