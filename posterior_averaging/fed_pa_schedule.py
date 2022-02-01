@@ -296,7 +296,6 @@ def create_update_delta_fn(name, *, rho=1.):
   return _update_delta
 
 
-@tf.function
 def _update_delta_simple_mean(data_pass_outputs, previous_updates):
   """Updates weights delta using a simple running mean over posterior samples.
 
@@ -338,7 +337,6 @@ def _struct_dot(struct1, struct2):
   return sum(tf.nest.flatten(dot_struct))
 
 
-@tf.function
 def _update_delta_posterior_mean(data_pass_outputs, previous_updates, *, rho):
   r"""Updates weights delta by incrementally re-computing posterior mean.
 
