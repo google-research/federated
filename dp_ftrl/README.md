@@ -24,7 +24,7 @@ This folder is organized as following,
     of training by both epochs of clients shuffling and rounds of clients
     sampling.
 *   TFF iterative process builder `dp_fedavg` based on TFF
-    [`simple_fedavg` example](https://github.com/tensorflow/federated/tree/main/tensorflow_federated/python/examples/simple_fedavg).
+    [`simple_fedavg` example](https://github.com/tensorflow/federated/tree/main/tensorflow_federated/examples/simple_fedavg).
     Major changes: accept a customized class as server optimizers; add the
     option of clipping model delta before sending back to server for
     differential privacy.
