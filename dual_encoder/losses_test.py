@@ -969,6 +969,90 @@ class LossesTest(absltest.TestCase):
     }
     self.assertEqual(config, expected_config)
 
+  def test_spreadout(self):
+    loss = losses.Spreadout(
+        spreadout_context_lambda=0.1,
+        spreadout_label_lambda=0.2,
+        spreadout_cross_lambda=0.3)
+
+    y_pred = tf.constant([[1, 0], [0.0, 1.0], [1, 1], [0, 1], [1, 0], [1, 0]])
+    y_true = tf.constant([1.0, 1.0, 1.0])
+
+    # Test both Keras-internal call and external call since behavior may be
+    # slightly different due to type/shape conversion.
+    loss_value = loss(y_true, y_pred)
+    expected_loss_value = 1.024264
+
+    tf.debugging.assert_near(expected_loss_value, loss_value)
+
+    loss_value = loss.call(y_true, y_pred)
+    expected_loss_value = 1.024264
+
+    tf.debugging.assert_near(expected_loss_value, loss_value)
+
+  def test_spreadout_with_global_similarity(self):
+    loss = losses.Spreadout(
+        spreadout_context_lambda=0.1,
+        spreadout_label_lambda=0.2,
+        spreadout_cross_lambda=0.3,
+        use_global_similarity=True)
+
+    y_pred = tf.constant([[1, 0], [0.0, 1.0], [1, 1], [0, 1], [1, 0], [0, 0],
+                          [1, 0]])
+    y_true = tf.constant([[0], [1], [3]])
+
+    # Test both Keras-internal call and external call since behavior may be
+    # slightly different due to type/shape conversion.
+    loss_value = loss(y_true, y_pred)
+    expected_loss_value = 1.024264
+
+    tf.debugging.assert_near(expected_loss_value, loss_value)
+
+    loss_value = loss.call(y_true, y_pred)
+    expected_loss_value = 1.024264
+
+    tf.debugging.assert_near(expected_loss_value, loss_value)
+
+  def test_spreadout_no_embeddings(self):
+    with self.assertRaises(ValueError):
+      losses.BatchSoftmax(expect_embeddings=False, spreadout_context_lambda=0.1)
+
+  def test_spreadout_get_config(self):
+    loss = losses.Spreadout()
+
+    config = loss.get_config()
+    expected_config = {
+        'normalization_fn': utils.l2_normalize_fn,
+        'expect_embeddings': True,
+        'spreadout_context_lambda': 0.0,
+        'spreadout_label_lambda': 0.0,
+        'spreadout_cross_lambda': 0.0,
+        'name': None,
+        'reduction': 'auto',
+    }
+    self.assertEqual(config, expected_config)
+
+  def test_spreadout_get_config_keyword_args(self):
+    loss = losses.Spreadout(
+        normalization_fn=None,
+        expect_embeddings=True,
+        spreadout_context_lambda=0.0,
+        spreadout_label_lambda=0.0,
+        spreadout_cross_lambda=0.1,
+        name='my_loss')
+
+    config = loss.get_config()
+    expected_config = {
+        'normalization_fn': None,
+        'expect_embeddings': True,
+        'spreadout_context_lambda': 0.0,
+        'spreadout_label_lambda': 0.0,
+        'spreadout_cross_lambda': 0.1,
+        'name': 'my_loss',
+        'reduction': 'auto'
+    }
+    self.assertEqual(config, expected_config)
+
   def test_update_loss_with_spreadout_loss(self):
     loss = 0.1
     context_embedding = tf.constant([[1, 0], [0.0, 1.0]])

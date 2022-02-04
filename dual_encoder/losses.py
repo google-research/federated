@@ -58,7 +58,7 @@ class BatchSoftmax(tf.keras.losses.Loss):
 
   If `use_global_similarity` is True, `y_true` is expected to be a
   pre-calculated global similarities matrix or a (context embeddings, full label
-  embeddings) tuple which is used to calcualte global similarities. It is
+  embeddings) tuple which is used to calculate global similarities. It is
   required to be False when calling `BatchSoftmax`.
 
   This class is called when using the batch softmax as the loss function and the
@@ -192,7 +192,7 @@ class BatchSoftmaxWithGlobalSimilarity(tf.keras.losses.Loss):
 
   If 'use_global_similarity' is True, y_true is expected to be a pre-calculated
   global similarities matrix or a (context embeddings, full label embeddings)
-  tuple which is used to calcualte global similarities. It is required to be
+  tuple which is used to calculate global similarities. It is required to be
   True when calling `BatchSoftmaxWithGlobalSimilarity`.
 
   This class is called when using the batch softmax as the loss function but the
@@ -323,7 +323,7 @@ class GlobalSoftmax(tf.keras.losses.Loss):
 
   If 'use_global_similarity' is True, `y_true` is expected to be a
   pre-calculated global similarities matrix or a (context embeddings, full label
-  embeddings) tuple which is used to calcualte global similarities. It is
+  embeddings) tuple which is used to calculate global similarities. It is
   required to be True when calling `GlobalSoftmax`.
 
   This class is called when using the global softmax as the loss function. The
@@ -436,9 +436,9 @@ class Hinge(tf.keras.losses.Loss):
 
   If `use_global_similarity` is True, `y_true` is expected to be a
   pre-calculated global similarities matrix or a (context embeddings, full label
-  embeddings) tuple which is used to calcualte global similarities. Otherwise,
+  embeddings) tuple which is used to calculate global similarities. Otherwise,
   `y_true` is either a pre-calculated batch similarities matrix or a (context
-  embeddings, batch label embeddings) tuple which is used to calcualte batch
+  embeddings, batch label embeddings) tuple which is used to calculate batch
   similarities.
   """
 
@@ -495,6 +495,84 @@ class Hinge(tf.keras.losses.Loss):
     # Apply spreadout if needed.
     loss = _update_loss_with_spreadout_loss(
         loss=loss,
+        context_embedding=context_embedding,
+        label_embedding=label_embedding,
+        similarities=similarities,
+        spreadout_context_lambda=self.spreadout_context_lambda,
+        spreadout_label_lambda=self.spreadout_label_lambda,
+        spreadout_cross_lambda=self.spreadout_cross_lambda)
+
+    return loss
+
+  def get_config(self):
+    config = {
+        'normalization_fn': self.normalization_fn,
+        'expect_embeddings': self.expect_embeddings,
+        'spreadout_context_lambda': self.spreadout_context_lambda,
+        'spreadout_label_lambda': self.spreadout_label_lambda,
+        'spreadout_cross_lambda': self.spreadout_cross_lambda,
+    }
+    base_config = super().get_config()
+    return dict(list(base_config.items()) + list(config.items()))
+
+
+class Spreadout(tf.keras.losses.Loss):
+  """Compute spreadout loss.
+
+  Optionally applies `normalization_fn` to context and label embeddings.
+  `expect_embeddings` must be true.
+
+  Allows the user to apply spreadout regularization with a given
+  scaling lambda. Note that `spreadout_label_lambda` includes full vocab labels,
+  but `spreadout_cross_lambda` includes only batch labels. Refer to description
+  of `class BatchSoftmax` for more details about spreadout regularization.
+  Note that the values of `spreadout_context_lambda`, `spreadout_label_lambda`
+  and `spreadout_cross_lambda` are expected to be non-negative.
+
+  If `use_global_similarity` is True, `y_true` is expected to be a
+  pre-calculated global similarities matrix or a (context embeddings, full label
+  embeddings) tuple which is used to calculate global similarities. Otherwise,
+  `y_true` is either a pre-calculated batch similarities matrix or a (context
+  embeddings, batch label embeddings) tuple which is used to calculate batch
+  similarities.
+  """
+
+  def __init__(
+      self,
+      normalization_fn: utils.NormalizationFnType = utils.l2_normalize_fn,
+      expect_embeddings: bool = True,
+      spreadout_context_lambda: float = 0.0,
+      spreadout_label_lambda: float = 0.0,
+      spreadout_cross_lambda: float = 0.0,
+      use_global_similarity: bool = False,
+      **kwargs):
+
+    if not expect_embeddings:
+      raise ValueError('`expect_embeddings` must be true for Spreadout loss.')
+
+    self.normalization_fn = normalization_fn
+    self.expect_embeddings = expect_embeddings
+    self.spreadout_context_lambda = spreadout_context_lambda
+    self.spreadout_label_lambda = spreadout_label_lambda
+    self.spreadout_cross_lambda = spreadout_cross_lambda
+    self.use_global_similarity = use_global_similarity
+    super().__init__(**kwargs)
+
+  @tf.function
+  def call(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+
+    context_embedding, label_embedding, similarities = (
+        utils.get_embeddings_and_similarities(y_pred, y_true,
+                                              self.expect_embeddings,
+                                              self.normalization_fn))
+
+    if self.use_global_similarity:
+      # Extract the batch similarities given the batch label (y_true).
+      similarities = tf.gather(similarities, tf.transpose(y_true)[0], axis=1)
+
+    # Compute spreadout loss.
+    loss = _update_loss_with_spreadout_loss(
+        loss=0.0,
         context_embedding=context_embedding,
         label_embedding=label_embedding,
         similarities=similarities,

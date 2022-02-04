@@ -27,6 +27,7 @@ from dual_encoder import model_utils as utils
 BATCH_SOFTMAX = 'batch_softmax'
 GLOBAL_SOFTMAX = 'global_softmax'
 HINGE = 'hinge'
+SPREADOUT = 'spreadout'
 # Type of encoders for the dual_encoder_model
 FLATTEN = 'flatten'
 BOW = 'bow'
@@ -133,6 +134,8 @@ def get_loss(
     loss_fn = losses.GlobalSoftmax
   elif loss_function == HINGE:
     loss_fn = losses.Hinge
+  elif loss_function == SPREADOUT:
+    loss_fn = losses.Spreadout
   else:
     raise ValueError(f'Got unexpected loss function {loss_function}.')
 
