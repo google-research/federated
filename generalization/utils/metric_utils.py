@@ -19,7 +19,6 @@ import time
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Tuple
 
 from absl import logging
-from clu import metric_writers
 import pandas as pd
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -98,24 +97,15 @@ class EpochTimerCallback(tf.keras.callbacks.Callback):
     logs[EPOCH_TIME_KEY] = elapsed_time
 
 
-class MetricWriterManager(tff.program.ReleaseManager):
-  """A `tff.program.ReleaseManager` that wraps a `MetricWriter` instance."""
-
-  def __init__(self, metric_writer: metric_writers.MetricWriter):
-    self._writer = metric_writer
-
-  def release(self, value: Mapping[str, Any], key: int):
-    self._writer.write_scalars(step=key, scalars=_flatten_nested_dict(value))
-
-
 class MetricWriterCallback(tf.keras.callbacks.Callback):
   """A keras callback that wraps a clu `MetricWriter` instance."""
 
-  def __init__(self, metric_writer: metric_writers.MetricWriter):
-    self._writer = metric_writer
+  def __init__(self, summary_dir: str):
+    self._tensorboard_writer = tff.program.TensorboardReleaseManager(
+        summary_dir)
 
   def on_epoch_end(self, epoch: int, logs=None):
-    self._writer.write_scalars(step=epoch, scalars=logs)
+    self._tensorboard_writer.release(value=logs, key=epoch)
 
 
 def _make_output_dirs(root_output_dir, experiment_name):
@@ -193,8 +183,7 @@ def configure_default_managers(
       tff.program.LoggingReleaseManager(),
       tff.program.CSVFileReleaseManager(
           file_path=csv_file, key_fieldname='round_num'),
-      MetricWriterManager(
-          metric_writers.create_default_writer(logdir=summary_dir))
+      tff.program.TensorboardReleaseManager(summary_dir=summary_dir)
   ]
 
   logging.info('Writing...')
@@ -236,10 +225,10 @@ def configure_default_callbacks(
       period=epochs_per_checkpoint,
       write_graph=False)
 
-  metric_callbacks = [AtomicCSVLoggerCallback(results_dir)]
-  metric_callbacks.append(
-      MetricWriterCallback(
-          metric_writers.create_default_writer(logdir=summary_dir)))
+  metric_callbacks = [
+      AtomicCSVLoggerCallback(results_dir),
+      MetricWriterCallback(summary_dir)
+  ]
   logging.info('Writing...')
   logging.info('    checkpoints to: %s', checkpoint_dir)
   logging.info('    CSV metrics to: %s', results_dir)
