@@ -57,6 +57,7 @@ py_test(
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
+    tags = ["nokokoro"],
     deps = [":fed_avg_schedule"],
 )
 

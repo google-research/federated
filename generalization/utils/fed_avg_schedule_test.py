@@ -233,7 +233,9 @@ class ModelDeltaProcessTest(tf.test.TestCase):
             optimizer_state=(tf.int64,),
             round_num=tf.float32), tff.SERVER)
     metrics_type = tff.FederatedType(
-        collections.OrderedDict(loss=tf.float32), tff.SERVER)
+        collections.OrderedDict(
+            loss=tf.float32, num_examples=tf.int64, num_batches=tf.int64),
+        tff.SERVER)
 
     expected_parameter_type = collections.OrderedDict(
         server_state=server_state_type,

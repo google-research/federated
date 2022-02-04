@@ -308,7 +308,10 @@ class AdaptiveFedAvgTest(tf.test.TestCase):
                 y=tff.TensorType(tf.float32, [None, 1]))), tff.CLIENTS)
 
     metrics_type = tff.FederatedType(
-        collections.OrderedDict(loss=tff.TensorType(tf.float32)), tff.SERVER)
+        collections.OrderedDict(
+            loss=tff.TensorType(tf.float32),
+            num_examples=tff.TensorType(tf.int64),
+            num_batches=tff.TensorType(tf.int64)), tff.SERVER)
     output_type = collections.OrderedDict(
         before_training=metrics_type, during_training=metrics_type)
 
