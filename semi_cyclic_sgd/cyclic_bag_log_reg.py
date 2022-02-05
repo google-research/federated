@@ -338,14 +338,14 @@ def test(test_data,
   t_process_y = 0
   t_process_tf = 0
   for b in test_data.get_test_data(g):
-    t1 = time.clock()
+    t1 = time.clock()  # pytype: disable=module-attr  # py39-upgrade
     x = model.process_x(b)
-    t2 = time.clock()
+    t2 = time.clock()  # pytype: disable=module-attr  # py39-upgrade
     y = model.process_y(b)
-    t3 = time.clock()
+    t3 = time.clock()  # pytype: disable=module-attr  # py39-upgrade
     num_test_examples = num_test_examples + len(x)
     num_correct_ = sess.run([eval_metric_op], {features: x, labels: y})
-    t4 = time.clock()
+    t4 = time.clock()  # pytype: disable=module-attr  # py39-upgrade
     num_correct = num_correct + num_correct_[0]
     t_process_x = t_process_x + (t2 - t1)
     t_process_y = t_process_y + (t3 - t2)
