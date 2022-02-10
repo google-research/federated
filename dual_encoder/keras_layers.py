@@ -58,6 +58,11 @@ class MaskedAverage(tf.keras.layers.Layer):
 
     return tf.reduce_any(mask, axis=self.axis)
 
+  def get_config(self):
+    config = super().get_config()
+    config.update({'axis': self.axis})
+    return config
+
 
 class MaskedReshape(tf.keras.layers.Layer):
   """Keras layer for reshaping a tensor along with its mask.
@@ -83,6 +88,14 @@ class MaskedReshape(tf.keras.layers.Layer):
       raise ValueError('Inputs to `MaskedReshape` need to be masked.')
 
     return tf.reshape(mask, self.new_mask_shape)
+
+  def get_config(self):
+    config = super().get_config()
+    config.update({
+        'new_inputs_shape': self.new_inputs_shape,
+        'new_mask_shape': self.new_mask_shape,
+    })
+    return config
 
 
 class EmbeddingSpreadoutRegularizer(tf.keras.regularizers.Regularizer):

@@ -99,6 +99,11 @@ class KerasLayersTest(absltest.TestCase):
     with self.assertRaises(ValueError):
       masked_average_layer.compute_mask(inputs, mask=mask)
 
+  def test_masked_average_get_config(self):
+    masked_average_layer = keras_layers.MaskedAverage(1)
+    config = masked_average_layer.get_config()
+    self.assertEqual(config['axis'], 1)
+
   def test_masked_reshape(self):
     masked_reshape_layer = keras_layers.MaskedReshape((4, 4, 2, 1), (4, 4, 2))
 
@@ -181,6 +186,12 @@ class KerasLayersTest(absltest.TestCase):
 
     with self.assertRaises(ValueError):
       masked_reshape_layer.compute_mask(inputs, mask=mask)
+
+  def test_masked_reshape_get_config(self):
+    masked_reshape_layer = keras_layers.MaskedReshape((-1, 4, 2, 1), (-1, 4, 2))
+    config = masked_reshape_layer.get_config()
+    self.assertEqual(config['new_inputs_shape'], (-1, 4, 2, 1))
+    self.assertEqual(config['new_mask_shape'], (-1, 4, 2))
 
   def test_embedding_spreadout_regularizer_dot_product(self):
     weights = tf.constant(
