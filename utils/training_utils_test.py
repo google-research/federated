@@ -130,7 +130,7 @@ class TrainingUtilsTest(tf.test.TestCase):
     model = task.model_fn()
     model_weights = tff.learning.ModelWeights.from_model(model)
     validation_metrics = validation_fn(model_weights, round_num=1)
-    self.assertEqual(validation_metrics['stat']['num_examples'], 3)
+    self.assertEqual(validation_metrics['eval']['num_examples'], 3)
 
   def test_create_test_fn_is_compatible_with_model_weights(self):
     task = create_task()
