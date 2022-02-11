@@ -102,6 +102,8 @@ optimizer_utils.define_optimizer_flags('client')
 # MovieLens data generation parameter flags.
 flags.DEFINE_string('input_data_dir', None,
                     'Path to the cns directory of input data.')
+flags.DEFINE_string('ratings_file_name', 'ratings.dat',
+                    'Name of the rating file.')
 flags.DEFINE_float('train_fraction', 0.8,
                    'The fraction of examples used for training.')
 flags.DEFINE_float('val_fraction', 0.1,
@@ -174,7 +176,8 @@ def model_fn(element_spec):
 
 
 def main(unused_argv):
-  ratings_df = movielens_data_gen.read_ratings(FLAGS.input_data_dir)
+  ratings_df = movielens_data_gen.read_ratings(
+      data_dir=FLAGS.input_data_dir, ratings_file_name=FLAGS.ratings_file_name)
   train_df, val_df, _ = movielens_data_gen.split_ratings_df(
       ratings_df=ratings_df,
       train_fraction=FLAGS.train_fraction,

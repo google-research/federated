@@ -24,6 +24,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from absl import app
 from absl import flags
+from absl import logging
 import pandas as pd
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -57,14 +58,18 @@ flags.DEFINE_integer("max_context_length", 10,
                      "contexts get padded to this length.")
 
 
-def read_ratings(data_dir: str, tmp_dir: str = _LOCAL_DIR) -> pd.DataFrame:
+def read_ratings(data_dir: str,
+                 tmp_dir: str = _LOCAL_DIR,
+                 ratings_file_name: str = _RATINGS_FILE_NAME) -> pd.DataFrame:
   """Read movielens ratings data into dataframe."""
-  if not tf.io.gfile.exists(os.path.join(tmp_dir, _RATINGS_FILE_NAME)):
+  if not tf.io.gfile.exists(os.path.join(tmp_dir, ratings_file_name)):
     tf.io.gfile.copy(
-        os.path.join(data_dir, _RATINGS_FILE_NAME),
-        os.path.join(tmp_dir, _RATINGS_FILE_NAME))
+        os.path.join(data_dir, ratings_file_name),
+        os.path.join(tmp_dir, ratings_file_name))
+  logging.info("Read movielens ratings data from %s",
+               os.path.join(data_dir, ratings_file_name))
   ratings_df = pd.read_csv(
-      os.path.join(tmp_dir, _RATINGS_FILE_NAME),
+      os.path.join(tmp_dir, ratings_file_name),
       sep="::",
       names=["UserID", "MovieID", "Rating", "Timestamp"])
   ratings_df["Timestamp"] = ratings_df["Timestamp"].apply(int)
