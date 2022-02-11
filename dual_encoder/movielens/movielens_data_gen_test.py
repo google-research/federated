@@ -115,6 +115,30 @@ class MovielensDataGenTest(absltest.TestCase):
     self.assertListEqual(list(test_val_ratings_df['UserID']), [7, 3, 3, 4])
     self.assertEmpty(list(test_test_ratings_df['UserID']))
 
+  def test_split_ratings_df_shuffled_user_ids(self):
+    test_train_ratings_df, test_val_ratings_df, test_test_ratings_df = (
+        movielens_data_gen.split_ratings_df(self.ratings_df, 0.3, 0.3, 123))
+    self.assertListEqual(list(test_train_ratings_df['UserID']), [4])
+    self.assertListEqual(list(test_val_ratings_df['UserID']), [7])
+    self.assertListEqual(
+        list(test_test_ratings_df['UserID']), [1, 1, 1, 1, 3, 3])
+
+  def test_split_ratings_df_empty_val_shuffled_user_ids(self):
+    test_train_ratings_df, test_val_ratings_df, test_test_ratings_df = (
+        movielens_data_gen.split_ratings_df(self.ratings_df, 0.3, 0.0, 123))
+    self.assertListEqual(list(test_train_ratings_df['UserID']), [4])
+    self.assertEmpty(list(test_val_ratings_df['UserID']))
+    self.assertListEqual(
+        list(test_test_ratings_df['UserID']), [1, 1, 1, 7, 1, 3, 3])
+
+  def test_split_ratings_df_empty_test_shuffled_user_ids(self):
+    test_train_ratings_df, test_val_ratings_df, test_test_ratings_df = (
+        movielens_data_gen.split_ratings_df(self.ratings_df, 0.3, 0.7, 123))
+    self.assertListEqual(list(test_train_ratings_df['UserID']), [4])
+    self.assertListEqual(
+        list(test_val_ratings_df['UserID']), [1, 1, 1, 7, 1, 3, 3])
+    self.assertEmpty(list(test_test_ratings_df['UserID']))
+
   def test_convert_to_timelines(self):
     test_timelines = movielens_data_gen.convert_to_timelines(self.ratings_df)
     self.assertDictEqual(test_timelines, self.timelines)
@@ -227,7 +251,6 @@ class MovielensDataGenTest(absltest.TestCase):
             test_timeline, 3, 0))[1]
     test_decoded_example = movielens_data_gen.decode_example(
         test_example, False)
-    print(test_decoded_example)
     self.assertLen(test_decoded_example, 2)
     self.assertListEqual([1, 5, 0], list(test_decoded_example[0]['context']))
     self.assertEqual([3], test_decoded_example[0]['label'])

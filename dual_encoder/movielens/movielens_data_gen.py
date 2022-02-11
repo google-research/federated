@@ -74,7 +74,8 @@ def read_ratings(data_dir: str, tmp_dir: str = _LOCAL_DIR) -> pd.DataFrame:
 def split_ratings_df(
     ratings_df: pd.DataFrame,
     train_fraction: float = 0.8,
-    val_fraction: float = 0.1
+    val_fraction: float = 0.1,
+    shuffle_users_seed: Optional[int] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
   """Split per-user rating DataFrame into train/val/test by user id.
 
@@ -86,6 +87,9 @@ def split_ratings_df(
       actual number will be rounded to the nearest integer.
     val_fraction: The approximate fraction of users be in the validation set.
       The actual number will be rounded to the nearest integer.
+    shuffle_users_seed: The seed used for initializing the random number
+      generator to shuffle the user ids when splitting ratings DataFrame. If it
+      is `None`, do not shuffle the user ids before splitting.
 
   Returns:
     train_ratings_df: Pandas DataFrame containing the train subset of
@@ -101,17 +105,28 @@ def split_ratings_df(
   # Splitting the ratings_df into train/val/test data frames.
   # Current setting assumes the data distribution doesn't vary by UserID
   # so that the train, validation and test datasets will have similar
-  # distribution over the number of examples per user.
-  # TODO(b/181596254): consistently randomly permute train/test/val mask
-  # before using them to generate the train/val/test data frames.
-  # Using a single permutation, otherwise there'll be some overlap.
-  last_train_user_id = user_ids[round(len(user_ids) * train_fraction) - 1]
-  last_val_user_id = user_ids[
-      round(len(user_ids) * (train_fraction + val_fraction)) - 1]
+  # distribution over the number of examples per user. Optionally randomly
+  # permute user_ids before splitting.
+  if shuffle_users_seed:
+    random.seed(shuffle_users_seed)
+    random.shuffle(user_ids)
+    train_user_id = user_ids[:round(len(user_ids) * train_fraction)]
+    val_user_id = user_ids[round(len(user_ids) * train_fraction):round(
+        len(user_ids) * (train_fraction + val_fraction))]
+    test_user_id = user_ids[
+        round(len(user_ids) * (train_fraction + val_fraction)):]
 
-  train_mask = ratings_df.UserID <= last_train_user_id
-  test_mask = ratings_df.UserID > last_val_user_id
-  val_mask = ~train_mask & ~test_mask
+    train_mask = ratings_df.UserID.isin(train_user_id)
+    val_mask = ratings_df.UserID.isin(val_user_id)
+    test_mask = ratings_df.UserID.isin(test_user_id)
+  else:
+    last_train_user_id = user_ids[round(len(user_ids) * train_fraction) - 1]
+    last_val_user_id = user_ids[
+        round(len(user_ids) * (train_fraction + val_fraction)) - 1]
+
+    train_mask = ratings_df.UserID <= last_train_user_id
+    test_mask = ratings_df.UserID > last_val_user_id
+    val_mask = ~train_mask & ~test_mask
 
   train_ratings_df = ratings_df[train_mask]
   val_ratings_df = ratings_df[val_mask]
