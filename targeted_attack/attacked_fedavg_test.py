@@ -281,12 +281,10 @@ class ServerTest(tf.test.TestCase):
 
   def _assert_server_update_with_all_ones(self, model_fn):
     optimizer_fn = lambda: tf.keras.optimizers.SGD(learning_rate=0.1)
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=(784,)),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(units=10, kernel_initializer='zeros'),
-        tf.keras.layers.Softmax(),
-    ])
+    model = model_fn()
+    # Initialize the model weights with all zeros.
+    for var in model.trainable_variables:
+      var.assign(tf.zeros_like(var))
     optimizer = optimizer_fn()
     state, optimizer_vars = server_init(model, optimizer)
     weights_delta = tf.nest.map_structure(
