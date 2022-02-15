@@ -481,3 +481,129 @@ def ddgauss_params(q,
   local_stddev = ddgauss_local_stddev(q, epsilon, l2_clip_norm, gamma, beta,
                                       steps, num_clients, dim, delta, orders)
   return gamma, local_stddev
+
+
+####################################
+############ Skellam  ##############
+####################################
+
+
+def _skellam_rdp(l1_sens, l2_sens, central_var, scale, order):
+  assert order > 1, f'alpha must be greater than 1. Found {order}.'
+  a, s, mu = order, scale, central_var
+  rdp = a / (2 * mu) * l2_sens**2
+  rdp += min(((2 * a - 1) * s * l2_sens**2 + 6 * l1_sens) / (4 * s**3 * mu**2),
+             3 * l1_sens / (2 * s * mu))
+  return rdp
+
+
+def skellam_epsilon(scale,
+                    central_stddev,
+                    l2_sens,
+                    beta,
+                    dim,
+                    q,
+                    steps,
+                    delta,
+                    l1_sens=None,
+                    rounding=True,
+                    orders=RDP_ORDERS):
+  """Computes epsilon of (distributed) Skellam via RDP."""
+  l1_sens = l1_sens or (l2_sens * np.sqrt(dim))
+  if rounding:
+    l2_sens = rounded_l2_norm_bound(l2_sens * scale, beta, dim) / scale
+    l1_sens = rounded_l1_norm_bound(l2_sens * scale, dim) / scale
+
+  orders = [int(order) for order in orders]
+  central_var = central_stddev**2
+
+  def eps_fn(order):
+    return _skellam_rdp(l1_sens, l2_sens, central_var, scale, order)
+
+  if q == 1:
+    rdp = np.array([eps_fn(order) for order in orders])
+  else:
+    # Take min between subsampled RDP and unamplified RDP, for all orders.
+    rdp = np.array([
+        min(_compute_rdp_subsampled(order, q, eps_fn), eps_fn(order))
+        for order in orders
+    ])
+
+  eps, _, order = tfp.get_privacy_spent(orders, rdp * steps, target_delta=delta)
+  return eps, order
+
+
+def skellam_local_stddev(epsilon,
+                         scale,
+                         l2_clip,
+                         num_clients,
+                         beta,
+                         dim,
+                         q,
+                         steps,
+                         delta,
+                         orders=RDP_ORDERS):
+  """Selects the local stddev for the distributed discrete Gaussian."""
+
+  def stddev_opt_fn(local_stddev):
+    local_stddev += DIV_EPSILON
+    central_stddev = local_stddev * np.sqrt(num_clients)
+    cur_epsilon, _ = skellam_epsilon(
+        scale,
+        central_stddev,
+        l2_clip,
+        beta,
+        dim,
+        q,
+        steps,
+        delta,
+        orders=orders)
+    return (epsilon - cur_epsilon)**2
+
+  local_stddev_result = optimize.minimize_scalar(stddev_opt_fn)
+  if not local_stddev_result.success:
+    raise ValueError('Cannot compute local_stddev for Skellam.')
+
+  return local_stddev_result.x
+
+
+def skellam_params(epsilon,
+                   l2_clip,
+                   bits,
+                   num_clients,
+                   beta,
+                   dim,
+                   q,
+                   steps,
+                   delta,
+                   k=3,
+                   rho=1,
+                   sqrtn_norm_growth=False,
+                   orders=RDP_ORDERS):
+  """Computes the scaling and local noise stddev for Skellam."""
+  n_factor = num_clients**(1 if sqrtn_norm_growth else 2)
+
+  # The implementation optimizes for gamma = 1 / scale for stability.
+  def local_stddev(gamma):
+    scale = 1.0 / (gamma + DIV_EPSILON)
+    return skellam_local_stddev(epsilon, scale, l2_clip, num_clients, beta, dim,
+                                q, steps, delta, orders)
+
+  def mod_min(gamma):
+    var = rho / dim * l2_clip**2 * n_factor
+    var += (gamma**2 / 4 + local_stddev(gamma)**2) * num_clients
+    return k * math.sqrt(var)
+
+  def gamma_opt_fn(gamma):
+    return (math.pow(2, bits) - 2 * mod_min(gamma) / (gamma + DIV_EPSILON))**2
+
+  gamma_result = optimize.minimize_scalar(gamma_opt_fn)
+  if not gamma_result.success:
+    raise ValueError('Cannot compute scaling factor.')
+
+  scale = 1. / gamma_result.x
+  # Select the local_stddev that gave the best scale.
+  local_stddev = skellam_local_stddev(epsilon, scale, l2_clip, num_clients,
+                                      beta, dim, q, steps, delta, orders)
+
+  return scale, local_stddev

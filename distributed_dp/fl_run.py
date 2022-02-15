@@ -89,7 +89,7 @@ with utils_impl.record_hparam_flags() as dp_flags:
   flags.DEFINE_float('delta', None, 'Delta for the DP mechanism. ')
   flags.DEFINE_float('l2_norm_clip', 2.0, 'Initial L2 norm clip.')
 
-  dp_mechanisms = ['gaussian', 'ddgauss']
+  dp_mechanisms = ['gaussian', 'ddgauss', 'dskellam']
   flags.DEFINE_enum('dp_mechanism', 'ddgauss', dp_mechanisms,
                     'Which DP mechanism to use.')
 

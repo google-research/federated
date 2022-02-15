@@ -46,6 +46,7 @@ py_library(
         ":accounting_utils",
         ":compression_query",
         ":distributed_discrete_gaussian_query",
+        ":distributed_skellam_query",
     ],
 )
 
@@ -75,6 +76,18 @@ py_test(
         ":discrete_gaussian_utils",
         ":distributed_discrete_gaussian_query",
     ],
+)
+
+py_library(
+    name = "distributed_skellam_query",
+    srcs = ["distributed_skellam_query.py"],
+)
+
+py_test(
+    name = "distributed_skellam_query_test",
+    srcs = ["distributed_skellam_query_test.py"],
+    python_version = "PY3",
+    deps = [":distributed_skellam_query"],
 )
 
 py_library(

@@ -1,10 +1,14 @@
-# Distributed DP with Distributed Discrete Gaussian
+# Distributed Differential Privacy
 
 ## Overview
 
-This directory contains the code for the paper "The Distributed Discrete
-Gaussian Mechanism for Federated Learning with Secure Aggregation". ICML 2021.
+This directory contains the code for the papers "The Distributed Discrete
+Gaussian Mechanism for Federated Learning with Secure Aggregation" ICML 2021
 [[PDF](https://arxiv.org/pdf/2102.06387)][[arXiv](https://arxiv.org/abs/2102.06387)]
+and "The Skellam Mechanism for Differentially Private Federated Learning"
+NeurIPS 2021
+[[PDF](https://arxiv.org/pdf/2110.04995.pdf)][[arXiv](https://arxiv.org/abs/2110.04995)]
+.
 
 ## Dependencies
 
@@ -38,6 +42,8 @@ Shared modules:
 -   `distributed_discrete_gaussian_query.py`: Implements the distributed
     discrete Gaussian mechanism as a `DPQuery` object from TensorFlow Privacy
     for simulations.
+-   `distributed_skellam_query.py`: Implements the distributed Skellam mechanism
+    as a `DPQuery` object from TensorFlow Privacy for simulations.
 -   `modular_clipping_factory.py`: implements the TensorFlow Federated
     `tff.aggregators.AggregationProcessFactory` interface for applying modular
     clipping before and after aggregation. Used by the FL experiments.
@@ -151,13 +157,24 @@ clients) and low-noise (utility-preserving) settings.
 -   If errors occur with calls to the TFF util libraries (mainly used by the FL
     training scripts), try using a TFF nightly build.
 
-## Citation
+## Citations
 
 ```
-@article{kairouz2021distributed,
-  title={The Distributed Discrete Gaussian Mechanism for Federated Learning with Secure Aggregation},
+@inproceedings{kairouz2021distributed,
+  title={The distributed discrete gaussian mechanism for federated learning with secure aggregation},
   author={Kairouz, Peter and Liu, Ziyu and Steinke, Thomas},
-  journal={arXiv preprint arXiv:2102.06387},
+  booktitle={International Conference on Machine Learning},
+  pages={5201--5212},
+  year={2021},
+  organization={PMLR}
+}
+
+@article{agarwal2021skellam,
+  title={The skellam mechanism for differentially private federated learning},
+  author={Agarwal, Naman and Kairouz, Peter and Liu, Ziyu},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
   year={2021}
 }
+
 ```

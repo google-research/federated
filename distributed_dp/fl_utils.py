@@ -89,8 +89,8 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
     logging.info(gauss_params_dict)
     params_dict.update(gauss_params_dict)
 
-  # Distributed Discrete Gaussian
-  elif mechanism == 'ddgauss':
+  # Discrete Mechanisms.
+  elif mechanism in ('ddgauss', 'dskellam'):
     padded_dim = pad_dim(dim)
     k_stddevs = compression_flags['k_stddevs'] or 4
     beta = compression_flags['beta']
@@ -99,18 +99,33 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
     # Modular clipping has exclusive upper bound.
     mod_clip_lo, mod_clip_hi = -(2**(bits - 1)), 2**(bits - 1)
 
-    gamma, local_stddev = accounting_utils.ddgauss_params(
-        q=sampling_rate,
-        epsilon=epsilon,
-        l2_clip_norm=clip,
-        bits=bits,
-        num_clients=num_clients_per_round,
-        dim=padded_dim,
-        delta=delta,
-        beta=beta,
-        steps=num_rounds,
-        k=k_stddevs)
-    scale = 1.0 / gamma
+    if mechanism == 'ddgauss':
+      gamma, local_stddev = accounting_utils.ddgauss_params(
+          q=sampling_rate,
+          epsilon=epsilon,
+          l2_clip_norm=clip,
+          bits=bits,
+          num_clients=num_clients_per_round,
+          dim=padded_dim,
+          delta=delta,
+          beta=beta,
+          steps=num_rounds,
+          k=k_stddevs)
+      scale = 1.0 / gamma
+
+    elif mechanism == 'dskellam':
+      scale, local_stddev = accounting_utils.skellam_params(
+          epsilon=epsilon,
+          l2_clip=clip,
+          bits=bits,
+          num_clients=num_clients_per_round,
+          beta=beta,
+          dim=padded_dim,
+          q=sampling_rate,
+          steps=num_rounds,
+          delta=delta,
+          k=k_stddevs)
+      gamma = 1.0 / scale
 
     central_stddev = local_stddev * np.sqrt(num_clients_per_round)
     noise_mult_clip = central_stddev / clip
@@ -128,12 +143,12 @@ def build_aggregator(compression_flags, dp_flags, num_clients,
         'k_stddevs': k_stddevs,
         'local_stddev': local_stddev,
         'mechanism': mechanism,
-        'inflated_l2': inflated_l2,
         'noise_mult_clip': noise_mult_clip,
         'noise_mult_inflated': noise_mult_inflated,
+        'inflated_l2': inflated_l2
     }
 
-    logging.info('DDGauss Parameters:')
+    logging.info('%s parameters:', mechanism)
     logging.info(pprint.pformat(discrete_params_dict))
     params_dict.update(discrete_params_dict)
 

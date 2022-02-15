@@ -36,7 +36,8 @@ flags.DEFINE_integer(
 flags.DEFINE_integer('repeat', 5, 'Number of times to repeat (sequentially).')
 flags.DEFINE_string('output_dir', '/tmp/ddp_dme_outputs', 'Output directory.')
 flags.DEFINE_string('tag', '', 'Extra subfolder for the output result files.')
-flags.DEFINE_enum('mechanism', 'ddgauss', ['ddgauss'], 'DDP mechanism to use.')
+flags.DEFINE_enum('mechanism', 'ddgauss', ['ddgauss', 'dskellam'],
+                  'DDP mechanism to use.')
 flags.DEFINE_float('norm', 10.0, 'Norm of the randomly generated vectors.')
 flags.DEFINE_integer(
     'k_stddevs', 2, 'Number of standard deviations of the '
@@ -120,6 +121,22 @@ def experiment(bits,
             k=k_stddevs,
             sqrtn_norm_growth=sqrtn_norm_growth)
         scale = 1.0 / gamma
+
+      elif mechanism == 'dskellam':
+        scale, local_stddev = accounting_utils.skellam_params(
+            epsilon=eps,
+            l2_clip=clip,
+            bits=bit,
+            num_clients=num_clients,
+            beta=beta,
+            dim=padded_dim,
+            q=1,
+            steps=1,
+            delta=delta,
+            k=k_stddevs,
+            sqrtn_norm_growth=sqrtn_norm_growth)
+        gamma = 1.0 / scale
+
       else:
         raise ValueError(f'Unsupported mechanism: {mechanism}')
 

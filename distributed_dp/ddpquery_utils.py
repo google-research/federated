@@ -18,15 +18,20 @@ from absl import logging
 from distributed_dp import accounting_utils
 from distributed_dp import compression_query
 from distributed_dp import distributed_discrete_gaussian_query
+from distributed_dp import distributed_skellam_query
 
 
 def _ddp_query_factory(mechanism, local_stddev, l1_norm_bound, l2_norm_bound):
   """Factory for distributed discrete DPQuery objects from TF Privacy."""
-  del l1_norm_bound  # Unused.
   mechanism = mechanism.lower()
   if mechanism == 'ddgauss':
     return distributed_discrete_gaussian_query.DistributedDiscreteGaussianSumQuery(
         l2_norm_bound=l2_norm_bound, local_scale=local_stddev)
+  elif mechanism == 'dskellam':
+    return distributed_skellam_query.DistributedSkellamSumQuery(
+        l1_norm_bound=l1_norm_bound,
+        l2_norm_bound=l2_norm_bound,
+        local_stddev=local_stddev)
   else:
     raise ValueError(f'Unsupported mechanism: "{mechanism}".')
 
