@@ -170,12 +170,12 @@ def _create_iterative_process(
   if FLAGS.iterative_process == 'FedOpt':
 
     client_optimizer_fn = flag_utils.create_optimizer_fn_from_flags('client')
-    return tff.learning.build_federated_averaging_process(
+    return tff.learning.algorithms.build_weighted_fed_avg(
         model_fn=model_fn,
         client_optimizer_fn=client_optimizer_fn,
         server_optimizer_fn=server_optimizer_fn,
         client_weighting=client_weighting,
-        model_update_aggregation_factory=model_update_aggregation_factory)
+        model_aggregator=model_update_aggregation_factory)
 
   elif FLAGS.iterative_process == 'FedSGD':
 

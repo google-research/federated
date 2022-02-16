@@ -128,8 +128,8 @@ class ClientOutput(object):
   Attributes:
     accumulated_gradients: A list of accumulated gradients for the model's
       trainable variables. Note: This is a sum of gradients, not the difference
-      between the initial brodcast model, and the trained model (as in
-      `tff.learning.build_federated_averaging_process`).
+      between the initial brodcast model, and the trained model (as in FedOpt,
+      see https://arxiv.org/abs/2003.00295).
     client_weight: Weight to be used in a weighted mean when aggregating
       the `weights_delta`.
     initial_model_output: A structure matching
