@@ -18,8 +18,9 @@ from rcc_dp import optimize_unbias
 from rcc_dp import privunit
 
 
-def get_parameters_unbiased_approx_miracle(epsilon_target, d, number_candidates,
-                                           budget, delta):
+def get_parameters_unbiased_approx_miracle(epsilon_target, d,
+                                           approx_number_candidates,
+                                           number_candidates, budget, delta):
   """Get privunit parameters for miracle with approxmiate-DP guarantees.
 
   The approximate DP guarantee of miracle is as follows: If a mechanism is
@@ -34,6 +35,7 @@ def get_parameters_unbiased_approx_miracle(epsilon_target, d, number_candidates,
   Args:
     epsilon_target: The privacy guarantee we desire.
     d: The number of dimensions.
+    approx_number_candidates: Approximate number of candidates.
     number_candidates: The number of candidates.
     budget: The default budget splitting between the gamma and p parameters.
     delta: The delta in the differential privacy guarantee.
@@ -56,7 +58,8 @@ def get_parameters_unbiased_approx_miracle(epsilon_target, d, number_candidates,
     gamma, _ = privunit.find_best_gamma(d, budget * epsilon)
     p = np.exp((1 - budget) * epsilon) / (1 + np.exp((1 - budget) * epsilon))
     c1, c2 = privunit.get_privunit_densities(d, gamma, p)
-    t = np.abs(c1 - c2) * np.sqrt((np.log(2 / delta)) / (2 * number_candidates))
+    t = np.abs(c1 - c2) * np.sqrt(
+        (np.log(2 / delta)) / (2 * approx_number_candidates))
     if -1 < t < 1:
       if epsilon + np.log(1 + t) - np.log(1 - t) <= epsilon_target:
         epsilon_approx = epsilon

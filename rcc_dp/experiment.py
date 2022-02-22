@@ -134,9 +134,13 @@ def evaluate(work_path, config, file_open=open):
 
       if config.run_approx_miracle:
         x_approx_miracle = np.zeros((d, n))
-        c1, c2, m, gamma, epsilon_approx = (
+        approx_coding_cost = int(
+            np.ceil(config.approx_coding_cost_multiplier * epsilon_target /
+                    np.log(2) + config.approx_t))
+        c1, c2, m, gamma, _ = (
             get_parameters.get_parameters_unbiased_approx_miracle(
-                epsilon_target, d, 2**coding_cost, budget, delta))
+                epsilon_target, d, 2**approx_coding_cost, 2**coding_cost,
+                budget, delta))
         for i in range(n):
           k, _, _ = miracle.encoder(i + itr * n, x[:, i], 2**coding_cost, c1,
                                     c2, gamma)

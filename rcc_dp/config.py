@@ -24,15 +24,17 @@ def get_config():
       # can take one of "biased_data", "unbiased_data", "same_data".
       data="biased_data",
       # Flags to indicate which methods to compare.
-      run_approx_miracle=False,
-      run_miracle=True,
-      run_modified_miracle=True,
+      run_approx_miracle=True,
+      run_miracle=False,
+      run_modified_miracle=False,
       run_privunit=True,
       run_sqkr=True,
       # Common parameters.
       num_itr=1,
       coding_cost=8,
       coding_cost_multiplier=1,
+      approx_coding_cost_multiplier=3,
+      approx_t=6,
       # Specific parameters (leave them as they are for now).
       delta=10**(-6),
       budget=0.5,

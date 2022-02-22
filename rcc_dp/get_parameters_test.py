@@ -61,7 +61,7 @@ class GetParametersTest(absltest.TestCase):
 
     x_approx_miracle = np.zeros((d, n))
     c1, c2, m, gamma, _ = get_parameters.get_parameters_unbiased_approx_miracle(
-        epsilon, d, 2**coding_cost, budget, delta)
+        epsilon, d, 2**coding_cost, 2**coding_cost, budget, delta)
     for i in range(n):
       k, _, _ = miracle.encoder(i, x[:, i], 2**coding_cost, c1, c2, gamma)
       z_k = miracle.decoder(i, k, d, 2**coding_cost)
