@@ -14,8 +14,9 @@
 """Tests for experiment definitions."""
 
 from absl.testing import absltest
-from rcc_dp import config as defaults
-from rcc_dp import experiment
+from rcc_dp.mean_estimation import config as defaults
+from rcc_dp.mean_estimation import experiment
+from rcc_dp.mean_estimation import experiment_coding_cost
 
 
 class ExperimentTest(absltest.TestCase):
@@ -24,11 +25,16 @@ class ExperimentTest(absltest.TestCase):
     work_path = self.create_tempdir().full_path
     config = defaults.get_config()
     config.num_itr = 1
-    config.eps_space = [1]
-    config.t = 2
     config.d = 100
     config.n = 200
-    experiment.evaluate(work_path, config)
+    if config.vary == "cc":
+        config.epsilon_target = 1
+        config.cc_space = [4]
+        experiment_coding_cost.evaluate(work_path, config)
+    else:
+        config.eps_space = [1]
+        config.t = 2
+        experiment.evaluate(work_path, config)
 
 
 if __name__ == "__main__":

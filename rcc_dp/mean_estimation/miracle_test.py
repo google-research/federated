@@ -15,8 +15,8 @@
 
 from absl.testing import absltest
 import numpy as np
-from rcc_dp import get_parameters
-from rcc_dp import miracle
+from rcc_dp.mean_estimation import get_parameters
+from rcc_dp.mean_estimation import miracle
 
 
 class MiracleTest(absltest.TestCase):
