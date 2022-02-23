@@ -43,7 +43,7 @@ def get_config():
       alpha=1.0,
       # Variation.
       vary="eps",  # Can take one of "cc", "k", "n", "eps".
-      cc_space=[6, 8, 10, 12],
+      cc_space=[6, 8, 10, 12, 14],
       k_space=[200, 400, 600, 800, 1000],
       n_space=[2000, 4000, 6000, 8000, 10000],
       eps_space=list(range(1, 9)),
