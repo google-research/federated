@@ -50,10 +50,10 @@ py_library(
     ],
     srcs_version = "PY3",
     deps = [
+        ":optimizer_flag_utils",
         ":pseudo_client_data",
         "//utils:training_utils",
         "//utils:utils_impl",
-        "//utils/optimizers:optimizer_utils",
     ],
 )
 
@@ -63,6 +63,20 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [":global_trainer_lib"],
+)
+
+py_library(
+    name = "optimizer_flag_utils",
+    srcs = ["optimizer_flag_utils.py"],
+    srcs_version = "PY3",
+)
+
+py_test(
+    name = "optimizer_flag_utils_test",
+    srcs = ["optimizer_flag_utils_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":optimizer_flag_utils"],
 )
 
 py_library(

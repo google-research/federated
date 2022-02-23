@@ -24,10 +24,10 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 
+from data_poor_fl import optimizer_flag_utils
 from data_poor_fl import pseudo_client_data
 from utils import training_utils
 from utils import utils_impl
-from utils.optimizers import optimizer_utils
 
 with utils_impl.record_hparam_flags() as training_flags:
   # Training loop configuration
@@ -71,8 +71,8 @@ with utils_impl.record_hparam_flags() as training_flags:
       'only be set to True for debugging purposes.')
 
 with utils_impl.record_hparam_flags() as optimizer_flags:
-  optimizer_utils.define_optimizer_flags('client')
-  optimizer_utils.define_optimizer_flags('server')
+  optimizer_flag_utils.define_optimizer_flags('client')
+  optimizer_flag_utils.define_optimizer_flags('server')
 
 FLAGS = flags.FLAGS
 
@@ -98,8 +98,10 @@ def _write_hparams():
   # Update with optimizer flags corresponding to the chosen optimizers.
   opt_flag_dict = utils_impl.lookup_flag_values(optimizer_flags)
   if FLAGS.train_algorithm != 'fedsgd':
-    opt_flag_dict = optimizer_utils.remove_unused_flags('client', opt_flag_dict)
-  opt_flag_dict = optimizer_utils.remove_unused_flags('server', opt_flag_dict)
+    opt_flag_dict = optimizer_flag_utils.remove_unused_flags(
+        'client', opt_flag_dict)
+  opt_flag_dict = optimizer_flag_utils.remove_unused_flags(
+      'server', opt_flag_dict)
   hparam_dict.update(opt_flag_dict)
 
   # Write the updated hyperparameters to a file.
@@ -111,7 +113,8 @@ def _create_train_algorithm(
     model_fn: Callable[[], tff.learning.Model]
 ) -> tff.learning.templates.LearningProcess:
   """Creates a learning process for client training."""
-  server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
+  server_optimizer_fn = optimizer_flag_utils.create_optimizer_from_flags(
+      'server')
   model_aggregator = tff.learning.robust_aggregator(
       zeroing=FLAGS.zeroing,
       clipping=FLAGS.clipping,
@@ -123,7 +126,7 @@ def _create_train_algorithm(
         server_optimizer_fn=server_optimizer_fn,
         model_aggregator=model_aggregator)
   elif FLAGS.train_algorithm == 'fedopt':
-    client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags(
+    client_optimizer_fn = optimizer_flag_utils.create_optimizer_from_flags(
         'client')
     if FLAGS.example_weighting:
       client_weighting = tff.learning.ClientWeighting.NUM_EXAMPLES
