@@ -11,16 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Experiment definitions (i.e., evaluation of miracle, sqkr, privunit methods 
+"""Experiment definitions (i.e., evaluation of miracle, sqkr, privunit methods
 when the coding cost is varied)."""
 
 import json
 import math
 import time
 import matplotlib
-matplotlib.rcParams['ps.useafm'] = True
-matplotlib.rcParams['pdf.use14corefonts'] = True
-matplotlib.rcParams['text.usetex'] = True
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import numpy as np
@@ -30,6 +27,9 @@ from rcc_dp.mean_estimation import miracle
 from rcc_dp.mean_estimation import modify_pi
 from rcc_dp.mean_estimation import privunit
 from rcc_dp.mean_estimation import sqkr
+matplotlib.rcParams['ps.useafm'] = True
+matplotlib.rcParams['pdf.use14corefonts'] = True
+matplotlib.rcParams['text.usetex'] = True
 
 
 def evaluate(work_path, config, file_open=open):
@@ -39,7 +39,6 @@ def evaluate(work_path, config, file_open=open):
 
   start_time = time.time()
 
-  delta = config.delta
   budget = config.budget
   alpha = config.alpha
   # Get default values.
@@ -57,7 +56,7 @@ def evaluate(work_path, config, file_open=open):
 
   sqkr_coding_cost = epsilon_target
 
-  for itr in range(num_itr):
+  for itr in range(config.num_itr):
     print("itr = %d" % itr)
     print("epsilon target = " + str(epsilon_target))
     print("n = " + str(n))
@@ -68,20 +67,20 @@ def evaluate(work_path, config, file_open=open):
       print("alpha = " + str(alpha))
 
     if config.data == "unbiased_data":
-        x = np.random.normal(0, 1, (d, n))
-        x /= np.linalg.norm(x, axis=0)
-      elif config.data == "biased_data":
-        x = np.zeros((d, n))
-        x[:, 0::2] = np.random.normal(10, 1, (d, (n + 1) // 2))
-        x[:, 1::2] = np.random.normal(1, 1, (d, n // 2))
-        x /= np.linalg.norm(x, axis=0)
-      elif config.data == "same_data":
-        x = np.random.normal(0, 1, (d, 1))
-        x /= np.linalg.norm(x, axis=0)
-        x = np.repeat(x, n, axis=1)
-      else:
-        raise ValueError(
-            "data should be either be biased_data, unbiased_data, same_data.")
+      x = np.random.normal(0, 1, (d, n))
+      x /= np.linalg.norm(x, axis=0)
+    elif config.data == "biased_data":
+      x = np.zeros((d, n))
+      x[:, 0::2] = np.random.normal(10, 1, (d, (n + 1) // 2))
+      x[:, 1::2] = np.random.normal(1, 1, (d, n // 2))
+      x /= np.linalg.norm(x, axis=0)
+    elif config.data == "same_data":
+      x = np.random.normal(0, 1, (d, 1))
+      x /= np.linalg.norm(x, axis=0)
+      x = np.repeat(x, n, axis=1)
+    else:
+      raise ValueError(
+          "data should be either be biased_data, unbiased_data, same_data.")
 
     if config.run_privunit:
       x_privunit, _ = privunit.apply_privunit(x, epsilon_target, budget)
@@ -102,7 +101,7 @@ def evaluate(work_path, config, file_open=open):
 
     for step, vary_parameter in enumerate(vary_space):
       coding_cost = vary_parameter
-      print("coding cost = %d" % coding_cost)    
+      print("coding cost = %d" % coding_cost)
 
       if config.run_modified_miracle:
         x_modified_miracle = np.zeros((d, n))
@@ -124,9 +123,9 @@ def evaluate(work_path, config, file_open=open):
     print(time.time() - start_time)
 
   print("--------------")
-  if config.run_approx_miracle:
+  if config.run_modified_miracle:
     print("approx miracle mse:")
-    print(np.mean(approx_miracle_mse, axis=0))
+    print(np.mean(modified_miracle_mse, axis=0))
   if config.run_privunit:
     print("privunit mse:")
     print(np.mean(privunit_mse, axis=0))
@@ -140,20 +139,20 @@ def evaluate(work_path, config, file_open=open):
     plt.errorbar(
         vary_space,
         np.mean(modified_miracle_mse, axis=0),
-        yerr=np.std(modified_miracle_mse, axis=0)/np.sqrt(num_itr),
+        yerr=np.std(modified_miracle_mse, axis=0)/np.sqrt(config.num_itr),
         linewidth = 3.0,
         label="MMRC")
   if config.run_privunit:
-    line1 = plt.errorbar(vary_space, 
-      [np.mean(privunit_mse, axis=0)[0]]*len(vary_space), 
-      yerr = [np.std(privunit_mse, axis=0)[0]/np.sqrt(num_itr)]*len(vary_space), 
+    line1 = plt.errorbar(vary_space,
+      [np.mean(privunit_mse, axis=0)[0]]*len(vary_space),
+      yerr = [np.std(privunit_mse, axis=0)[0]/np.sqrt(config.num_itr)]*len(vary_space),
       ls='--',
       linewidth = 3.0,
       label="PrivUnit$_{2}$")
   if config.run_sqkr:
-    line2 = plt.errorbar(vary_space, 
-      [np.mean(sqkr_mse, axis=0)[0]]*len(vary_space), 
-      yerr = [np.std(sqkr_mse, axis=0)[0]/np.sqrt(num_itr)]*len(vary_space), 
+    line2 = plt.errorbar(vary_space,
+      [np.mean(sqkr_mse, axis=0)[0]]*len(vary_space),
+      yerr = [np.std(sqkr_mse, axis=0)[0]/np.sqrt(config.num_itr)]*len(vary_space),
       ls='--',
       linewidth = 3.0,
       label="SQKR")

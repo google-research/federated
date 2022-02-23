@@ -11,16 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Experiment definitions (i.e., evaluation of miracle, rhr, subset selection 
+"""Experiment definitions (i.e., evaluation of miracle, rhr, subset selection
 methods when the coding cost is varied)."""
 
 import json
 import math
 import time
 import matplotlib
-matplotlib.rcParams['ps.useafm'] = True
-matplotlib.rcParams['pdf.use14corefonts'] = True
-matplotlib.rcParams['text.usetex'] = True
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import numpy as np
@@ -29,26 +26,32 @@ from rcc.frequency_estimation import modify_pi
 from rcc.frequency_estimation import rhr
 from rcc.frequency_estimation import ss
 from rcc.frequency_estimation import unbias
+matplotlib.rcParams['ps.useafm'] = True
+matplotlib.rcParams['pdf.use14corefonts'] = True
+matplotlib.rcParams['text.usetex'] = True
 
 
 def generate_geometric_distribution(k,lbd):
-    elements = range(0,k)
-    prob = [(1-lbd)*math.pow(lbd,x)/(1-math.pow(lbd,k)) for x in elements]
-    return prob
+  """Generate the discrete geometric distribution."""
+  elements = range(0,k)
+  prob = [(1-lbd)*math.pow(lbd,x)/(1-math.pow(lbd,k)) for x in elements]
+  return prob
 
 
 def generate_uniform_distribution(k):
-    raw_distribution = [1] * k
-    sum_raw = sum(raw_distribution)
-    prob = [float(y)/float(sum_raw) for y in raw_distribution]
-    return prob
+  """Generate the discrete uniform distribution."""
+  raw_distribution = [1] * k
+  sum_raw = sum(raw_distribution)
+  prob = [float(y)/float(sum_raw) for y in raw_distribution]
+  return prob
 
 
 def generate_zipf_distribution(k,degree):
-    raw_distribution = [1/(float(i)**(degree)) for i in range(1,k+1)]
-    sum_raw = sum(raw_distribution)
-    prob = [float(y)/float(sum_raw) for y in raw_distribution]
-    return prob
+  """Generate the discrete zipf distribution."""
+  raw_distribution = [1/(float(i)**(degree)) for i in range(1,k+1)]
+  sum_raw = sum(raw_distribution)
+  prob = [float(y)/float(sum_raw) for y in raw_distribution]
+  return prob
 
 
 def evaluate(work_path, config, file_open=open):
@@ -58,7 +61,6 @@ def evaluate(work_path, config, file_open=open):
 
   start_time = time.time()
 
-  delta = config.delta
   alpha = config.alpha
   # Get default values.
   k = config.k
@@ -75,7 +77,7 @@ def evaluate(work_path, config, file_open=open):
 
   rhr_coding_cost = epsilon_target
 
-  for itr in range(num_itr):
+  for itr in range(config.num_itr):
     print("itr = %d" % itr)
     print("epsilon target = " + str(epsilon_target))
     print("n = " + str(n))
@@ -99,18 +101,18 @@ def evaluate(work_path, config, file_open=open):
           "distribution should be either be geometric, zipf, uniform.")
     x = np.random.choice(k, n, p=prob)
 
-    
+
     if config.run_ss:
       x_ss = ss.encode_string_fast(k, epsilon_target, x)
       prob_ss = ss.decode_string(k, epsilon_target, x_ss, n, normalization = 1)
-      ss_error[itr, 0] = np.linalg.norm([p_i - phat_i for p_i, phat_i 
+      ss_error[itr, 0] = np.linalg.norm([p_i - phat_i for p_i, phat_i
         in zip(prob, prob_ss)], ord=1)
 
     if config.run_rhr:
-      x_rhr = rhr.encode_string(k, epsilon_target, coding_cost, x)
-      prob_rhr = rhr.decode_string_fast(k, epsilon_target, coding_cost, x_rhr, 
+      x_rhr = rhr.encode_string(k, epsilon_target, rhr_coding_cost, x)
+      prob_rhr = rhr.decode_string_fast(k, epsilon_target, rhr_coding_cost, x_rhr,
       normalization = 1) # estimate the original underlying distribution
-      rhr_error[itr, 0] = np.linalg.norm([p_i - phat_i for p_i, phat_i 
+      rhr_error[itr, 0] = np.linalg.norm([p_i - phat_i for p_i, phat_i
         in zip(prob, prob_rhr)], ord=1)
 
     for step, vary_parameter in enumerate(vary_space):
@@ -124,17 +126,17 @@ def evaluate(work_path, config, file_open=open):
             x_modified_miracle[:,i] = miracle.encode_decode_modified_miracle_fast(
               i+itr*n, x[i], k, alpha*epsilon_target, 2**coding_cost)
           else:
-            _, pi, _ = miracle.encoder(i+itr*n, x[i], k, alpha*epsilon_target, 
+            _, pi, _ = miracle.encoder(i+itr*n, x[i], k, alpha*epsilon_target,
               2**coding_cost)
             expected_beta = np.ceil(k/(np.exp(epsilon_target)+1))/k
-            pi_all = modify_pi.modify_pi(pi, eta, epsilon_target, 
+            pi_all = modify_pi.modify_pi(pi, eta, epsilon_target,
               (np.exp(epsilon_target/2))/(1+expected_beta*(np.exp(epsilon_target)-1)))
             index = np.random.choice(2**coding_cost, 1, p=pi_all[-1])[0]
-            x_modified_miracle[:,i] = miracle.decoder(i+itr*n, index, k, 
+            x_modified_miracle[:,i] = miracle.decoder(i+itr*n, index, k,
               alpha*epsilon_target, 2**coding_cost)
-        prob_modified_miracle = unbias.unbias_modified_miracle(k, alpha*epsilon_target, 
+        prob_modified_miracle = unbias.unbias_modified_miracle(k, alpha*epsilon_target,
           2**coding_cost, x_modified_miracle.T, n, normalization = 1)
-        modified_miracle_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i 
+        modified_miracle_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i
           in zip(prob, prob_modified_miracle)], ord=1)
 
     print(time.time() - start_time)
@@ -159,16 +161,16 @@ def evaluate(work_path, config, file_open=open):
       linewidth = 3.0,
       label="MMRC")
   if config.run_ss:
-    line1 = plt.errorbar(vary_space, 
-      [np.mean(ss_error, axis=0)[0]]*len(vary_space), 
-      yerr = [np.std(ss_error, axis=0)[0]/np.sqrt(num_itr)]*len(vary_space), 
+    line1 = plt.errorbar(vary_space,
+      [np.mean(ss_error, axis=0)[0]]*len(vary_space),
+      yerr = [np.std(ss_error, axis=0)[0]/np.sqrt(config.num_itr)]*len(vary_space),
       ls='--',
       linewidth = 3.0,
       label="Subset Selection")
   if config.run_rhr:
-    line2 = plt.errorbar(vary_space, 
-      [np.mean(rhr_error, axis=0)[0]]*len(vary_space), 
-      yerr = [np.std(rhr_error, axis=0)[0]/np.sqrt(num_itr)]*len(vary_space), 
+    line2 = plt.errorbar(vary_space,
+      [np.mean(rhr_error, axis=0)[0]]*len(vary_space),
+      yerr = [np.std(rhr_error, axis=0)[0]/np.sqrt(config.num_itr)]*len(vary_space),
       ls='--',
       linewidth = 3.0,
       label="RHR")

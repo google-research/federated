@@ -30,9 +30,9 @@ def encode_string(dim, epsilon, comm, x):
 
   # Pad dim to the power of 2.
   padded_d = int(math.pow(2, math.ceil(math.log(dim, 2))))
-  # Calculate the effective communication cost 
+  # Calculate the effective communication cost
   # i.e., min(comm, log(e^\epsilon)).
-  eff_comm = min(comm, math.ceil(epsilon*math.log(math.e, 2)), 
+  eff_comm = min(comm, math.ceil(epsilon*math.log(math.e, 2)),
     math.ceil(math.log(dim, 2))+1)
   # Set the block size.
   block_size = int(padded_d/math.pow(2, eff_comm-1))
@@ -45,7 +45,7 @@ def encode_string(dim, epsilon, comm, x):
     if get_hadamard_entry(padded_d, j, x_individual) == -1:
       loc_sign[idx] = loc_sign[idx] + 1
 
-  z = rr_encode_string(int(math.pow(2, eff_comm)), epsilon, 
+  z = rr_encode_string(int(math.pow(2, eff_comm)), epsilon,
     np.array(loc_sign))
   return z
 
@@ -57,7 +57,7 @@ def rr_encode_string(alphabet_size, epsilon, samples):
   private_samples_rr = np.copy(samples)
 
   # Determine which samples need to be noised (i.e., flipped).
-  flip = np.random.random_sample(n) < (alphabet_size 
+  flip = np.random.random_sample(n) < (alphabet_size
     - 1)/(math.exp(epsilon) + alphabet_size - 1)
   flip_samples = samples[flip]
 
@@ -79,9 +79,9 @@ def decode_string_fast(dim, epsilon, comm, z, normalization = 1):
   l = len(z)
   # Pad dim to the power of 2.
   padded_d = int(math.pow(2, math.ceil(math.log(dim,2))))
-  # Calculate the effective communication cost 
+  # Calculate the effective communication cost
   # i.e., min(comm, log(e^\epsilon)).
-  eff_comm = min(comm, math.ceil(epsilon*math.log(math.e, 2)), 
+  eff_comm = min(comm, math.ceil(epsilon*math.log(math.e, 2)),
     math.ceil(math.log(dim, 2))+1)
   # Set the block size.
   block_size = int(padded_d/math.pow(2, eff_comm-1))
@@ -92,16 +92,16 @@ def decode_string_fast(dim, epsilon, comm, z, normalization = 1):
   # Create histograms to specify the empirical distributions of each group.
   histograms = np.zeros((block_size, int(padded_d/block_size)))
   for g_idx in range(block_size):
-    g_count,g_axis = np.histogram(group_list[g_idx], 
+    g_count, _ = np.histogram(group_list[g_idx],
       range(int(math.pow(2, eff_comm))+1))
     histograms[g_idx] = g_count[::2] - g_count[1::2]
-    histograms[g_idx] = histograms[g_idx] * (math.exp(epsilon) 
+    histograms[g_idx] = histograms[g_idx] * (math.exp(epsilon)
       + math.pow(2, eff_comm)-1)/(math.exp(epsilon)-1)*(block_size/n)
 
   # Obtain estimator of q.
   q = np.zeros((block_size, int(padded_d/block_size)))
   for j in range(block_size):
-    q[j, :] = fast_inverse_hadamard_transform(int(padded_d/block_size), 
+    q[j, :] = fast_inverse_hadamard_transform(int(padded_d/block_size),
       histograms[j, :])
 
   q = q.reshape((padded_d, ), order = 'F')

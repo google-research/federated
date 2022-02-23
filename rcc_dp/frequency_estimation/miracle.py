@@ -13,9 +13,9 @@
 # limitations under the License.
 """Minimal random coding (likelihood decoder) definitions.
 
-This is the code to be used to simulate the minimum random coding algorithm 
-(tailored to subset selection). The algorithm was introduced by Havasi et al. 
-in "Minimal Random Code Learning: Getting Bits Back from Compressed Model 
+This is the code to be used to simulate the minimum random coding algorithm
+(tailored to subset selection). The algorithm was introduced by Havasi et al.
+in "Minimal Random Code Learning: Getting Bits Back from Compressed Model
 Parameters" - https://arxiv.org/pdf/1810.00440.pdf.
 
 For brevity, we may refer to it as 'MIRACLE', although technically this refers
@@ -114,13 +114,13 @@ def get_approx_epsilon(epsilon_target, k, number_candidates, delta):
 
 
 def encode_decode_miracle_fast(seed, x, k, epsilon, number_candidates):
-  """A fast implementation of the miracle protocol -- instead of 
-  generating number_candidates samples, generate one sample with 
+  """A fast implementation of the miracle protocol -- instead of
+  generating number_candidates samples, generate one sample with
   true expectation.
   """
   d = int(np.ceil(k/(np.exp(epsilon)+1)))
   num_cand_in_cap = np.random.binomial(number_candidates, d/k, size=None)
-  pi_in = np.exp(epsilon)/(num_cand_in_cap*np.exp(epsilon) 
+  pi_in = np.exp(epsilon)/(num_cand_in_cap*np.exp(epsilon)
     + (number_candidates-num_cand_in_cap))
   prob_sample_from_cap = num_cand_in_cap*pi_in
 
@@ -140,8 +140,8 @@ def encode_decode_miracle_fast(seed, x, k, epsilon, number_candidates):
 
 
 def encode_decode_modified_miracle_fast(seed, x, k, epsilon, number_candidates):
-  """A fast implementation of the modified miracle protocol -- instead of 
-  generating number_candidates samples, generate one sample with 
+  """A fast implementation of the modified miracle protocol -- instead of
+  generating number_candidates samples, generate one sample with
   true expectation.
   """
   d = int(np.ceil(k/(np.exp(epsilon)+1)))
@@ -154,10 +154,10 @@ def encode_decode_modified_miracle_fast(seed, x, k, epsilon, number_candidates):
   expected_beta = np.ceil(k/(np.exp(epsilon)+1))/k
 
   pi_in = c1/(num_cand_in_cap*c1+(number_candidates-num_cand_in_cap)*c2)
-  tilde_pi_in = pi_in*(1+beta*(np.exp(epsilon)-1))/((1 
+  tilde_pi_in = pi_in*(1+beta*(np.exp(epsilon)-1))/((1
     + expected_beta*(np.exp(epsilon)-1)))
   if beta > expected_beta:
-    tilde_pi_in = tilde_pi_in*(beta+expected_beta*(np.exp(epsilon) 
+    tilde_pi_in = tilde_pi_in*(beta+expected_beta*(np.exp(epsilon)
       - 1))/(beta*np.exp(epsilon))
 
   prob_sample_from_cap = num_cand_in_cap*tilde_pi_in

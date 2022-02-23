@@ -11,17 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Experiment definitions (i.e., evaluation of miracle, sqkr, privunit methods 
-when either the data dimension d, the number of users n, or the privacy 
+"""Experiment definitions (i.e., evaluation of miracle, sqkr, privunit methods
+when either the data dimension d, the number of users n, or the privacy
 parameter epsilon is varied)."""
 
 import json
 import math
 import time
 import matplotlib
-matplotlib.rcParams['ps.useafm'] = True
-matplotlib.rcParams['pdf.use14corefonts'] = True
-matplotlib.rcParams['text.usetex'] = True
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import numpy as np
@@ -31,6 +28,9 @@ from rcc_dp.mean_estimation import miracle
 from rcc_dp.mean_estimation import modify_pi
 from rcc_dp.mean_estimation import privunit
 from rcc_dp.mean_estimation import sqkr
+matplotlib.rcParams['ps.useafm'] = True
+matplotlib.rcParams['pdf.use14corefonts'] = True
+matplotlib.rcParams['text.usetex'] = True
 
 
 def evaluate(work_path, config, file_open=open):

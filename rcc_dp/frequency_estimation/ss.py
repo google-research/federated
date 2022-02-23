@@ -24,6 +24,7 @@ import numpy as np
 
 
 def probability_project_simplex(p):
+  """Project the probabilitiess on the simplex."""
   k = len(p)  # Infer the size of the alphabet.
   p_sorted = np.sort(p)
   p_sorted[:] = p_sorted[::-1]
@@ -38,15 +39,16 @@ def probability_project_simplex(p):
 
 
 def probability_normalize(p):
+  """Normalize the probabilities so that they sum to 1."""
   p = np.maximum(p,0) # Map it to be positive.
   norm = np.sum(p)
-  p = np.true_divide(p,norm) # Ensure the l_1 norm is one.
+  p = np.true_divide(p,norm)
   return p
 
 
 def encode_string_fast(k, epsilon, x):
-  """A fast implementation of the subset selection protocol -- instead 
-  of selecting exactly d ones, set each bit to be one independently 
+  """A fast implementation of the subset selection protocol -- instead
+  of selecting exactly d ones, set each bit to be one independently
   with true expectation.
   """
   d = int(np.ceil(k/(np.exp(epsilon)+1)))

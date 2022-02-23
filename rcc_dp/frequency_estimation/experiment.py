@@ -11,17 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Experiment definitions (i.e., evaluation of miracle, rhr, subset selection 
-methods when either the data dimension k, the number of users n, or the 
+"""Experiment definitions (i.e., evaluation of miracle, rhr, subset selection
+methods when either the data dimension k, the number of users n, or the
 privacy parameter epsilon is varied)."""
 
 import json
 import math
 import time
 import matplotlib
-matplotlib.rcParams['ps.useafm'] = True
-matplotlib.rcParams['pdf.use14corefonts'] = True
-matplotlib.rcParams['text.usetex'] = True
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import numpy as np
@@ -30,26 +27,32 @@ from rcc_dp.frequency_estimation import modify_pi
 from rcc_dp.frequency_estimation import rhr
 from rcc_dp.frequency_estimation import ss
 from rcc_dp.frequency_estimation import unbias
+matplotlib.rcParams['ps.useafm'] = True
+matplotlib.rcParams['pdf.use14corefonts'] = True
+matplotlib.rcParams['text.usetex'] = True
 
 
 def generate_geometric_distribution(k,lbd):
-    elements = range(0,k)
-    prob = [(1-lbd)*math.pow(lbd,x)/(1-math.pow(lbd,k)) for x in elements]
-    return prob
+  """Generate the discrete geometric distribution."""
+  elements = range(0,k)
+  prob = [(1-lbd)*math.pow(lbd,x)/(1-math.pow(lbd,k)) for x in elements]
+  return prob
 
 
 def generate_uniform_distribution(k):
-    raw_distribution = [1] * k
-    sum_raw = sum(raw_distribution)
-    prob = [float(y)/float(sum_raw) for y in raw_distribution]
-    return prob
+  """Generate the discrete uniform distribution."""
+  raw_distribution = [1] * k
+  sum_raw = sum(raw_distribution)
+  prob = [float(y)/float(sum_raw) for y in raw_distribution]
+  return prob
 
 
 def generate_zipf_distribution(k,degree):
-    raw_distribution = [1/(float(i)**(degree)) for i in range(1,k+1)]
-    sum_raw = sum(raw_distribution)
-    prob = [float(y)/float(sum_raw) for y in raw_distribution]
-    return prob
+  """Generate the discrete zipf distribution."""
+  raw_distribution = [1/(float(i)**(degree)) for i in range(1,k+1)]
+  sum_raw = sum(raw_distribution)
+  prob = [float(y)/float(sum_raw) for y in raw_distribution]
+  return prob
 
 
 def evaluate(work_path, config, file_open=open):
@@ -125,16 +128,16 @@ def evaluate(work_path, config, file_open=open):
         x_miracle = np.zeros((k,n))
         for i in range(n):
           if config.encoding_type == "fast":
-            x_miracle[:,i] = miracle.encode_decode_miracle_fast(i+itr*n, x[i], 
+            x_miracle[:,i] = miracle.encode_decode_miracle_fast(i+itr*n, x[i],
               k, epsilon_target/2, 2**coding_cost)
           else:
-            _, _, index = miracle.encoder(i+itr*n, x[i], k, epsilon_target/2, 
+            _, _, index = miracle.encoder(i+itr*n, x[i], k, epsilon_target/2,
               2**coding_cost)
-            x_miracle[:,i] = miracle.decoder(i+itr*n, index, k, epsilon_target/2, 
+            x_miracle[:,i] = miracle.decoder(i+itr*n, index, k, epsilon_target/2,
               2**coding_cost)
-        prob_miracle = unbias.unbias_miracle(k, epsilon_target/2, 2**coding_cost, 
+        prob_miracle = unbias.unbias_miracle(k, epsilon_target/2, 2**coding_cost,
           x_miracle.T, n, normalization = 1)
-        miracle_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i 
+        miracle_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i
           in zip(prob, prob_miracle)], ord=1)
 
       if config.run_modified_miracle:
@@ -144,49 +147,49 @@ def evaluate(work_path, config, file_open=open):
             x_modified_miracle[:,i] = miracle.encode_decode_modified_miracle_fast(
               i+itr*n, x[i], k, alpha*epsilon_target, 2**coding_cost)
           else:
-            _, pi, _ = miracle.encoder(i+itr*n, x[i], k, alpha*epsilon_target, 
+            _, pi, _ = miracle.encoder(i+itr*n, x[i], k, alpha*epsilon_target,
               2**coding_cost)
             expected_beta = np.ceil(k/(np.exp(epsilon_target)+1))/k
-            pi_all = modify_pi.modify_pi(pi, eta, epsilon_target, 
+            pi_all = modify_pi.modify_pi(pi, eta, epsilon_target,
               (np.exp(epsilon_target/2))/(1+expected_beta*(np.exp(epsilon_target)-1)))
             index = np.random.choice(2**coding_cost, 1, p=pi_all[-1])[0]
-            x_modified_miracle[:,i] = miracle.decoder(i+itr*n, index, k, 
+            x_modified_miracle[:,i] = miracle.decoder(i+itr*n, index, k,
               alpha*epsilon_target, 2**coding_cost)
-        prob_modified_miracle = unbias.unbias_modified_miracle(k, alpha*epsilon_target, 
+        prob_modified_miracle = unbias.unbias_modified_miracle(k, alpha*epsilon_target,
           2**coding_cost, x_modified_miracle.T, n, normalization = 1)
-        modified_miracle_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i 
+        modified_miracle_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i
           in zip(prob, prob_modified_miracle)], ord=1)
 
       if config.run_approx_miracle:
         x_approx_miracle = np.zeros((k,n))
         approx_coding_cost = int(np.ceil(
           config.approx_coding_cost_multiplier*epsilon_target/np.log(2) + config.approx_t))
-        epsilon_approx = miracle.get_approx_epsilon(epsilon_target, k, 
+        epsilon_approx = miracle.get_approx_epsilon(epsilon_target, k,
           2**approx_coding_cost, delta)
         for i in range(n):
           if config.encoding_type == "fast":
-            x_approx_miracle[:,i] = miracle.encode_decode_miracle_fast(i+itr*n, x[i], 
+            x_approx_miracle[:,i] = miracle.encode_decode_miracle_fast(i+itr*n, x[i],
               k, epsilon_approx, 2**coding_cost)
           else:
             _, _, index = miracle.encoder(i+itr*n, x[i], k, epsilon_approx, 2**coding_cost)
-            x_approx_miracle[:,i] = miracle.decoder(i+itr*n, index, k, epsilon_approx, 
+            x_approx_miracle[:,i] = miracle.decoder(i+itr*n, index, k, epsilon_approx,
               2**coding_cost)
-        prob_approx_miracle = unbias.unbias_miracle(k, epsilon_approx, 2**coding_cost, 
+        prob_approx_miracle = unbias.unbias_miracle(k, epsilon_approx, 2**coding_cost,
           x_approx_miracle.T, n, normalization = 1)
-        approx_miracle_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i 
+        approx_miracle_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i
           in zip(prob, prob_approx_miracle)], ord=1)
 
       if config.run_ss:
         x_ss = ss.encode_string_fast(k, epsilon_target, x)
         prob_ss = ss.decode_string(k, epsilon_target, x_ss, n, normalization = 1)
-        ss_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i 
+        ss_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i
           in zip(prob, prob_ss)], ord=1)
 
       if config.run_rhr:
         x_rhr = rhr.encode_string(k, epsilon_target, coding_cost, x)
-        prob_rhr = rhr.decode_string_fast(k, epsilon_target, coding_cost, x_rhr, 
+        prob_rhr = rhr.decode_string_fast(k, epsilon_target, coding_cost, x_rhr,
         normalization = 1) # estimate the original underlying distribution
-        rhr_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i 
+        rhr_error[itr, step] = np.linalg.norm([p_i - phat_i for p_i, phat_i
           in zip(prob, prob_rhr)], ord=1)
 
     if config.run_approx_miracle:
@@ -226,28 +229,28 @@ def evaluate(work_path, config, file_open=open):
     plt.errorbar(
         vary_space,
         np.mean(approx_miracle_error, axis=0),
-        yerr=np.std(approx_miracle_error, axis=0)/np.sqrt(num_itr),
+        yerr=np.std(approx_miracle_error, axis=0)/np.sqrt(config.num_itr),
         linewidth = 3.0,
         label="MRC")
   if config.run_miracle:
     plt.errorbar(
         vary_space,
         np.mean(miracle_error, axis=0),
-        yerr=np.std(miracle_error, axis=0)/np.sqrt(num_itr),
+        yerr=np.std(miracle_error, axis=0)/np.sqrt(config.num_itr),
         linewidth = 3.0,
         label="MRC")
   if config.run_modified_miracle:
     plt.errorbar(
         vary_space,
         np.mean(modified_miracle_error, axis=0),
-        yerr=np.std(modified_miracle_error, axis=0)/np.sqrt(num_itr),
+        yerr=np.std(modified_miracle_error, axis=0)/np.sqrt(config.num_itr),
         linewidth = 3.0,
         label="MMRC")
   if config.run_ss:
     plt.errorbar(
         vary_space,
         np.mean(ss_error, axis=0),
-        yerr=np.std(ss_error, axis=0)/np.sqrt(num_itr),
+        yerr=np.std(ss_error, axis=0)/np.sqrt(config.num_itr),
         ls='--',
         linewidth = 3.0,
         label="Subset Selection")
@@ -255,7 +258,7 @@ def evaluate(work_path, config, file_open=open):
     plt.errorbar(
         vary_space,
         np.mean(rhr_error, axis=0),
-        yerr=np.std(rhr_error, axis=0)/np.sqrt(num_itr),
+        yerr=np.std(rhr_error, axis=0)/np.sqrt(config.num_itr),
         ls='--',
         linewidth = 3.0,
         label="RHR")

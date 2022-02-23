@@ -33,7 +33,7 @@ def unbias_miracle(k, epsilon, number_candidates, z, n, normalization = 1):
     number_candidates: The number of candidates to be sampled.
     z: The privatized data.
     n: The number of users.
-    normalization: Indicator whether to clip and normalize or 
+    normalization: Indicator whether to clip and normalize or
     project on the simplex
 
   Returns:
@@ -45,7 +45,7 @@ def unbias_miracle(k, epsilon, number_candidates, z, n, normalization = 1):
   beta = np.array(range(number_candidates+1))/number_candidates
   # The probability with which you choose a candidate inside the cap.
   pi_in = 1/number_candidates*(c1/(beta*c1+(1-beta)*c2))
-  expectation = np.sum(stats.binom.pmf(range(number_candidates+1), 
+  expectation = np.sum(stats.binom.pmf(range(number_candidates+1),
     number_candidates, d/k)*range(number_candidates+1)*pi_in)
   b_hat = (d - expectation)/(k-1)
   m_hat = k*expectation/(k-1) - d/(k-1)
@@ -61,7 +61,7 @@ def unbias_miracle(k, epsilon, number_candidates, z, n, normalization = 1):
   return p_estimate
 
 
-def unbias_modified_miracle(k, epsilon, number_candidates, z, n, 
+def unbias_modified_miracle(k, epsilon, number_candidates, z, n,
   normalization = 1):
   """Get the unbiased estimate for modified miracle.
 
@@ -71,7 +71,7 @@ def unbias_modified_miracle(k, epsilon, number_candidates, z, n,
     number_candidates: The number of candidates to be sampled.
     z: The privatized data.
     n: The number of users.
-    normalization: Indicator whether to clip and normalize or 
+    normalization: Indicator whether to clip and normalize or
     project on the simplex
 
   Returns:
@@ -96,7 +96,7 @@ def unbias_modified_miracle(k, epsilon, number_candidates, z, n,
   # The probability with which you choose a candidate inside the cap.
   tilde_pi_in = indicator * tilde_pi_in_1 + (1 - indicator) * tilde_pi_in_2
   expectation = np.sum(
-      stats.binom.pmf(range(number_candidates + 1), number_candidates, 
+      stats.binom.pmf(range(number_candidates + 1), number_candidates,
         d / k) * range(number_candidates + 1) * tilde_pi_in)
   b_tilde = (d - expectation)/(k-1)
   m_tilde = k*expectation/(k-1) - d/(k-1)
