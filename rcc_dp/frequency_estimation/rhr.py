@@ -73,9 +73,7 @@ def rr_encode_string(alphabet_size, epsilon, samples):
 
 
 def decode_string_fast(dim, epsilon, comm, z, normalization = 1):
-  """Learn the original distribution from the privatized strings when
-  the input is a matrix consisting of all the bit vectors.
-  """
+  """Learn the original distribution from the privatized strings faster."""
   l = len(z)
   # Pad dim to the power of 2.
   padded_d = int(math.pow(2, math.ceil(math.log(dim,2))))
@@ -87,6 +85,7 @@ def decode_string_fast(dim, epsilon, comm, z, normalization = 1):
   block_size = int(padded_d/math.pow(2, eff_comm-1))
   n = int(l/block_size)*block_size
 
+  # The input z is a matrix consisting of all the bit vectors.
   group_list = np.array(z[:n]).reshape(int(n/block_size), block_size).T
 
   # Create histograms to specify the empirical distributions of each group.
@@ -130,7 +129,7 @@ def get_hadamard_entry(d, x, y):
 
 
 def fast_inverse_hadamard_transform(k, dist):
-  """ Performs inverse Hadamard transform."""
+  """Performs inverse Hadamard transform."""
   if k == 1:
     return dist
   dist1 = dist[0 : k//2]

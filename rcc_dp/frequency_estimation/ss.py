@@ -47,10 +47,7 @@ def probability_normalize(p):
 
 
 def encode_string_fast(k, epsilon, x):
-  """A fast implementation of the subset selection protocol -- instead
-  of selecting exactly d ones, set each bit to be one independently
-  with true expectation.
-  """
+  """A fast implementation of the subset selection protocol."""
   d = int(np.ceil(k/(np.exp(epsilon)+1)))
   p = d*np.exp(epsilon)/(d*np.exp(epsilon)+k-d)
   q = (d-p)/(k-1)
@@ -59,20 +56,21 @@ def encode_string_fast(k, epsilon, x):
   z = np.zeros((n, k))
   flip = np.random.random_sample((n, k))
 
+  # Instead of selecting exactly d ones, set each bit to be one 
+  # independently with true expectation.
   for i in range(n):
     z[i,x[i]] = np.logical_or(0,flip[i,x[i]] < p)
   return np.logical_or(z, flip < q)
 
 def decode_string(k, epsilon, z, length, normalization = 1):
-  """Learn the original distribution from the privatized strings when
-  the input is a matrix consisting of all the bit vectors.
-  """
+  """Learn the original distribution from the privatized strings faster."""
   d = int(np.ceil(k/(np.exp(epsilon)+1)))
 
   temp1 = ((k-1)*np.exp(epsilon)
     +1.0*(k-1)*(k-d)/d)/((k-d)*(np.exp(epsilon)-1))
   temp2 = ((d-1)*np.exp(epsilon)+k-d) / (1.0*(k-d)*(np.exp(epsilon)-1))
 
+  # The input z is a matrix consisting of all the bit vectors.
   p_estimate = (1.0*np.sum(z, axis=0)*temp1/length)-temp2
 
   if normalization == 0:

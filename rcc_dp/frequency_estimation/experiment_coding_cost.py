@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Experiment definitions (i.e., evaluation of miracle, rhr, subset selection
-methods when the coding cost is varied)."""
+"""Evaluation of miracle, rhr, and subset selection when coding cost is varied."""
 
 import json
 import math
@@ -161,14 +160,14 @@ def evaluate(work_path, config, file_open=open):
       linewidth = 3.0,
       label="MMRC")
   if config.run_ss:
-    line1 = plt.errorbar(vary_space,
+    plt.errorbar(vary_space,
       [np.mean(ss_error, axis=0)[0]]*len(vary_space),
       yerr = [np.std(ss_error, axis=0)[0]/np.sqrt(config.num_itr)]*len(vary_space),
       ls='--',
       linewidth = 3.0,
       label="Subset Selection")
   if config.run_rhr:
-    line2 = plt.errorbar(vary_space,
+    plt.errorbar(vary_space,
       [np.mean(rhr_error, axis=0)[0]]*len(vary_space),
       yerr = [np.std(rhr_error, axis=0)[0]/np.sqrt(config.num_itr)]*len(vary_space),
       ls='--',

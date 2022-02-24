@@ -117,6 +117,16 @@ def encode_decode_miracle_fast(seed, x, k, epsilon, number_candidates):
   """A fast implementation of the miracle protocol -- instead of
   generating number_candidates samples, generate one sample with
   true expectation.
+
+  Args:
+    seed: The random seed to be used by the encoder.
+    x: The user input data.
+    k: The dimension of the one-hot encoded x.
+    epsilon: The privacy parameter epsilon.
+    number_candidates: The number of candidates to be sampled.
+
+  Returns:
+    z: The candidate sampled at the decoder.
   """
   d = int(np.ceil(k/(np.exp(epsilon)+1)))
   num_cand_in_cap = np.random.binomial(number_candidates, d/k, size=None)
@@ -136,13 +146,24 @@ def encode_decode_miracle_fast(seed, x, k, epsilon, number_candidates):
     rs = np.random.RandomState(seed)
     rs.shuffle(z)
     z = z[:x] + [0] + z[x:]
-  return np.array(z)
+  z = np.array(z)
+  return z
 
 
 def encode_decode_modified_miracle_fast(seed, x, k, epsilon, number_candidates):
   """A fast implementation of the modified miracle protocol -- instead of
   generating number_candidates samples, generate one sample with
   true expectation.
+
+  Args:
+    seed: The random seed to be used by the encoder.
+    x: The user input data.
+    k: The dimension of the one-hot encoded x.
+    epsilon: The privacy parameter epsilon.
+    number_candidates: The number of candidates to be sampled.
+
+  Returns:
+    z: The candidate sampled at the decoder.
   """
   d = int(np.ceil(k/(np.exp(epsilon)+1)))
   c1 = np.exp(epsilon)/(sc.comb(k-1,d-1)* np.exp(epsilon) + sc.comb(k-1,d))
@@ -174,4 +195,5 @@ def encode_decode_modified_miracle_fast(seed, x, k, epsilon, number_candidates):
     rs = np.random.RandomState(seed)
     rs.shuffle(z)
     z = z[:x] + [0] + z[x:]
-  return np.array(z)
+  z = np.array(z)
+  return z
