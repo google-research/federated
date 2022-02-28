@@ -14,8 +14,8 @@
 """Code to obtain parameters of various miracle methods."""
 
 import numpy as np
-from rcc_dp import optimize_unbias
-from rcc_dp import privunit
+from rcc_dp.mean_estimation import optimize_unbias
+from rcc_dp.mean_estimation import privunit
 
 
 def get_parameters_unbiased_approx_miracle(epsilon_target, d,

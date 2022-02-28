@@ -20,35 +20,38 @@ def get_config():
   """Returns config dictionary for model."""
   config = dict(
       name="defaults",
-      # Either use unbiased data, biased data, or same data i.e., data variable
-      # can take one of "biased_data", "unbiased_data", "same_data".
-      data="biased_data",
+      # Either use geometric, zipf, or uniform i.e., data variable
+      # can take one of "geometric", "zipf", "uniform".
+      distribution="zipf",
+      lbd_geometric=0.8,
+      degree_zipf=1.0,
       # Flags to indicate which methods to compare.
-      run_approx_miracle=True,
+      run_approx_miracle=False,
       run_miracle=False,
-      run_modified_miracle=False,
-      run_privunit=True,
-      run_sqkr=True,
+      run_modified_miracle=True,
+      run_ss=True,
+      run_rhr=True,
+      encoding_type="fast", # Can take either fast or normal
       # Common parameters.
       num_itr=1,
-      coding_cost=8,
+      coding_cost=14,
       coding_cost_multiplier=1,
       approx_coding_cost_multiplier=3,
       approx_t=6,
       # Specific parameters (leave them as they are for now).
       delta=10**(-6),
-      budget=0.5,
       alpha=1.0,
       # Variation.
-      vary="eps",  # Can take one of "d", "n", "eps".
-      d_space=[200, 400, 600, 800, 1000],
+      vary="eps",  # Can take one of "cc", "k", "n", "eps".
+      cc_space=[6, 8, 10, 12, 14],
+      k_space=[200, 400, 600, 800, 1000],
       n_space=[2000, 4000, 6000, 8000, 10000],
       eps_space=list(range(1, 9)),
       # Defaults.
       n=5000,
-      d=500,
-      t=2,
-      epsilon_target=4,
+      k=500,
+      t=3,
+      epsilon_target=6,
   )
   config = config_dict.ConfigDict(config)
   config.lock()  # Prevent addition of new fields.
