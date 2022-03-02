@@ -17,7 +17,7 @@ installed:
 
 Python --- json, math, time, matplotlib, numpy, scipy,
 [absl](https://github.com/abseil/abseil-py),
-[ml_collections](https://github.com/google/ml_collections)
+[ml_collections](https://pypi.org/project/ml-collections/)
 
 ### Wrapper functions:
 
