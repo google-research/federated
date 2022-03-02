@@ -17,7 +17,8 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 from scipy import stats
-from rcc_dp import sqkr
+
+from rcc_dp.mean_estimation import sqkr
 
 
 class SqkrTest(parameterized.TestCase):

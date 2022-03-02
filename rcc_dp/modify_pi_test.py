@@ -15,9 +15,10 @@
 
 from absl.testing import absltest
 import numpy as np
-from rcc_dp import get_parameters
-from rcc_dp import miracle
+
 from rcc_dp import modify_pi
+from rcc_dp.mean_estimation import get_parameters
+from rcc_dp.mean_estimation import miracle
 
 
 class ModifyPiTest(absltest.TestCase):
@@ -39,7 +40,7 @@ class ModifyPiTest(absltest.TestCase):
                                        c1 / (np.exp(epsilon / 2)))
           self.assertLessEqual(len(pi_all), 3)
           for distribution in pi_all:
-            self.assertLessEqual(np.abs(np.sum(distribution)-1), 0.0001)
+            self.assertLessEqual(np.abs(np.sum(distribution) - 1), 0.0001)
 
   def test_tilde_pi_is_private(self):
     """Test whether tilde pi satisfies the DP constraint."""

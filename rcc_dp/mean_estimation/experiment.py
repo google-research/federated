@@ -11,19 +11,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Experiment definitions (i.e., evaluation of miracle, sqkr, privunit methods)."""
+"""Experiment definitions.
+
+This includes evaluation of miracle, sqkr, privunit methods when either the data
+dimension d, the number of users n, or the privacy parameter epsilon is varied.
+"""
 
 import json
 import math
 import time
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
-from rcc_dp import get_parameters
-from rcc_dp import miracle
+
 from rcc_dp import modify_pi
-from rcc_dp import privunit
-from rcc_dp import sqkr
+from rcc_dp.mean_estimation import get_parameters
+from rcc_dp.mean_estimation import miracle
+from rcc_dp.mean_estimation import privunit
+from rcc_dp.mean_estimation import sqkr
+
+matplotlib.rcParams["ps.useafm"] = True
+matplotlib.rcParams["pdf.use14corefonts"] = True
+matplotlib.rcParams["text.usetex"] = True
 
 
 def evaluate(work_path, config, file_open=open):
@@ -196,54 +206,64 @@ def evaluate(work_path, config, file_open=open):
     print("sqkr mse:")
     print(np.mean(sqkr_mse, axis=0))
 
-  plt.figure(figsize=(10, 8), dpi=80)
+  plt.figure(figsize=((8, 5)), dpi=80)
+  plt.axes((.15, .2, .83, .75))
   if config.run_approx_miracle:
     plt.errorbar(
         vary_space,
         np.mean(approx_miracle_mse, axis=0),
         yerr=np.std(approx_miracle_mse, axis=0) / np.sqrt(config.num_itr),
-        label="Approx-DP Miracle")
+        linewidth=3.0,
+        label="MRC")
   if config.run_miracle:
     plt.errorbar(
         vary_space,
         np.mean(miracle_mse, axis=0),
         yerr=np.std(miracle_mse, axis=0) / np.sqrt(config.num_itr),
-        label="Miracle")
+        linewidth=3.0,
+        label="MRC")
   if config.run_modified_miracle:
     plt.errorbar(
         vary_space,
         np.mean(modified_miracle_mse, axis=0),
         yerr=np.std(modified_miracle_mse, axis=0) / np.sqrt(config.num_itr),
-        label="Modified Miracle")
+        linewidth=3.0,
+        label="MMRC")
   if config.run_privunit:
     plt.errorbar(
         vary_space,
         np.mean(privunit_mse, axis=0),
         yerr=np.std(privunit_mse, axis=0) / np.sqrt(config.num_itr),
-        label="PrivUnit")
+        ls="--",
+        linewidth=3.0,
+        label="PrivUnit$_{2}$")
   if config.run_sqkr:
     plt.errorbar(
         vary_space,
         np.mean(sqkr_mse, axis=0),
         yerr=np.std(sqkr_mse, axis=0) / np.sqrt(config.num_itr),
+        ls="--",
+        linewidth=3.0,
         label="SQKR")
-  plt.legend(fontsize=18)
-  plt.xticks(fontsize=18)
-  plt.yticks(fontsize=18)
-  plt.ylabel("mse", fontsize=18)
+  plt.legend(fontsize=24)
+  plt.xticks(fontsize=28)
+  plt.yticks(fontsize=28)
+  plt.ylabel(r"$\ell_{2}$ error", fontsize=28)
   if config.vary == "d":
-    plt.xlabel(r"$d$", fontsize=18)
-    plt.title(
-        "n = " + str(n) + ", " + r"$\epsilon = $" + str(epsilon_target),
-        fontsize=18)
+    plt.xlabel(r"$d$", fontsize=28)
+    plt.xticks([200, 400, 600, 800, 1000])
+    plt.yticks([0.00, 0.04, 0.08, 0.12, 0.16])
+    plt.legend(fontsize=24, loc="upper left")
   elif config.vary == "n":
-    plt.xlabel(r"$n$", fontsize=18)
-    plt.title(
-        "d = " + str(d) + ", " + r"$\epsilon = $" + str(epsilon_target),
-        fontsize=18)
+    plt.xlabel(r"$n$", fontsize=28)
+    plt.ticklabel_format(style="sci", axis="x", scilimits=(3, 3))
+    plt.gca().xaxis.get_offset_text().set_fontsize(16)
+    plt.yticks([0.00, 0.05, 0.10, 0.15, 0.20])
+    plt.legend(fontsize=24, loc="upper right")
   elif config.vary == "eps":
-    plt.xlabel(r"$\epsilon$", fontsize=18)
-    plt.title("d = " + str(d) + ", $n = $" + str(n), fontsize=18)
+    plt.xlabel(r"$\varepsilon$", fontsize=28)
+    plt.yticks([0.3, 0.6, 0.9, 1.2, 1.5])
+    plt.legend(fontsize=24, loc="upper right")
 
   with file_open(work_path + "/rcc_dp_comparison.png", "wb") as f:
     plt.savefig(f, format="png")

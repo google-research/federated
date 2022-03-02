@@ -28,7 +28,8 @@ minimizing the variance or maximizing the corresponding m in this range.
 
 import numpy as np
 from scipy import stats
-from rcc_dp import privunit
+
+from rcc_dp.mean_estimation import privunit
 
 
 def get_unbiased_p_hat(number_candidates, c1, c2, p):
