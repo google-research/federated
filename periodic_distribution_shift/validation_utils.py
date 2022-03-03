@@ -54,8 +54,8 @@ def build_federated_evaluation(
 
   Returns:
     A federated computation (an instance of `tff.Computation`) that accepts
-    model parameters and federated data, and returns the evaluation metrics
-    as aggregated by `tff.learning.Model.federated_output_computation`.
+    model parameters and federated data, and returns the aggregated evaluation
+    metrics.
   """
   if broadcast_process is not None:
     if not isinstance(broadcast_process, tff.templates.MeasuredProcess):
@@ -77,6 +77,10 @@ def build_federated_evaluation(
     kmeans_centers_type = tff.types.type_from_tensors(
         tf.zeros([k_total, feature_dim]))
     dist_scalar_type = tff.types.type_from_tensors(tf.constant(1., tf.float32))
+    unfinalized_metrics_type = tff.framework.type_from_tensors(
+        model.report_local_unfinalized_metrics())
+    metrics_aggregation_computation = tff.learning.metrics.sum_then_finalize(
+        model.metric_finalizers(), unfinalized_metrics_type)
 
   @tff.tf_computation(model_weights_type, kmeans_centers_type, dist_scalar_type,
                       SequenceType(batch_type))
@@ -110,7 +114,8 @@ def build_federated_evaluation(
         dataset=dataset,
         initial_state_fn=lambda: tf.zeros([], dtype=tf.int64))
     return collections.OrderedDict(
-        local_outputs=model.report_local_outputs(), num_examples=num_examples)
+        local_outputs=model.report_local_unfinalized_metrics(),
+        num_examples=num_examples)
 
   @tff.federated_computation(
       tff.types.at_server(model_weights_type),
@@ -130,7 +135,7 @@ def build_federated_evaluation(
         tff.federated_broadcast(dist_scalar),
         federated_dataset,
     ])
-    model_metrics = model.federated_output_computation(
+    model_metrics = metrics_aggregation_computation(
         client_outputs.local_outputs)
     statistics = collections.OrderedDict(
         num_examples=tff.federated_sum(client_outputs.num_examples))
