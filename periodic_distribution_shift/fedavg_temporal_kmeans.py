@@ -82,8 +82,8 @@ class ClientOutput(object):
   -   `client_weight`: Weight to be used in a weighted mean when
       aggregating `weights_delta`.
   -   `model_output`: A structure matching
-      `tff.learning.Model.report_local_outputs`, reflecting the results of
-      training on the input dataset.
+      `tff.learning.Model.report_local_unfinalized_metrics`, reflecting the
+      results of training on the input dataset.
   -   `optimizer_output`: Additional metrics or other outputs defined by the
       optimizer.
   -   `kmeans_deltas`: Updates to the cluster centers.
@@ -110,8 +110,8 @@ class ClientOutputNoKmeans(object):
   -   `client_weight`: Weight to be used in a weighted mean when
       aggregating `weights_delta`.
   -   `model_output`: A structure matching
-      `tff.learning.Model.report_local_outputs`, reflecting the results of
-      training on the input dataset.
+      `tff.learning.Model.report_local_unfinalized_metrics`, reflecting the
+      results of training on the input dataset.
   -   `optimizer_output`: Additional metrics or other outputs defined by the
       optimizer.
   """
@@ -145,9 +145,10 @@ def create_client_update_no_kmeans_fn():
       initial_weights: A `tff.learning.ModelWeights` from server.
       client_optimizer: A `tf.keras.optimizer.Optimizer` object.
       client_weight_fn: Optional function that takes the output of
-        `model.report_local_outputs` and returns a tensor that provides the
-        weight in the federated average of model deltas. If not provided, the
-        default is the total number of examples processed on device.
+        `model.report_local_unfinalized_metrics` and returns a tensor that
+        provides the weight in the federated average of model deltas. If not
+        provided, the default is the total number of examples processed on
+        device.
 
     Returns:
       A 'ClientOutput`.
@@ -166,7 +167,7 @@ def create_client_update_no_kmeans_fn():
       client_optimizer.apply_gradients(grads_and_vars)
       num_examples += tf.shape(output.predictions)[0]
 
-    aggregated_outputs = model.report_local_outputs()
+    aggregated_outputs = model.report_local_unfinalized_metrics()
     weights_delta = tf.nest.map_structure(lambda a, b: a - b,
                                           model_weights.trainable,
                                           initial_weights.trainable)
@@ -275,9 +276,10 @@ def create_client_aggregated_update_fn():
       initial_weights: A `tff.learning.ModelWeights` from server.
       client_optimizer: A `tf.keras.optimizer.Optimizer` object.
       client_weight_fn: Optional function that takes the output of
-        `model.report_local_outputs` and returns a tensor that provides the
-        weight in the federated average of model deltas. If not provided, the
-        default is the total number of examples processed on device.
+        `model.report_local_unfinalized_metrics` and returns a tensor that
+        provides the weight in the federated average of model deltas. If not
+        provided, the default is the total number of examples processed on
+        device.
       kmeans_centers: The cluster centers.
       kmeans_k: Number of clusters for k-means.
       feature_dim: Dimension of the feature space in which k-means is defined.
@@ -310,7 +312,7 @@ def create_client_aggregated_update_fn():
       client_optimizer.apply_gradients(grads_and_vars)
       num_examples += tf.shape(output.predictions)[0]
 
-    aggregated_outputs = model.report_local_outputs()
+    aggregated_outputs = model.report_local_unfinalized_metrics()
     weights_delta = tf.nest.map_structure(lambda a, b: a - b,
                                           model_weights.trainable,
                                           initial_weights.trainable)
@@ -415,9 +417,9 @@ def build_fed_avg_process(
     server_lr: A scalar learning rate or a function that accepts a float
       `round_num` argument and returns a learning rate.
     client_weight_fn: Optional function that takes the output of
-      `model.report_local_outputs` and returns a tensor that provides the weight
-      in the federated average of model deltas. If not provided, the default is
-      the total number of examples processed on device.
+      `model.report_local_unfinalized_metrics` and returns a tensor that
+      provides the weight in the federated average of model deltas. If not
+      provided, the default is the total number of examples processed on device.
     kmeans_k: Number of centers for k-means. Currently only support 2 centers.
     feature_dim: Dimension of the feature space where k-means is based on.
     aggregated_kmeans: Whether to use aggregated k-means.
@@ -440,6 +442,10 @@ def build_fed_avg_process(
     server_lr_schedule = lambda round_num: server_lr
 
   placeholder_model = model_fn()
+  unfinalized_metrics_type = tff.framework.type_from_tensors(
+      placeholder_model.report_local_unfinalized_metrics())
+  metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
+      placeholder_model.metric_finalizers(), unfinalized_metrics_type)
 
   server_init_tf = build_server_init_fn(
       model_fn,
@@ -492,8 +498,7 @@ def build_fed_avg_process(
       federated_dataset: A federated `tf.Dataset` with placement `tff.CLIENTS`.
 
     Returns:
-      A tuple of updated `ServerState` and the result of
-      `tff.learning.Model.federated_output_computation`.
+      A tuple of updated `ServerState` and aggregated metrics.
     """
 
     client_model = tff.federated_broadcast(server_state.model)
@@ -508,8 +513,7 @@ def build_fed_avg_process(
     client_weight = client_outputs.client_weight
     model_delta = tff.federated_mean(
         client_outputs.weights_delta, weight=client_weight)
-    aggregated_outputs = placeholder_model.federated_output_computation(
-        client_outputs.model_output)
+    aggregated_outputs = metrics_aggregation_fn(client_outputs.model_output)
     if aggregated_outputs.type_signature.is_struct():
       aggregated_outputs = tff.federated_zip(aggregated_outputs)
     if not aggregated_kmeans:
