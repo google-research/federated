@@ -56,25 +56,6 @@ py_test(
 )
 
 py_library(
-    name = "eval_utils",
-    srcs = ["eval_utils.py"],
-    srcs_version = "PY3",
-    deps = [":simulation_specs"],
-)
-
-py_test(
-    name = "eval_utils_test",
-    size = "small",
-    srcs = ["eval_utils_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        ":eval_utils",
-        ":simulation_specs",
-    ],
-)
-
-py_library(
     name = "file_utils",
     srcs = ["file_utils.py"],
     srcs_version = "PY3",
