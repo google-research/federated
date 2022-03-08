@@ -13,22 +13,8 @@ This library uses [TensorFlow Federated](https://www.tensorflow.org/federated).
 For a more general look at using TensorFlow Federated for research, see
 [Using TFF for Federated Learning Research](https://www.tensorflow.org/federated/tff_for_research).
 
-Some pip packages are required by this library, and may need to be installed:
-
-```
-absl-py
-attrs
-dm-tree
-numpy
-pandas
-tensorflow-federated-nightly
-tensorflow-model-optimization
-tensorflow-privacy
-tensorflow-probability
-tensorflow-text-nightly
-tf-nightly
-tfa-nightly
-```
+Some pip packages are required by this library, and may need to be installed.
+See the [requirements](requirements.txt) file for details.
 
 We also require [Bazel](https://www.bazel.build/) in order to run the code.
 Please see the guide
