@@ -58,6 +58,23 @@ py_test(
 )
 
 py_library(
+    name = "hypcluster",
+    srcs = ["hypcluster.py"],
+    deps = [
+        ":coordinate_aggregators",
+        ":coordinate_finalizers",
+    ],
+)
+
+py_test(
+    name = "hypcluster_test",
+    srcs = ["hypcluster_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":hypcluster"],
+)
+
+py_library(
     name = "optimizer_flag_utils",
     srcs = ["optimizer_flag_utils.py"],
     srcs_version = "PY3",
