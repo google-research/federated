@@ -20,9 +20,9 @@ from data_poor_fl import hypcluster
 
 
 def create_dataset():
-  # Create data satisfying y = 2*x + 1
+  # Create data satisfying y = x + 1
   x = [[1.0], [2.0], [3.0]]
-  y = [[3.0], [5.0], [7.0]]
+  y = [[2.0], [3.0], [4.0]]
   return tf.data.Dataset.from_tensor_slices((x, y)).batch(1)
 
 
@@ -30,12 +30,12 @@ def get_input_spec():
   return create_dataset().element_spec
 
 
-def model_fn():
+def model_fn(initializer='zeros'):
   keras_model = tf.keras.Sequential([
       tf.keras.layers.Dense(
           1,
-          kernel_initializer='zeros',
-          bias_initializer='zeros',
+          kernel_initializer=initializer,
+          bias_initializer=initializer,
           input_shape=(1,))
   ])
   return tff.learning.from_keras_model(
@@ -130,7 +130,7 @@ class ScatterTest(tf.test.TestCase):
     self.assertEqual(actual_weight, expected_weight)
 
 
-class HypClusterTest(tf.test.TestCase, parameterized.TestCase):
+class HypClusterTrainTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('clusters1', 1),
@@ -199,6 +199,42 @@ class HypClusterTest(tf.test.TestCase, parameterized.TestCase):
           fed_avg.get_model_weights(fed_avg_state).trainable,
           hyp_alg.get_model_weights(hyp_alg_state)[0].trainable)
 
+
+class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      ('clusters1', 1),
+      ('clusters2', 2),
+      ('clusters3', 3),
+      ('clusters5', 5),
+  )
+  def test_constructs(self, num_clusters):
+    hyp_eval = hypcluster.build_hypcluster_eval(
+        model_fn=model_fn, num_clusters=num_clusters)
+    self.assertLen(hyp_eval.type_signature.parameter[0].member, num_clusters)
+
+  def test_matches_federated_eval_with_one_cluster(self):
+    hyp_eval = hypcluster.build_hypcluster_eval(
+        model_fn=model_fn, num_clusters=1)
+    federated_eval = tff.learning.build_federated_evaluation(model_fn)
+    model_weights = tff.learning.ModelWeights.from_model(model_fn())
+    federated_data = [create_dataset(), create_dataset()]
+    hyp_metrics = hyp_eval([model_weights], federated_data)
+    reference_metrics = federated_eval(model_weights, federated_data)
+    self.assertAllClose(hyp_metrics, reference_metrics)
+
+  def test_selects_best_model(self):
+    hyp_eval = hypcluster.build_hypcluster_eval(
+        model_fn=model_fn, num_clusters=2)
+    zero_model = model_fn(initializer='zeros')
+    ones_model = model_fn(initializer='ones')
+    zero_weights = tff.learning.ModelWeights.from_model(zero_model)
+    ones_weights = tff.learning.ModelWeights.from_model(ones_model)
+    federated_data = [create_dataset()]
+    hyp_metrics = hyp_eval([zero_weights, ones_weights], federated_data)
+    federated_eval = tff.learning.build_federated_evaluation(model_fn)
+    reference_metrics = federated_eval(ones_weights, federated_data)
+    self.assertAllClose(hyp_metrics, reference_metrics)
 
 if __name__ == '__main__':
   tf.test.main()

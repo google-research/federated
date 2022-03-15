@@ -20,7 +20,7 @@ Three Approaches for Personalization with Applications to Federated Learning
 """
 
 import collections
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -87,6 +87,23 @@ def select_best_model(model_outputs):
   return min_index
 
 
+def build_find_best_model_fn(
+    model_fn: Callable[[], tff.learning.Model], num_clusters: int,
+    model_weights_type: tff.Type, data_type: tff.Type
+) -> Callable[[List[tff.learning.ModelWeights], tf.data.Dataset], int]:
+  """Creates a tff.Computation for selecting the best model for a dataset."""
+  list_weights_type = tff.StructWithPythonType(
+      [model_weights_type for _ in range(num_clusters)], container_type=list)
+
+  @tff.tf_computation(list_weights_type, data_type)
+  def find_best_model(weights, dataset):
+    eval_models = [model_fn() for _ in range(num_clusters)]
+    eval_models_outputs = multi_model_eval(eval_models, weights, dataset)
+    return select_best_model(eval_models_outputs)
+
+  return find_best_model
+
+
 @tf.function
 def client_update_tf(model, optimizer, initial_weights, data):
   """Client training loop."""
@@ -141,34 +158,29 @@ def build_hypcluster_client_work(model_fn: Callable[[], tff.learning.Model],
 
   data_type = tff.types.SequenceType(model.input_spec)
   weights_gather_fn = build_gather_fn(model_weights_type, num_clusters)
-  metrics_gather_fn = build_gather_fn(unfinalized_metrics_type, num_clusters)
   list_weights_type = tff.StructWithPythonType(
       [model_weights_type for _ in range(num_clusters)], container_type=list)
 
+  cluster_selection_fn = build_find_best_model_fn(model_fn, num_clusters,
+                                                  model_weights_type, data_type)
   pack_update_and_weight_fn = build_scatter_fn(model_weights_type.trainable,
                                                num_clusters)
 
   @tff.tf_computation(list_weights_type, data_type)
-  def find_best_model_and_train(weights, dataset):
-    # Perform evaluation on all models and select the best one
-    eval_models = [model_fn() for _ in range(num_clusters)]
-    eval_models_outputs = multi_model_eval(eval_models, weights, dataset)
-    best_model_index = select_best_model(eval_models_outputs)
-
-    # Gather the relevant metrics
-    eval_model_output = metrics_gather_fn(eval_models_outputs, best_model_index)
-
+  def select_model_and_train(weights, dataset):
+    # Determine which cluster to select from
+    model_index = cluster_selection_fn(weights, dataset)
     # Gather the relevant weights and train
     train_model = model_fn()
-    train_model_weights = weights_gather_fn(weights, best_model_index)
+    train_model_weights = weights_gather_fn(weights, model_index)
     client_update, num_examples, train_model_output = client_update_tf(
         train_model, optimizer, train_model_weights, dataset)
 
     one_hot_update, one_hot_weight = pack_update_and_weight_fn(
-        client_update, best_model_index, num_examples)
+        client_update, model_index, num_examples)
     client_result = tff.learning.templates.ClientResult(
         update=one_hot_update, update_weight=one_hot_weight)
-    return client_result, train_model_output, eval_model_output
+    return client_result, train_model_output
 
   @tff.federated_computation
   def init_fn():
@@ -178,12 +190,11 @@ def build_hypcluster_client_work(model_fn: Callable[[], tff.learning.Model],
                              tff.type_at_clients(list_weights_type),
                              tff.type_at_clients(data_type))
   def next_fn(state, list_of_weights, client_data):
-    client_result, train_model_outputs, eval_model_outputs = tff.federated_map(
-        find_best_model_and_train, (list_of_weights, client_data))
+    client_result, train_model_outputs = tff.federated_map(
+        select_model_and_train, (list_of_weights, client_data))
     train_metrics = metrics_aggregation_fn(train_model_outputs)
-    eval_metrics = metrics_aggregation_fn(eval_model_outputs)
     measurements = tff.federated_zip(
-        collections.OrderedDict(train=train_metrics, pre_train=eval_metrics))
+        collections.OrderedDict(train=train_metrics))
     return tff.templates.MeasuredProcessOutput(state, client_result,
                                                measurements)
 
@@ -277,3 +288,41 @@ def build_hypcluster_train(
   return tff.learning.templates.compose_learning_process(
       initial_weights_fn, weights_distributor, client_work, aggregator,
       finalizer)
+
+
+def build_hypcluster_eval(model_fn: Callable[[], tff.learning.Model],
+                          num_clusters: int) -> tff.Computation:
+  """Builds a computation for performing HypCluster evaluation."""
+
+  with tf.Graph().as_default():
+    # Wrap model construction in a graph to avoid polluting the global context
+    # with variables created for this model.
+    model = model_fn()
+    model_weights_type = tff.learning.framework.weights_type_from_model(model)
+    unfinalized_metrics_type = tff.types.type_from_tensors(
+        model.report_local_unfinalized_metrics())
+    metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
+        model.metric_finalizers(), unfinalized_metrics_type)
+
+  data_type = tff.types.SequenceType(model.input_spec)
+  metrics_gather_fn = build_gather_fn(unfinalized_metrics_type, num_clusters)
+  list_weights_type = tff.StructWithPythonType(
+      [model_weights_type for _ in range(num_clusters)], container_type=list)
+
+  @tff.tf_computation(list_weights_type, data_type)
+  def local_hypcluster_eval(model_weights, dataset):
+    eval_models = [model_fn() for _ in range(num_clusters)]
+    eval_models_outputs = multi_model_eval(eval_models, model_weights, dataset)
+    best_model_index = select_best_model(eval_models_outputs)
+    return metrics_gather_fn(eval_models_outputs, best_model_index)
+
+  @tff.federated_computation(
+      tff.type_at_server(list_weights_type), tff.type_at_clients(data_type))
+  def hypcluster_eval(server_model_weights, client_datasets):
+    client_model_weights = tff.federated_broadcast(server_model_weights)
+    client_metrics = tff.federated_map(local_hypcluster_eval,
+                                       (client_model_weights, client_datasets))
+    eval_metrics = metrics_aggregation_fn(client_metrics)
+    return tff.federated_zip(collections.OrderedDict(eval=eval_metrics))
+
+  return hypcluster_eval
