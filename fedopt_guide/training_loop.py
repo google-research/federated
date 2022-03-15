@@ -48,7 +48,7 @@ def _setup_outputs(root_output_dir, experiment_name, hparam_dict):
       file_path=csv_file, key_fieldname='round_num')
 
   summary_logdir = os.path.join(root_output_dir, 'logdir', experiment_name)
-  tensorboard_mngr = tff.program.TensorboardReleaseManager(summary_logdir)
+  tensorboard_mngr = tff.program.TensorBoardReleaseManager(summary_logdir)
 
   if hparam_dict:
     summary_writer = tf.summary.create_file_writer(summary_logdir)

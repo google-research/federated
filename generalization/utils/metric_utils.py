@@ -101,7 +101,7 @@ class MetricWriterCallback(tf.keras.callbacks.Callback):
   """A keras callback that wraps a clu `MetricWriter` instance."""
 
   def __init__(self, summary_dir: str):
-    self._tensorboard_writer = tff.program.TensorboardReleaseManager(
+    self._tensorboard_writer = tff.program.TensorBoardReleaseManager(
         summary_dir)
 
   def on_epoch_end(self, epoch: int, logs=None):
@@ -183,7 +183,7 @@ def configure_default_managers(
       tff.program.LoggingReleaseManager(),
       tff.program.CSVFileReleaseManager(
           file_path=csv_file, key_fieldname='round_num'),
-      tff.program.TensorboardReleaseManager(summary_dir=summary_dir)
+      tff.program.TensorBoardReleaseManager(summary_dir=summary_dir)
   ]
 
   logging.info('Writing...')

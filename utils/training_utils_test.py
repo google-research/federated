@@ -55,9 +55,9 @@ class CreateManagersTest(parameterized.TestCase):
     self.assertIsInstance(release_managers[1],
                           tff.program.CSVFileReleaseManager)
     self.assertIsInstance(release_managers[2],
-                          tff.program.TensorboardReleaseManager)
+                          tff.program.TensorBoardReleaseManager)
 
-  @mock.patch.object(tff.program, 'TensorboardReleaseManager')
+  @mock.patch.object(tff.program, 'TensorBoardReleaseManager')
   @mock.patch.object(tff.program, 'CSVFileReleaseManager')
   @mock.patch.object(tff.program, 'LoggingReleaseManager')
   @mock.patch.object(tff.program, 'FileProgramStateManager')

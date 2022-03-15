@@ -46,7 +46,7 @@ def create_managers(
     A `tff.program.FileProgramStateManager`, and a list of
     `tff.program.ReleaseManager`s consisting of a
     `tff.program.LoggingReleaseManager`, a `tff.program.CSVFileReleaseManager`,
-    and a `tff.program.TensorboardReleaseManager`.
+    and a `tff.program.TensorBoardReleaseManager`.
   """
   program_state_dir = os.path.join(root_dir, 'checkpoints', experiment_name)
   program_state_manager = tff.program.FileProgramStateManager(
@@ -62,7 +62,7 @@ def create_managers(
       key_fieldname='round_num')
 
   summary_dir = os.path.join(root_dir, 'logdir', experiment_name)
-  tensorboard_release_manager = tff.program.TensorboardReleaseManager(
+  tensorboard_release_manager = tff.program.TensorBoardReleaseManager(
       summary_dir=summary_dir)
 
   logging.info('Writing...')
