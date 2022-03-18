@@ -24,7 +24,6 @@ py_test(
     srcs_version = "PY3",
     tags = [
         "manual",
-        "nokokoro",
     ],
     deps = [":heavy_hitters_utils"],
 )

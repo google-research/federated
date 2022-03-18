@@ -44,7 +44,6 @@ py_test(
     srcs_version = "PY3",
     tags = [
         "manual",
-        "nokokoro",  # TODO(b/199435517): Remove this tag when the test succeeds in a non-flaky manner.
         "notap",  #TODO(b/201413656): Remove this tag once the test succeeds again.
     ],
     deps = [

@@ -38,7 +38,6 @@ py_test(
     shard_count = 10,
     srcs_version = "PY3",
     tags = [
-        "nokokoro",
         "requires-net:external",
     ],
     deps = [
@@ -87,7 +86,6 @@ py_test(
     shard_count = 10,
     srcs_version = "PY3",
     tags = [
-        "nokokoro",
         "requires-net:external",
     ],
     deps = [

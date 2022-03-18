@@ -57,7 +57,6 @@ py_library(
 py_test(
     name = "get_parameters_test",
     srcs = ["get_parameters_test.py"],
-    tags = ["nokokoro"],  # Runtime too high for continuous integration.
     deps = [
         ":get_parameters",
         ":miracle",

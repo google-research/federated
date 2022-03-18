@@ -45,7 +45,6 @@ py_test(
 py_test(
     name = "emnist_preprocessing_test",
     srcs = ["emnist_preprocessing_test.py"],
-    tags = ["nokokoro"],
     deps = [":emnist_preprocessing"],
 )
 
@@ -55,7 +54,6 @@ py_test(
     srcs = ["client_sampling_test.py"],
     shard_count = 5,
     tags = [
-        "nokokoro",
         "requires-net:external",
     ],
     deps = [":client_sampling"],

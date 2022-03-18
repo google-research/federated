@@ -72,7 +72,6 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     tags = [
-        "nokokoro",
         "requires-net:external",
     ],
     deps = [":models"],
@@ -95,7 +94,6 @@ py_test(
     srcs = ["simple_fedavg_tf_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["nokokoro"],
     deps = [
         ":models",
         ":simple_fedavg_tf",
@@ -110,7 +108,6 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     tags = [
-        "nokokoro",
         "requires-net:external",
     ],
     deps = [

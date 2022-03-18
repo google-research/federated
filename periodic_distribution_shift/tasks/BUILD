@@ -80,7 +80,6 @@ py_test(
     name = "emnist_classification_tasks_test",
     srcs = ["emnist_classification_tasks_test.py"],
     tags = [
-        "nokokoro",
         "requires-net:external",
     ],
     deps = [

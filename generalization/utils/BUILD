@@ -57,7 +57,6 @@ py_test(
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
-    tags = ["nokokoro"],
     deps = [":fed_avg_schedule"],
 )
 
@@ -88,7 +87,6 @@ py_test(
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
-    tags = ["nokokoro"],
     deps = [":client_data_utils"],
 )
 
@@ -131,7 +129,6 @@ py_test(
 py_test(
     name = "resnet_models_test",
     srcs = ["resnet_models_test.py"],
-    tags = ["nokokoro"],
     deps = [":resnet_models"],
 )
 

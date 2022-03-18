@@ -42,7 +42,6 @@ py_test(
     srcs_version = "PY3",
     tags = [
         "manual",
-        "nokokoro",
         "notap",
     ],
     deps = [":filtered_emnist_data_utils"],
