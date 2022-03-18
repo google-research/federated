@@ -9,8 +9,8 @@ different optimizers on various models and tasks.
 @article{yuan2021we,
   title={What Do We Mean by Generalization in Federated Learning?},
   author={Yuan, Honglin and Morningstar, Warren and Ning, Lin and Singhal, Karan},
-  journal={NeurIPS 2021 Workshop on New Frontiers in Federated Learning (NeurIPS NFFL 2021)},
-  year={2021}
+  journal={International Conference on Learning Representations (ICLR 2022)},
+  year={2022}
 }
 ```
 
