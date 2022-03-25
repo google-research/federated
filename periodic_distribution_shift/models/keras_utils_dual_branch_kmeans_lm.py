@@ -625,3 +625,12 @@ class _KerasModel(tff.learning.Model):
       finalizers[metric.name] = (
           tff.learning.metrics.finalizer.create_keras_metric_finalizer(metric))  # pytype: disable=attribute-error
     return finalizers
+
+  @tf.function
+  def reset_metrics(self):
+    """Resets metrics variables to initial value."""
+    raise NotImplementedError(
+        'The `reset_metrics` method isn\'t implemented for your custom '
+        '`tff.learning.Model`. Please implement it before using this method. '
+        'You can leave this method unimplemented if you won\'t use this method.'
+    )

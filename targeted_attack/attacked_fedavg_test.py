@@ -158,6 +158,15 @@ class MnistModel(tff.learning.Model):
         loss=tf.function(func=lambda x: x[0] / x[1]),
         accuracy=tf.function(func=lambda x: x[0] / x[1]))
 
+  @tf.function
+  def reset_metrics(self):
+    """Resets metrics variables to initial value."""
+    raise NotImplementedError(
+        'The `reset_metrics` method isn\'t implemented for your custom '
+        '`tff.learning.Model`. Please implement it before using this method. '
+        'You can leave this method unimplemented if you won\'t use this method.'
+    )
+
 
 def create_client_data():
   rng = np.random.default_rng(1)
