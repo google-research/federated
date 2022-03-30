@@ -98,6 +98,33 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "hypcluster_trainer",
+    srcs = ["hypcluster_trainer.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":hypcluster_trainer_lib",
+    ],
+)
+
+py_library(
+    name = "hypcluster_trainer_lib",
+    srcs = ["hypcluster_trainer.py"],
+    data = [
+        ":emnist_train_num_examples.csv",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        ":hypcluster",
+        ":personalization_utils",
+        ":pseudo_client_data",
+        "//utils:training_utils",
+        "//utils:utils_impl",
+        "//utils/optimizers:optimizer_utils",
+    ],
+)
+
 py_library(
     name = "personalization_trainer_lib",
     srcs = ["personalization_trainer.py"],
@@ -143,4 +170,10 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [":pseudo_client_data"],
+)
+
+py_test(
+    name = "hypcluster_trainer_test",
+    srcs = ["hypcluster_trainer_test.py"],
+    deps = [":hypcluster_trainer_lib"],
 )

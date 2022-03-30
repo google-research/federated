@@ -212,6 +212,7 @@ def build_hypcluster_train(
     .Optimizer = DEFAULT_SERVER_OPTIMIZER,
     model_aggregator: Optional[
         tff.aggregators.WeightedAggregationFactory] = None,
+    initial_model_weights_list: Optional[List[tff.learning.ModelWeights]] = None
 ) -> tff.learning.templates.LearningProcess:
   """Builds a learning process that performs HypCluster training.
 
@@ -248,13 +249,25 @@ def build_hypcluster_train(
     model_aggregator: An optional `tff.aggregators.WeightedAggregationFactory`
       used to aggregate client updates on the server. If `None`, this is set to
       `tff.aggregators.MeanFactory`.
+    initial_model_weights_list: If provided, used as the initialization.
 
   Returns:
     A `tff.learning.templates.LearningProcess`.
+
+  Raises:
+    ValueError: If the number of models provided by `initial_model_weights_list`
+      does not equal `num_clusters`.
   """
 
   @tff.tf_computation()
   def initial_weights_fn():
+    if initial_model_weights_list:
+      if len(initial_model_weights_list) != num_clusters:
+        raise ValueError(
+            'The `initial_model_weights_list` does not equal `num_clusters`: '
+            f'the number of provided models: {len(initial_model_weights_list)} '
+            f'while the number of desired clusters: {num_clusters}.')
+      return initial_model_weights_list
     return [
         tff.learning.ModelWeights.from_model(model_fn())
         for _ in range(num_clusters)

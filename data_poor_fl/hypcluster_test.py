@@ -53,6 +53,13 @@ def create_nested_structure():
   ]
 
 
+def create_initial_models(num_models: int):
+  model = model_fn(initializer='ones')
+  model_weights_tensors = tf.nest.map_structure(
+      lambda var: var.numpy(), tff.learning.ModelWeights.from_model(model))
+  return [model_weights_tensors for _ in range(num_models)]
+
+
 class GatherTest(tf.test.TestCase):
 
   def test_gather_type_signature(self):
@@ -133,31 +140,14 @@ class ScatterTest(tf.test.TestCase):
 class HypClusterTrainTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('clusters1', 1),
-      ('clusters2', 2),
-      ('clusters3', 3),
-      ('clusters5', 5),
+      ('clusters1_with_init', 1, create_initial_models(1)),
+      ('clusters1_without_init', 1, None),
+      ('clusters2_without_int', 2, None),
+      ('clusters3_with_init', 3, create_initial_models(3)),
+      ('clusters5_without_init', 5, None),
   )
-  def test_constructs_with_default_aggregator(self, num_clusters):
-    client_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=0.01)
-    server_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=1.0)
-    hyp_alg = hypcluster.build_hypcluster_train(
-        model_fn=model_fn,
-        num_clusters=num_clusters,
-        client_optimizer=client_optimizer,
-        server_optimizer=server_optimizer)
-    state = hyp_alg.initialize()
-    self.assertLen(state.global_model_weights, num_clusters)
-    self.assertLen(state.aggregator, num_clusters)
-    self.assertLen(state.finalizer, num_clusters)
-
-  @parameterized.named_parameters(
-      ('clusters1', 1),
-      ('clusters2', 2),
-      ('clusters3', 3),
-      ('clusters5', 5),
-  )
-  def test_constructs_with_non_default_aggregator(self, num_clusters):
+  def test_constructs_with_default_aggregator(self, num_clusters,
+                                              initial_model_weights_list):
     client_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=0.01)
     server_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=1.0)
     hyp_alg = hypcluster.build_hypcluster_train(
@@ -165,11 +155,53 @@ class HypClusterTrainTest(tf.test.TestCase, parameterized.TestCase):
         num_clusters=num_clusters,
         client_optimizer=client_optimizer,
         server_optimizer=server_optimizer,
-        model_aggregator=tff.learning.robust_aggregator())
+        initial_model_weights_list=initial_model_weights_list)
     state = hyp_alg.initialize()
     self.assertLen(state.global_model_weights, num_clusters)
     self.assertLen(state.aggregator, num_clusters)
     self.assertLen(state.finalizer, num_clusters)
+    if initial_model_weights_list:
+      tf.nest.map_structure(self.assertAllEqual, state.global_model_weights,
+                            initial_model_weights_list)
+
+  @parameterized.named_parameters(
+      ('clusters1_with_init', 1, create_initial_models(1)),
+      ('clusters1_without_init', 1, None),
+      ('clusters2_without_int', 2, None),
+      ('clusters3_with_init', 3, create_initial_models(3)),
+      ('clusters5_without_init', 5, None),
+  )
+  def test_constructs_with_non_default_aggregator(self, num_clusters,
+                                                  initial_model_weights_list):
+    client_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=0.01)
+    server_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=1.0)
+    hyp_alg = hypcluster.build_hypcluster_train(
+        model_fn=model_fn,
+        num_clusters=num_clusters,
+        client_optimizer=client_optimizer,
+        server_optimizer=server_optimizer,
+        model_aggregator=tff.learning.robust_aggregator(),
+        initial_model_weights_list=initial_model_weights_list)
+    state = hyp_alg.initialize()
+    self.assertLen(state.global_model_weights, num_clusters)
+    self.assertLen(state.aggregator, num_clusters)
+    self.assertLen(state.finalizer, num_clusters)
+    if initial_model_weights_list:
+      tf.nest.map_structure(self.assertAllEqual, state.global_model_weights,
+                            initial_model_weights_list)
+
+  def test_construction_fails_with_mismatched_initial_models(self):
+    num_clusters = 1
+    initial_model_weights_list = create_initial_models(2)
+    client_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=0.01)
+    server_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=1.0)
+    with self.assertRaisesRegex(ValueError, 'does not equal'):
+      hypcluster.build_hypcluster_train(
+          model_fn=model_fn,
+          num_clusters=num_clusters,
+          client_optimizer=client_optimizer,
+          server_optimizer=server_optimizer,
+          initial_model_weights_list=initial_model_weights_list)
 
   def test_matches_fed_avg_with_one_cluster(self):
     client_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=0.01)
@@ -235,6 +267,7 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
     federated_eval = tff.learning.build_federated_evaluation(model_fn)
     reference_metrics = federated_eval(ones_weights, federated_data)
     self.assertAllClose(hyp_metrics, reference_metrics)
+
 
 if __name__ == '__main__':
   tf.test.main()
