@@ -117,11 +117,11 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":hypcluster",
+        ":optimizer_flag_utils",
         ":personalization_utils",
         ":pseudo_client_data",
         "//utils:training_utils",
         "//utils:utils_impl",
-        "//utils/optimizers:optimizer_utils",
     ],
 )
 

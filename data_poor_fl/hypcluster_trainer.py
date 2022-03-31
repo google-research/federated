@@ -27,11 +27,11 @@ import tensorflow_federated as tff
 
 
 from data_poor_fl import hypcluster
+from data_poor_fl import optimizer_flag_utils
 from data_poor_fl import personalization_utils
 from data_poor_fl import pseudo_client_data
 from utils import training_utils
 from utils import utils_impl
-from utils.optimizers import optimizer_utils
 
 with utils_impl.record_hparam_flags() as training_flags:
   # Training loop configuration
@@ -78,8 +78,8 @@ with utils_impl.record_hparam_flags() as training_flags:
       'only be set to True for debugging purposes.')
 
 with utils_impl.record_hparam_flags() as optimizer_flags:
-  optimizer_utils.define_optimizer_flags('client')
-  optimizer_utils.define_optimizer_flags('server')
+  optimizer_flag_utils.define_optimizer_flags('client')
+  optimizer_flag_utils.define_optimizer_flags('server')
 
 FLAGS = flags.FLAGS
 
@@ -98,36 +98,15 @@ def _write_hparams():
 
   # Update with optimizer flags corresponding to the chosen optimizers.
   opt_flag_dict = utils_impl.lookup_flag_values(optimizer_flags)
-  opt_flag_dict = optimizer_utils.remove_unused_flags('client', opt_flag_dict)
-  opt_flag_dict = optimizer_utils.remove_unused_flags('server', opt_flag_dict)
+  opt_flag_dict = optimizer_flag_utils.remove_unused_flags(
+      'client', opt_flag_dict)
+  opt_flag_dict = optimizer_flag_utils.remove_unused_flags(
+      'server', opt_flag_dict)
   hparam_dict.update(opt_flag_dict)
 
   # Write the updated hyperparameters to a file.
   training_utils.write_hparams_to_csv(hparam_dict, FLAGS.root_output_dir,
                                       FLAGS.experiment_name)
-
-
-def _convert_keras_optimizer_to_tff(
-    keras_optimizer: tf.keras.optimizers.Optimizer
-) -> tff.learning.optimizers.Optimizer:
-  """Creates a TFF optimizer equivalent of the given Keras optimizer."""
-  if isinstance(keras_optimizer, tf.keras.optimizers.SGD):
-    learning_rate = float(keras_optimizer.learning_rate.numpy())
-    momentum = float(keras_optimizer.momentum.numpy())
-    return tff.learning.optimizers.build_sgdm(
-        learning_rate=learning_rate, momentum=momentum)
-  elif isinstance(keras_optimizer, tf.keras.optimizers.Adam):
-    learning_rate = float(keras_optimizer.learning_rate.numpy())
-    beta_1 = float(keras_optimizer.beta_1.numpy())
-    beta_2 = float(keras_optimizer.beta_2.numpy())
-    epsilon = float(keras_optimizer.epsilon)
-    return tff.learning.optimizers.build_adam(learning_rate, beta_1, beta_2,
-                                              epsilon)
-  else:
-    raise TypeError(
-        f'Expect a SGD or Adam Keras optimizers, found a {keras_optimizer}. '
-        'Please update the function `_convert_keras_optimizer_to_tff` to '
-        'support conversion from this Keras optimizer to a TFF optimizer.')
 
 
 def _load_init_model_weights(
@@ -162,15 +141,11 @@ def _create_train_algorithm(
     model_fn: Callable[[], tff.learning.Model]
 ) -> tff.learning.templates.LearningProcess:
   """Creates a learning process for HypCluster training."""
-  server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
+  server_optimizer = optimizer_flag_utils.create_optimizer_from_flags('server')
   # Need to set `no_nan_division=True` to avoid NaNs in the learned model, which
   # can happen when a model is not selected by any client in a round.
   model_aggregator = tff.aggregators.MeanFactory(no_nan_division=True)
-  client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
-  # TODO(b/227488363): Delete `_convert_keras_optimizer_to_tff` once we have a
-  # uitility function that directly creates a TFF optimizer from flags.
-  client_tff_optimizer = _convert_keras_optimizer_to_tff(client_optimizer_fn())
-  server_tff_optimizer = _convert_keras_optimizer_to_tff(server_optimizer_fn())
+  client_optimizer = optimizer_flag_utils.create_optimizer_from_flags('client')
   initial_model_weights_list = None
   if FLAGS.warmstart_hypcluster:
     if not FLAGS.warmstart_root_dir:
@@ -180,8 +155,8 @@ def _create_train_algorithm(
   return hypcluster.build_hypcluster_train(
       model_fn=model_fn,
       num_clusters=FLAGS.num_clusters,
-      client_optimizer=client_tff_optimizer,
-      server_optimizer=server_tff_optimizer,
+      client_optimizer=client_optimizer,
+      server_optimizer=server_optimizer,
       model_aggregator=model_aggregator,
       initial_model_weights_list=initial_model_weights_list)
 
