@@ -24,10 +24,8 @@ def split_half(ds: tf.data.Dataset) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
   """Splits the dataset into two equal-sized datasets."""
   num_elements_total = ds.reduce(0, lambda x, _: x + 1)
   num_elements_half = tf.cast(num_elements_total / 2, dtype=tf.int64)
-  first_data = ds.enumerate().filter(lambda i, _: i < num_elements_half).map(
-      lambda _, entry: entry)
-  second_data = ds.enumerate().filter(lambda i, _: i >= num_elements_half).map(
-      lambda _, entry: entry)
+  first_data = ds.take(num_elements_half)
+  second_data = ds.skip(num_elements_half)
   return first_data, second_data
 
 
