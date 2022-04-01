@@ -200,13 +200,29 @@ def _build_hypcluster_eval(model_fn: Callable[[], tff.learning.Model],
   list_weights_type = tff.StructWithPythonType(
       [model_weights_type for _ in range(num_clusters)], container_type=list)
 
+  @tf.function
+  def get_metrics_for_select_and_test(model_list, weights_list, data):
+    outputs_for_select = hypcluster.multi_model_eval(model_list, weights_list,
+                                                     data['selection_data'])
+    # Resets the metrics variables before evaluation. This is necessary, because
+    # without resetting, the model's metrics will be from *all* previous
+    # `forward_pass` calls, including the metrics on the selection data.
+    for model in model_list:
+      # TODO(b/152633983): Replace it with a `reset_metrics` method.
+      for var in model.local_variables:
+        if var.initial_value is not None:
+          var.assign(var.initial_value)
+        else:
+          var.assign(tf.zeros_like(var))
+    outputs_for_metrics = hypcluster.multi_model_eval(model_list, weights_list,
+                                                      data['test_data'])
+    return outputs_for_select, outputs_for_metrics
+
   @tff.tf_computation(list_weights_type, client_data_type)
   def local_hypcluster_eval(model_weights, dataset):
     eval_models = [model_fn() for _ in range(num_clusters)]
-    eval_models_outputs_for_select = hypcluster.multi_model_eval(
-        eval_models, model_weights, dataset['selection_data'])
-    eval_models_outputs_for_metrics = hypcluster.multi_model_eval(
-        eval_models, model_weights, dataset['test_data'])
+    eval_models_outputs_for_select, eval_models_outputs_for_metrics = (
+        get_metrics_for_select_and_test(eval_models, model_weights, dataset))
     best_model_index = hypcluster.select_best_model(
         eval_models_outputs_for_select)
     local_metrics = collections.OrderedDict(
