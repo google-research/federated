@@ -2,30 +2,6 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])
 
-py_library(
-    name = "coordinate_aggregators",
-    srcs = ["coordinate_aggregators.py"],
-)
-
-py_test(
-    name = "coordinate_aggregators_test",
-    srcs = ["coordinate_aggregators_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":coordinate_aggregators"],
-)
-
-py_library(
-    name = "coordinate_finalizers",
-    srcs = ["coordinate_finalizers.py"],
-)
-
-py_test(
-    name = "coordinate_finalizers_test",
-    srcs = ["coordinate_finalizers_test.py"],
-    deps = [":coordinate_finalizers"],
-)
-
 py_binary(
     name = "global_trainer",
     srcs = ["global_trainer.py"],
@@ -38,7 +14,7 @@ py_library(
     name = "global_trainer_lib",
     srcs = ["global_trainer.py"],
     data = [
-        "//data_poor_fl:emnist_train_num_examples.csv",
+        ":emnist_train_num_examples.csv",
     ],
     srcs_version = "PY3",
     deps = [
@@ -55,23 +31,6 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [":global_trainer_lib"],
-)
-
-py_library(
-    name = "hypcluster",
-    srcs = ["hypcluster.py"],
-    deps = [
-        ":coordinate_aggregators",
-        ":coordinate_finalizers",
-    ],
-)
-
-py_test(
-    name = "hypcluster_test",
-    srcs = ["hypcluster_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [":hypcluster"],
 )
 
 py_library(
@@ -116,7 +75,8 @@ py_library(
     ],
     srcs_version = "PY3",
     deps = [
-        ":hypcluster",
+        ":hypcluster_eval",
+        ":hypcluster_train",
         ":optimizer_flag_utils",
         ":personalization_utils",
         ":pseudo_client_data",
@@ -164,6 +124,23 @@ py_library(
     srcs_version = "PY3",
 )
 
+py_library(
+    name = "hypcluster_utils",
+    srcs = ["hypcluster_utils.py"],
+)
+
+py_library(
+    name = "hypcluster_train",
+    srcs = ["hypcluster_train.py"],
+    deps = [":hypcluster_utils"],
+)
+
+py_library(
+    name = "hypcluster_eval",
+    srcs = ["hypcluster_eval.py"],
+    deps = [":hypcluster_utils"],
+)
+
 py_test(
     name = "pseudo_client_data_test",
     srcs = ["pseudo_client_data_test.py"],
@@ -176,4 +153,22 @@ py_test(
     name = "hypcluster_trainer_test",
     srcs = ["hypcluster_trainer_test.py"],
     deps = [":hypcluster_trainer_lib"],
+)
+
+py_test(
+    name = "hypcluster_train_test",
+    srcs = ["hypcluster_train_test.py"],
+    deps = [":hypcluster_train"],
+)
+
+py_test(
+    name = "hypcluster_utils_test",
+    srcs = ["hypcluster_utils_test.py"],
+    deps = [":hypcluster_utils"],
+)
+
+py_test(
+    name = "hypcluster_eval_test",
+    srcs = ["hypcluster_eval_test.py"],
+    deps = [":hypcluster_eval"],
 )

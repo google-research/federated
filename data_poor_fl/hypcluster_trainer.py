@@ -26,7 +26,8 @@ import tensorflow as tf
 import tensorflow_federated as tff
 
 
-from data_poor_fl import hypcluster
+from data_poor_fl import hypcluster_eval
+from data_poor_fl import hypcluster_train
 from data_poor_fl import optimizer_flag_utils
 from data_poor_fl import personalization_utils
 from data_poor_fl import pseudo_client_data
@@ -152,108 +153,13 @@ def _create_train_algorithm(
       raise ValueError('Must provide a `warmstart_root_dir` when '
                        '`warmstart_hypcluster` is True.')
     initial_model_weights_list = _load_init_model_weights(model_fn)
-  return hypcluster.build_hypcluster_train(
+  return hypcluster_train.build_hypcluster_train(
       model_fn=model_fn,
       num_clusters=FLAGS.num_clusters,
       client_optimizer=client_optimizer,
       server_optimizer=server_optimizer,
       model_aggregator=model_aggregator,
       initial_model_weights_list=initial_model_weights_list)
-
-
-def _build_hypcluster_eval(model_fn: Callable[[], tff.learning.Model],
-                           num_clusters: int,
-                           client_data_type: tff.Type) -> tff.Computation:
-  """Builds a computation for performing HypCluster evaluation.
-
-  This function is similar to `hypcluster.build_hypcluster_evel`, except that:
-  1. This function accepts an additional `client_data_type`, where we split the
-     client-side input into two datasets: "selection_data" (used to select the
-     best model) and "test_data" (used to evaluate the selected model).
-  2. This function adds additional metrics such as: performance of individual
-     models, and the percentage that each model is selected.
-
-  Args:
-    model_fn: A no-arg function that returns a `tff.learning.Model`. This method
-      must *not* capture TensorFlow tensors or variables and use them. The model
-      must be constructed entirely from scratch on each invocation, returning
-      the same pre-constructed model each call will result in an error.
-    num_clusters: An integer specifying the number of clusters to use.
-    client_data_type: The `tff.Type` of client-side local input, which is an
-      `OrderedDict` with two keys "selection_data" and "test_data".
-
-  Returns:
-    A federated TFF computation that performs HypCluster evaluation.
-  """
-  with tf.Graph().as_default():
-    # Wrap model construction in a graph to avoid polluting the global context
-    # with variables created for this model.
-    model = model_fn()
-    model_weights_type = tff.learning.framework.weights_type_from_model(model)
-    unfinalized_metrics_type = tff.types.type_from_tensors(
-        model.report_local_unfinalized_metrics())
-    metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
-        model.metric_finalizers(), unfinalized_metrics_type)
-
-  metrics_gather_fn = hypcluster.build_gather_fn(unfinalized_metrics_type,
-                                                 num_clusters)
-  list_weights_type = tff.StructWithPythonType(
-      [model_weights_type for _ in range(num_clusters)], container_type=list)
-
-  @tf.function
-  def get_metrics_for_select_and_test(model_list, weights_list, data):
-    outputs_for_select = hypcluster.multi_model_eval(model_list, weights_list,
-                                                     data['selection_data'])
-    # Resets the metrics variables before evaluation. This is necessary, because
-    # without resetting, the model's metrics will be from *all* previous
-    # `forward_pass` calls, including the metrics on the selection data.
-    for model in model_list:
-      # TODO(b/152633983): Replace it with a `reset_metrics` method.
-      for var in model.local_variables:
-        if var.initial_value is not None:
-          var.assign(var.initial_value)
-        else:
-          var.assign(tf.zeros_like(var))
-    outputs_for_metrics = hypcluster.multi_model_eval(model_list, weights_list,
-                                                      data['test_data'])
-    return outputs_for_select, outputs_for_metrics
-
-  @tff.tf_computation(list_weights_type, client_data_type)
-  def local_hypcluster_eval(model_weights, dataset):
-    eval_models = [model_fn() for _ in range(num_clusters)]
-    eval_models_outputs_for_select, eval_models_outputs_for_metrics = (
-        get_metrics_for_select_and_test(eval_models, model_weights, dataset))
-    best_model_index = hypcluster.select_best_model(
-        eval_models_outputs_for_select)
-    local_metrics = collections.OrderedDict(
-        best=metrics_gather_fn(eval_models_outputs_for_metrics,
-                               best_model_index))
-    for i in range(num_clusters):
-      local_metrics[f'model_{i}'] = metrics_gather_fn(
-          eval_models_outputs_for_metrics, i)
-    for i in range(num_clusters):
-      local_metrics[f'choose_{i}'] = tf.cast(
-          tf.equal(best_model_index, i), tf.float32)
-    return local_metrics
-
-  @tff.federated_computation(
-      tff.type_at_server(list_weights_type),
-      tff.type_at_clients(client_data_type))
-  def hypcluster_eval(server_model_weights, client_datasets):
-    client_model_weights = tff.federated_broadcast(server_model_weights)
-    client_metrics = tff.federated_map(local_hypcluster_eval,
-                                       (client_model_weights, client_datasets))
-    eval_metrics = collections.OrderedDict()
-    metric_names = tff.structure.name_list(
-        local_hypcluster_eval.type_signature.result)
-    for name in metric_names:
-      if 'choose' in name:
-        eval_metrics[name] = tff.federated_mean(client_metrics[name])
-      else:
-        eval_metrics[name] = metrics_aggregation_fn(client_metrics[name])
-    return tff.federated_zip(eval_metrics)
-
-  return hypcluster_eval
 
 
 def _get_pseudo_client_ids(examples_per_pseudo_clients: int,
@@ -356,14 +262,14 @@ def main(argv):
     # the example level instead of at the batch level.
     reshaped_data = eval_preprocess_fn(raw_data).unbatch()
     selection_data, test_data = personalization_utils.split_half(reshaped_data)
-    return collections.OrderedDict(
-        selection_data=selection_data.batch(FLAGS.train_batch_size),
-        test_data=test_data.batch(FLAGS.train_batch_size))
+    return collections.OrderedDict([
+        (hypcluster_eval.SELECTION_DATA_KEY,
+         selection_data.batch(FLAGS.train_batch_size)),
+        (hypcluster_eval.TEST_DATA_KEY, test_data.batch(FLAGS.train_batch_size))
+    ])
 
-  hypcluster_eval = _build_hypcluster_eval(
-      model_fn=task.model_fn,
-      num_clusters=FLAGS.num_clusters,
-      client_data_type=build_eval_datasets_from_client_id.type_signature.result)
+  hypcluster_eval_comp = hypcluster_eval.build_hypcluster_eval_with_dataset_split(
+      model_fn=task.model_fn, num_clusters=FLAGS.num_clusters)
   # Compose the dataset computation with the hypcluster eval computation. Note
   # that `tff.simulation.compose_dataset_computation_with_computation` does not
   # work when the dataset computation returns a dict of two datasets.
@@ -375,7 +281,7 @@ def main(argv):
   def composed_dataset_comp_with_hypcluster_eval(model_weights, client_ids):
     processed_datasets = tff.federated_map(build_eval_datasets_from_client_id,
                                            client_ids)
-    return hypcluster_eval(model_weights, processed_datasets)
+    return hypcluster_eval_comp(model_weights, processed_datasets)
 
   def evaluation_fn(state, federated_data):
     return composed_dataset_comp_with_hypcluster_eval(

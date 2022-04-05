@@ -16,7 +16,7 @@ from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from data_poor_fl import hypcluster
+from data_poor_fl import hypcluster_train
 
 
 def create_dataset():
@@ -60,83 +60,6 @@ def create_initial_models(num_models: int):
   return [model_weights_tensors for _ in range(num_models)]
 
 
-class GatherTest(tf.test.TestCase):
-
-  def test_gather_type_signature(self):
-    list_type = create_nested_structure.type_signature.result
-    list_element_type = tff.to_type(list_type[0])
-    gather_fn = hypcluster.build_gather_fn(list_element_type, num_indices=3)
-    self.assertEqual(gather_fn.type_signature.parameter[0], list_type)
-    self.assertEqual(gather_fn.type_signature.parameter[1],
-                     tff.TensorType(dtype=tf.int32))
-    self.assertEqual(gather_fn.type_signature.result, list_element_type)
-
-  def test_gather_on_list_of_tensors(self):
-    list_element_type = tff.TensorType(dtype=tf.int32)
-    gather_fn = hypcluster.build_gather_fn(list_element_type, num_indices=5)
-    gather_structure = [5, 1, 16, -1, 10042]
-    for i in range(5):
-      actual_result = gather_fn(gather_structure, i)
-      expected_result = gather_structure[i]
-      self.assertAllEqual(actual_result, expected_result)
-
-  def test_gather_on_nested_structure(self):
-    list_type = create_nested_structure.type_signature.result
-    list_element_type = tff.to_type(list_type[0])
-    gather_fn = hypcluster.build_gather_fn(list_element_type, num_indices=3)
-    gather_structure = create_nested_structure()
-    for i in range(3):
-      actual_result = gather_fn(gather_structure, i)
-      expected_result = gather_structure[i]
-      self.assertDictEqual(actual_result, expected_result)
-
-
-class ScatterTest(tf.test.TestCase):
-
-  def test_scatter_type_signature(self):
-    list_type = create_nested_structure.type_signature.result
-    list_element_type = tff.to_type(list_type[0])
-    scatter_fn = hypcluster.build_scatter_fn(list_element_type, num_indices=3)
-    self.assertEqual(scatter_fn.type_signature.parameter[0], list_element_type)
-    self.assertEqual(scatter_fn.type_signature.parameter[1],
-                     tff.TensorType(tf.int32))
-    self.assertEqual(scatter_fn.type_signature.parameter[2],
-                     tff.TensorType(tf.float32))
-    self.assertEqual(scatter_fn.type_signature.result[0], list_type)
-    expected_result_weight_type = tff.StructWithPythonType(
-        [tff.TensorType(tf.float32)] * 3, list)
-    self.assertEqual(scatter_fn.type_signature.result[1],
-                     expected_result_weight_type)
-
-  def test_scatter_tensor(self):
-    value_type = tff.TensorType(dtype=tf.int32)
-    scatter_fn = hypcluster.build_scatter_fn(value_type, num_indices=5)
-    for i in range(5):
-      actual_value, actual_weight = scatter_fn(7, i, 0.5)
-      expected_value = [0] * 5
-      expected_value[i] = 7
-      self.assertEqual(actual_value, expected_value)
-      expected_weight = [0.0] * 5
-      expected_weight[i] = 0.5
-      self.assertEqual(actual_weight, expected_weight)
-
-  def test_nested_structure(self):
-    list_type = create_nested_structure.type_signature.result
-    list_element_type = tff.to_type(list_type[0])
-    nested_structure = create_nested_structure()
-    scatter_fn = hypcluster.build_scatter_fn(list_element_type, num_indices=2)
-    actual_value, actual_weight = scatter_fn(nested_structure[1], 0, 3.0)
-    expected_value = [
-        nested_structure[1],
-        dict(a=tf.zeros((2, 2), dtype=tf.int32), b=0, c=0)
-    ]
-    for actual_dict, expected_dict in zip(actual_value, expected_value):
-      self.assertDictEqual(actual_dict, expected_dict)
-    # self.assertAllEqual(expected_value, actual_value)
-    expected_weight = [3.0, 0.0]
-    self.assertEqual(actual_weight, expected_weight)
-
-
 class HypClusterTrainTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
@@ -150,7 +73,7 @@ class HypClusterTrainTest(tf.test.TestCase, parameterized.TestCase):
                                               initial_model_weights_list):
     client_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=0.01)
     server_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=1.0)
-    hyp_alg = hypcluster.build_hypcluster_train(
+    hyp_alg = hypcluster_train.build_hypcluster_train(
         model_fn=model_fn,
         num_clusters=num_clusters,
         client_optimizer=client_optimizer,
@@ -175,7 +98,7 @@ class HypClusterTrainTest(tf.test.TestCase, parameterized.TestCase):
                                                   initial_model_weights_list):
     client_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=0.01)
     server_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=1.0)
-    hyp_alg = hypcluster.build_hypcluster_train(
+    hyp_alg = hypcluster_train.build_hypcluster_train(
         model_fn=model_fn,
         num_clusters=num_clusters,
         client_optimizer=client_optimizer,
@@ -196,7 +119,7 @@ class HypClusterTrainTest(tf.test.TestCase, parameterized.TestCase):
     client_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=0.01)
     server_optimizer = tff.learning.optimizers.build_sgdm(learning_rate=1.0)
     with self.assertRaisesRegex(ValueError, 'does not equal'):
-      hypcluster.build_hypcluster_train(
+      hypcluster_train.build_hypcluster_train(
           model_fn=model_fn,
           num_clusters=num_clusters,
           client_optimizer=client_optimizer,
@@ -210,7 +133,7 @@ class HypClusterTrainTest(tf.test.TestCase, parameterized.TestCase):
         model_fn=model_fn,
         client_optimizer_fn=client_optimizer,
         server_optimizer_fn=server_optimizer)
-    hyp_alg = hypcluster.build_hypcluster_train(
+    hyp_alg = hypcluster_train.build_hypcluster_train(
         model_fn=model_fn,
         num_clusters=1,
         client_optimizer=client_optimizer,
@@ -230,43 +153,6 @@ class HypClusterTrainTest(tf.test.TestCase, parameterized.TestCase):
       self.assertAllClose(
           fed_avg.get_model_weights(fed_avg_state).trainable,
           hyp_alg.get_model_weights(hyp_alg_state)[0].trainable)
-
-
-class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
-
-  @parameterized.named_parameters(
-      ('clusters1', 1),
-      ('clusters2', 2),
-      ('clusters3', 3),
-      ('clusters5', 5),
-  )
-  def test_constructs(self, num_clusters):
-    hyp_eval = hypcluster.build_hypcluster_eval(
-        model_fn=model_fn, num_clusters=num_clusters)
-    self.assertLen(hyp_eval.type_signature.parameter[0].member, num_clusters)
-
-  def test_matches_federated_eval_with_one_cluster(self):
-    hyp_eval = hypcluster.build_hypcluster_eval(
-        model_fn=model_fn, num_clusters=1)
-    federated_eval = tff.learning.build_federated_evaluation(model_fn)
-    model_weights = tff.learning.ModelWeights.from_model(model_fn())
-    federated_data = [create_dataset(), create_dataset()]
-    hyp_metrics = hyp_eval([model_weights], federated_data)
-    reference_metrics = federated_eval(model_weights, federated_data)
-    self.assertAllClose(hyp_metrics, reference_metrics)
-
-  def test_selects_best_model(self):
-    hyp_eval = hypcluster.build_hypcluster_eval(
-        model_fn=model_fn, num_clusters=2)
-    zero_model = model_fn(initializer='zeros')
-    ones_model = model_fn(initializer='ones')
-    zero_weights = tff.learning.ModelWeights.from_model(zero_model)
-    ones_weights = tff.learning.ModelWeights.from_model(ones_model)
-    federated_data = [create_dataset()]
-    hyp_metrics = hyp_eval([zero_weights, ones_weights], federated_data)
-    federated_eval = tff.learning.build_federated_evaluation(model_fn)
-    reference_metrics = federated_eval(ones_weights, federated_data)
-    self.assertAllClose(hyp_metrics, reference_metrics)
 
 
 if __name__ == '__main__':
