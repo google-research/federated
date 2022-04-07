@@ -50,8 +50,8 @@ attrs~=19.3.0
 numpy~=1.19.2
 pandas~=0.24.2
 tensorflow-privacy~=0.6.0
-tensorflow-federated-nightly
-tf-nightly
+tensorflow-federated~=0.20.0
+tensorflow~=2.8.0
 ```
 
 <!-- mdformat on -->
