@@ -52,8 +52,6 @@ with utils_impl.record_hparam_flags() as training_flags:
   flags.DEFINE_integer('train_batch_size', 10, 'Batch size on train clients.')
 
   # Training algorithm configuration
-  flags.DEFINE_enum('train_algorithm', 'fedopt', ['fedopt', 'fedsgd'],
-                    'Which training algorithm to use.')
   flags.DEFINE_bool(
       'example_weighting', True, 'Whether to use example weighting when '
       'aggregating client updates (True) or uniform weighting (False).')
@@ -98,23 +96,13 @@ _EMNIST_MAX_ELEMENTS_PER_CLIENT = 418
 _NUM_RAW_EVAL_CLIENTS = 900
 
 
-def _validate_flags():
-  """Validates that flag specifications are compatible."""
-  if FLAGS.train_algorithm == 'fedsgd' and FLAGS.client_optimizer is not None:
-    raise ValueError(
-        'Found flag --client_optimizer={!s}, but --train_algorithm=fedsgd. '
-        'If using fedsgd, please do not set --client_optimizer'.format(
-            FLAGS.client_optimizer))
-
-
 def _write_hparams():
   """Creates an ordered dictionary of hyperparameter flags and writes to CSV."""
   hparam_dict = utils_impl.lookup_flag_values(training_flags)
 
   # Update with optimizer flags corresponding to the chosen optimizers.
   opt_flag_dict = utils_impl.lookup_flag_values(optimizer_flags)
-  if FLAGS.train_algorithm != 'fedsgd':
-    opt_flag_dict = optimizer_utils.remove_unused_flags('client', opt_flag_dict)
+  opt_flag_dict = optimizer_utils.remove_unused_flags('client', opt_flag_dict)
   opt_flag_dict = optimizer_utils.remove_unused_flags('server', opt_flag_dict)
   opt_flag_dict = optimizer_utils.remove_unused_flags('finetuning',
                                                       opt_flag_dict)
@@ -130,32 +118,22 @@ def _create_train_algorithm(
 ) -> tff.learning.templates.LearningProcess:
   """Creates a learning process for client training."""
   server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
+  client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
   model_aggregator = tff.learning.robust_aggregator(
       zeroing=FLAGS.zeroing,
       clipping=FLAGS.clipping,
       add_debug_measurements=FLAGS.use_aggregator_debug_measurements)
 
-  if FLAGS.train_algorithm == 'fedsgd':
-    return tff.learning.algorithms.build_fed_sgd(
-        model_fn=model_fn,
-        server_optimizer_fn=server_optimizer_fn,
-        model_aggregator=model_aggregator)
-  elif FLAGS.train_algorithm == 'fedopt':
-    client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags(
-        'client')
-    if FLAGS.example_weighting:
-      client_weighting = tff.learning.ClientWeighting.NUM_EXAMPLES
-    else:
-      client_weighting = tff.learning.ClientWeighting.UNIFORM
-    return tff.learning.algorithms.build_weighted_fed_avg(
-        model_fn=model_fn,
-        client_optimizer_fn=client_optimizer_fn,
-        server_optimizer_fn=server_optimizer_fn,
-        client_weighting=client_weighting,
-        model_aggregator=model_aggregator)
+  if FLAGS.example_weighting:
+    client_weighting = tff.learning.ClientWeighting.NUM_EXAMPLES
   else:
-    raise ValueError(f'Found unexpected value {FLAGS.train_algorithm} for '
-                     'FLAGS.train_algorithm')
+    client_weighting = tff.learning.ClientWeighting.UNIFORM
+  return tff.learning.algorithms.build_weighted_fed_avg(
+      model_fn=model_fn,
+      client_optimizer_fn=client_optimizer_fn,
+      server_optimizer_fn=server_optimizer_fn,
+      client_weighting=client_weighting,
+      model_aggregator=model_aggregator)
 
 
 def _get_pseudo_client_ids(examples_per_pseudo_clients: int,

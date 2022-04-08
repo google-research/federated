@@ -60,7 +60,7 @@ with utils_impl.record_hparam_flags() as training_flags:
       'warmstart_root_dir', '',
       'Directory to load checkpoints from previous FedAvg training. Only used '
       'when `warmstart_hypcluster` is True.')
-  flags.DEFINE_integer('num_clusters', 1,
+  flags.DEFINE_integer('num_clusters', 2,
                        'Number of clusters used in HypCluster.')
 
   # Eval algorithm configuration
