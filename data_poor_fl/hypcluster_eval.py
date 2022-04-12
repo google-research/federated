@@ -92,12 +92,7 @@ def _get_metrics_for_select_and_test(model_list, weights_list, data):
   # without resetting, the model's metrics will be from *all* previous
   # `forward_pass` calls, including the metrics on the selection data.
   for model in model_list:
-    # TODO(b/152633983): Replace it with a `reset_metrics` method.
-    for var in model.local_variables:
-      if var.initial_value is not None:
-        var.assign(var.initial_value)
-      else:
-        var.assign(tf.zeros_like(var))
+    model.reset_metrics()
   outputs_for_metrics = hypcluster_utils.multi_model_eval(
       model_list, weights_list, data[TEST_DATA_KEY])
   return outputs_for_select, outputs_for_metrics
