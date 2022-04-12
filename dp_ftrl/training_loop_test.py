@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for shared training loops."""
 
+import asyncio
 import collections
 import csv
 import os
@@ -181,6 +181,7 @@ class ExperimentRunnerTest(tf.test.TestCase):
         validation_fn(initial_state.model)['loss'])
 
   def test_checkpoint_manager_saves_state(self):
+    loop = asyncio.get_event_loop()
     experiment_name = 'checkpoint_manager_saves_state'
     iterative_process = _build_federated_averaging_process()
     federated_data = [[_batch_fn()]]
@@ -205,8 +206,8 @@ class ExperimentRunnerTest(tf.test.TestCase):
 
     program_state_manager = tff.program.FileProgramStateManager(
         os.path.join(root_output_dir, 'checkpoints', experiment_name))
-    restored_state, restored_round = program_state_manager.load_latest(
-        final_state)
+    restored_state, restored_round = loop.run_until_complete(
+        program_state_manager.load_latest(final_state))
 
     self.assertEqual(restored_round, 0)
 
@@ -286,8 +287,8 @@ class ClientIDShufflerTest(tf.test.TestCase):
       clients1, epoch1 = client_shuffer1.sample_client_ids(round_num, epoch1)
       clients2, epoch2 = client_shuffer2.sample_client_ids(round_num, epoch2)
       round_num += 1
-    self.assertEqual(len(clients1), len(clients_data.client_ids) - 1)
-    self.assertEqual(len(clients2), 1)
+    self.assertLen(clients1, len(clients_data.client_ids) - 1)
+    self.assertLen(clients2, 1)
     self.assertEqual(epoch1, 2)
     self.assertEqual(epoch2, 1)
 

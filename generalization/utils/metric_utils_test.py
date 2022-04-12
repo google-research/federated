@@ -114,13 +114,6 @@ class ConfigureManagersTest(tf.test.TestCase):
     self.assertIsInstance(program_state_manager,
                           tff.program.FileProgramStateManager)
 
-    checkpoint_path = os.path.join(root_output_dir, 'checkpoints',
-                                   experiment_name)
-    test_state = _create_scalar_metrics()
-    program_state_manager.save(test_state, 1)
-    self.assertCountEqual(
-        tf.io.gfile.listdir(checkpoint_path), ['program_state_1'])
-
   def test_logging_manager_exists(self):
     root_output_dir = self.get_temp_dir()
     experiment_name = 'test'
@@ -148,12 +141,8 @@ class ConfigureManagersTest(tf.test.TestCase):
     _, metrics_managers = metric_utils.configure_default_managers(
         root_output_dir, experiment_name)
     default_writer_manager = metrics_managers[2]
-
-    summary_dir = os.path.join(root_output_dir, 'logdir', experiment_name)
-    default_writer_manager.release(_create_scalar_metrics(), 0)
-
-    self.assertTrue(tf.io.gfile.exists(summary_dir))
-    self.assertLen(tf.io.gfile.listdir(summary_dir), 1)
+    self.assertIsInstance(default_writer_manager,
+                          tff.program.TensorBoardReleaseManager)
 
 
 if __name__ == '__main__':
