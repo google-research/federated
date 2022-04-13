@@ -278,10 +278,10 @@ def main(argv):
   # Compose the dataset computation with the hypcluster eval computation. Note
   # that `tff.simulation.compose_dataset_computation_with_computation` does not
   # work when the dataset computation returns a dict of two datasets.
-  model_weights_at_clients_type = tff.types.at_server(
+  model_weights_at_server_type = tff.types.at_server(
       training_process.get_model_weights.type_signature.result)
 
-  @tff.federated_computation(model_weights_at_clients_type,
+  @tff.federated_computation(model_weights_at_server_type,
                              tff.types.at_clients(tf.string))
   def composed_dataset_comp_with_hypcluster_eval(model_weights, client_ids):
     processed_datasets = tff.federated_map(build_eval_datasets_from_client_id,
