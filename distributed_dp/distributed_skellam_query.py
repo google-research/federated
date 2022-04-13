@@ -17,7 +17,6 @@ import collections
 
 import tensorflow as tf
 import tensorflow_privacy as tfp
-from tensorflow_privacy.privacy.analysis import dp_event
 
 
 class DistributedSkellamSumQuery(tfp.SumAggregationDPQuery):
@@ -131,5 +130,7 @@ class DistributedSkellamSumQuery(tfp.SumAggregationDPQuery):
     """The noise was already added locally, therefore just continue."""
     # Note that this assumes we won't have clients dropping out (thus missing
     # local noise shares) for experiments.
-    event = dp_event.UnsupportedDpEvent()
-    return sample_state, global_state, event
+
+    # TODO(b/229026190): Enable dependency of federated_research on Google DP
+    # libraries. Third return value should be a DpEvent.
+    return sample_state, global_state, None
