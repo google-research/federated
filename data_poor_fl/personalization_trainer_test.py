@@ -16,32 +16,11 @@ import tempfile
 
 from absl.testing import absltest
 from absl.testing import flagsaver
-import pandas as pd
 
 from data_poor_fl import personalization_trainer
 
 
 class GlobalTrainerTest(absltest.TestCase):
-
-  def test_pseudo_client_id_generation(self):
-    data = dict(client_id=['A', 'B'], num_examples=[3, 5])
-    df = pd.DataFrame(data=data)
-    actual_pseudo_client_ids = personalization_trainer._get_pseudo_client_ids(
-        examples_per_pseudo_clients=2, base_client_examples_df=df)
-    expected_pseudo_client_ids = ['A-0', 'A-1', 'B-0', 'B-1', 'B-2']
-    self.assertEqual(actual_pseudo_client_ids, expected_pseudo_client_ids)
-
-  def test_split_pseudo_client_ids(self):
-    raw_client_ids = [str(i) for i in range(3400)]
-    pseudo_client_ids = [str(i) + '-0' for i in range(3400)
-                        ] + [str(i) + '-1' for i in range(3400)]
-    pseudo_train_client_ids, pseudo_eval_client_ids = (
-        personalization_trainer._split_pseudo_client_ids(
-            raw_client_ids, pseudo_client_ids))
-    self.assertLen(pseudo_eval_client_ids,
-                   personalization_trainer._NUM_RAW_EVAL_CLIENTS * 2)
-    self.assertLen(pseudo_client_ids,
-                   len(pseudo_train_client_ids) + len(pseudo_eval_client_ids))
 
   @flagsaver.flagsaver(
       root_output_dir=tempfile.mkdtemp(),

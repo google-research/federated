@@ -16,7 +16,7 @@ from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_federated as tff
 
-from data_poor_fl import pseudo_client_data
+from data_poor_fl.pseudo_client_tasks import pseudo_client_data
 
 
 def _build_balanced_client_data() -> tff.simulation.datasets.ClientData:

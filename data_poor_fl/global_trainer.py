@@ -14,18 +14,15 @@
 """Runs global training on EMNIST with varying levels of data paucity."""
 
 import functools
-import math
-from typing import Callable, List
+from typing import Callable
 
 from absl import app
 from absl import flags
-import pandas as pd
 import tensorflow as tf
 import tensorflow_federated as tff
 
-
 from data_poor_fl import optimizer_flag_utils
-from data_poor_fl import pseudo_client_data
+from data_poor_fl.pseudo_client_tasks import emnist_pseudo_client
 from utils import training_utils
 from utils import utils_impl
 
@@ -41,12 +38,19 @@ with utils_impl.record_hparam_flags() as training_flags:
   # Train client configuration
   flags.DEFINE_integer('clients_per_train_round', 10,
                        'How many clients to sample at each training round.')
-  flags.DEFINE_integer('examples_per_pseudo_client', 100,
-                       'Maximum number of examples per pseudo-client.')
   flags.DEFINE_integer(
       'train_epochs', 1,
       'Number of epochs performed by a client during a round of training.')
   flags.DEFINE_integer('train_batch_size', 10, 'Batch size on train clients.')
+
+  # Pseudo-client configuration
+  flags.DEFINE_bool('use_pseudo_clients', False, 'Whether to split the data '
+                    'into pseudo-clients.')
+  flags.DEFINE_integer(
+      'examples_per_pseudo_client', None,
+      'Maximum number of examples per pseudo-client. This '
+      'should only be set if the use_pseudo_clients flag is '
+      'set to True.')
 
   # Training algorithm configuration
   flags.DEFINE_bool(
@@ -122,30 +126,8 @@ def _create_train_algorithm(
       model_aggregator=model_aggregator)
 
 
-def _get_pseudo_client_ids(examples_per_pseudo_clients: int,
-                           base_client_examples_df: pd.DataFrame,
-                           separator: str = '-') -> List[str]:
-  """Generates a list of pseudo-client ids."""
-  pseudo_client_ids = []
-  for _, row in base_client_examples_df.iterrows():
-    num_pseudo_clients = math.ceil(row.num_examples /
-                                   examples_per_pseudo_clients)
-    client_id = row.client_id
-    expanded_client_ids = [
-        client_id + separator + str(i) for i in range(num_pseudo_clients)
-    ]
-    pseudo_client_ids += expanded_client_ids
-  return pseudo_client_ids
-
-
-def main(argv):
-  if len(argv) > 1:
-    raise app.UsageError('Expected no command-line arguments, '
-                         'got: {}'.format(argv))
-  if not FLAGS.experiment_name:
-    raise ValueError('FLAGS.experiment_name must be set.')
-
-  # Configuring the base EMNIST task
+def _create_task() -> tff.simulation.baselines.BaselineTask:
+  """Creates a task for performing federated training and evaluation."""
   train_client_spec = tff.simulation.baselines.ClientSpec(
       num_epochs=FLAGS.train_epochs,
       batch_size=FLAGS.train_batch_size,
@@ -155,33 +137,34 @@ def main(argv):
       model_id='cnn',
       only_digits=False,
       use_synthetic_data=FLAGS.use_synthetic_data)
+
+  if FLAGS.use_pseudo_clients:
+    task = emnist_pseudo_client.build_task(
+        base_task=task,
+        examples_per_pseudo_client=FLAGS.examples_per_pseudo_client)
+  return task
+
+
+def main(argv):
+  if len(argv) > 1:
+    raise app.UsageError('Expected no command-line arguments, '
+                         'got: {}'.format(argv))
+  if not FLAGS.experiment_name:
+    raise ValueError('FLAGS.experiment_name must be set.')
+
+  task = _create_task()
   train_preprocess_fn = task.datasets.train_preprocess_fn
-  test_data = task.datasets.get_centralized_test_data()
-
-  # Creating pseudo-clients
-  base_train_data = task.datasets.train_data
-  if not FLAGS.use_synthetic_data:
-    csv_file_path = 'data_poor_fl/emnist_train_num_examples.csv'
-    with open(csv_file_path) as csv_file:
-      train_client_example_counts = pd.read_csv(csv_file)
-    pseudo_client_ids = _get_pseudo_client_ids(FLAGS.examples_per_pseudo_client,
-                                               train_client_example_counts)
-  else:
-    pseudo_client_ids = None
-
-  extended_train_data = pseudo_client_data.create_pseudo_client_data(
-      base_train_data,
-      examples_per_pseudo_client=FLAGS.examples_per_pseudo_client,
-      pseudo_client_ids=pseudo_client_ids)
+  train_data = task.datasets.train_data
+  centralized_test_data = task.datasets.get_centralized_test_data()
   training_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
-          extended_train_data.client_ids, random_seed=FLAGS.base_random_seed),
+          train_data.client_ids, random_seed=FLAGS.base_random_seed),
       size=FLAGS.clients_per_train_round)
 
   # Creating the training process (and wiring in a dataset computation)
   @tff.tf_computation(tf.string)
   def build_train_dataset_from_client_id(client_id):
-    raw_client_data = extended_train_data.dataset_computation(client_id)
+    raw_client_data = train_data.dataset_computation(client_id)
     return train_preprocess_fn(raw_client_data)
 
   learning_process = _create_train_algorithm(task.model_fn)
@@ -205,7 +188,7 @@ def main(argv):
       training_selection_fn=training_selection_fn,
       total_rounds=FLAGS.total_rounds,
       evaluation_fn=evaluation_fn,
-      evaluation_selection_fn=lambda round_num: [test_data],
+      evaluation_selection_fn=lambda round_num: [centralized_test_data],
       rounds_per_evaluation=_ROUNDS_PER_EVALUATION,
       program_state_manager=program_state_manager,
       rounds_per_saving_program_state=_ROUNDS_PER_CHECKPOINT,

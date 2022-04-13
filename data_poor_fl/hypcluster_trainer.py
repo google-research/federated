@@ -22,16 +22,14 @@ from typing import Callable, List, Tuple
 from absl import app
 from absl import flags
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 import tensorflow_federated as tff
-
 
 from data_poor_fl import hypcluster_eval
 from data_poor_fl import hypcluster_train
 from data_poor_fl import optimizer_flag_utils
 from data_poor_fl import personalization_utils
-from data_poor_fl import pseudo_client_data
+from data_poor_fl.pseudo_client_tasks import emnist_pseudo_client
 from utils import training_utils
 from utils import utils_impl
 
@@ -47,12 +45,19 @@ with utils_impl.record_hparam_flags() as training_flags:
   # Train client configuration
   flags.DEFINE_integer('clients_per_train_round', 10,
                        'How many clients to sample at each training round.')
-  flags.DEFINE_integer('examples_per_pseudo_client', 100,
-                       'Maximum number of examples per pseudo-client.')
   flags.DEFINE_integer(
       'train_epochs', 1,
       'Number of epochs performed by a client during a round of training.')
   flags.DEFINE_integer('train_batch_size', 10, 'Batch size on train clients.')
+
+  # Pseudo-client configuration
+  flags.DEFINE_bool('use_pseudo_clients', False, 'Whether to split the data '
+                    'into pseudo-clients.')
+  flags.DEFINE_integer(
+      'examples_per_pseudo_client', None,
+      'Maximum number of examples per pseudo-client. This '
+      'should only be set if the use_pseudo_clients flag is '
+      'set to True.')
 
   # Training algorithm configuration
   flags.DEFINE_bool('warmstart_hypcluster', False,
@@ -68,6 +73,9 @@ with utils_impl.record_hparam_flags() as training_flags:
   flags.DEFINE_integer(
       'clients_per_evaluation', 100, 'Number of clients sampled to perform '
       'federated evaluation.')
+  flags.DEFINE_float(
+      'eval_client_fraction', 0.25, 'The fraction of clients partitioned into '
+      'the eval group, as opposed to the training group.')
 
   # Random seeds for reproducibility
   flags.DEFINE_integer(
@@ -91,7 +99,6 @@ _ROUNDS_PER_CHECKPOINT = 50
 _EMNIST_MAX_ELEMENTS_PER_CLIENT = 418
 # EMNIST has 3400 clients, we use the training data from 2500 clients for
 # training, and the training data from the rest 900 clients for evaluation.
-_NUM_RAW_EVAL_CLIENTS = 900
 
 
 def _write_hparams():
@@ -167,49 +174,18 @@ def _create_train_algorithm(
       initial_model_weights_list=initial_model_weights_list)
 
 
-def _get_pseudo_client_ids(examples_per_pseudo_clients: int,
-                           base_client_examples_df: pd.DataFrame,
-                           separator: str = '-') -> List[str]:
-  """Generates a list of pseudo-client ids."""
-  pseudo_client_ids = []
-  for _, row in base_client_examples_df.iterrows():
-    num_pseudo_clients = math.ceil(row.num_examples /
-                                   examples_per_pseudo_clients)
-    client_id = row.client_id
-    expanded_client_ids = [
-        client_id + separator + str(i) for i in range(num_pseudo_clients)
-    ]
-    pseudo_client_ids += expanded_client_ids
-  return pseudo_client_ids
-
-
-def _split_pseudo_client_ids(
-    raw_client_ids: List[str],
-    pseudo_client_ids: List[str],
-    separator: str = '-') -> Tuple[List[str], List[str]]:
-  """Splits the pseudo-client ids into training and evaluation."""
+def _split_client_ids(client_ids: List[str]) -> Tuple[List[str], List[str]]:
+  """Splits the client ids into training and evaluation."""
+  num_eval_clients = math.floor(FLAGS.eval_client_fraction * len(client_ids))
   random_state = np.random.RandomState(seed=FLAGS.base_random_seed)
-  shuffled_raw_client_ids = random_state.permutation(raw_client_ids)
-  raw_eval_client_ids = shuffled_raw_client_ids[:_NUM_RAW_EVAL_CLIENTS]
-  pseudo_train_client_ids = []
-  pseudo_eval_client_ids = []
-  for pseudo_client_id in pseudo_client_ids:
-    raw_id, _ = pseudo_client_id.split(separator)
-    if raw_id in raw_eval_client_ids:
-      pseudo_eval_client_ids.append(pseudo_client_id)
-    else:
-      pseudo_train_client_ids.append(pseudo_client_id)
-  return pseudo_train_client_ids, pseudo_eval_client_ids
+  shuffled_client_ids = random_state.permutation(client_ids)
+  train_client_ids = shuffled_client_ids[num_eval_clients:]
+  eval_client_ids = shuffled_client_ids[:num_eval_clients]
+  return train_client_ids, eval_client_ids
 
 
-def main(argv):
-  if len(argv) > 1:
-    raise app.UsageError('Expected no command-line arguments, '
-                         'got: {}'.format(argv))
-  if not FLAGS.experiment_name:
-    raise ValueError('FLAGS.experiment_name must be set.')
-
-  # Configuring the base EMNIST task
+def _create_task() -> tff.simulation.baselines.BaselineTask:
+  """Creates a task for performing federated training and evaluation."""
   train_client_spec = tff.simulation.baselines.ClientSpec(
       num_epochs=FLAGS.train_epochs,
       batch_size=FLAGS.train_batch_size,
@@ -219,40 +195,42 @@ def main(argv):
       model_id='cnn',
       only_digits=False,
       use_synthetic_data=FLAGS.use_synthetic_data)
+
+  if FLAGS.use_pseudo_clients:
+    task = emnist_pseudo_client.build_task(
+        base_task=task,
+        examples_per_pseudo_client=FLAGS.examples_per_pseudo_client)
+  return task
+
+
+def main(argv):
+  if len(argv) > 1:
+    raise app.UsageError('Expected no command-line arguments, '
+                         'got: {}'.format(argv))
+  if not FLAGS.experiment_name:
+    raise ValueError('FLAGS.experiment_name must be set.')
+
+  task = _create_task()
   train_preprocess_fn = task.datasets.train_preprocess_fn
   eval_preprocess_fn = task.datasets.eval_preprocess_fn
-
-  # Creating pseudo-clients
-  if not FLAGS.use_synthetic_data:
-    csv_file_path = 'data_poor_fl/emnist_train_num_examples.csv'
-    with open(csv_file_path) as csv_file:
-      train_client_example_counts = pd.read_csv(csv_file)
-    separator = '-'
-    pseudo_client_ids = _get_pseudo_client_ids(FLAGS.examples_per_pseudo_client,
-                                               train_client_example_counts,
-                                               separator)
-    pseudo_train_client_ids, pseudo_eval_client_ids = _split_pseudo_client_ids(
-        task.datasets.train_data.client_ids, pseudo_client_ids, separator)
+  client_data = task.datasets.train_data
+  if FLAGS.use_synthetic_data:
+    # Synthetic data may not have sufficiently many clients to split
+    train_client_ids = client_data.client_ids
+    eval_client_ids = client_data.client_ids
   else:
-    pseudo_train_client_ids, pseudo_eval_client_ids = None, None
+    train_client_ids, eval_client_ids = _split_client_ids(
+        client_data.client_ids)
 
-  extended_train_data = pseudo_client_data.create_pseudo_client_data(
-      base_client_data=task.datasets.train_data,
-      examples_per_pseudo_client=FLAGS.examples_per_pseudo_client,
-      pseudo_client_ids=pseudo_train_client_ids)
   training_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
-          extended_train_data.client_ids, random_seed=FLAGS.base_random_seed),
+          train_client_ids, random_seed=FLAGS.base_random_seed),
       size=FLAGS.clients_per_train_round)
-  extended_eval_data = pseudo_client_data.create_pseudo_client_data(
-      base_client_data=task.datasets.train_data,
-      examples_per_pseudo_client=FLAGS.examples_per_pseudo_client,
-      pseudo_client_ids=pseudo_eval_client_ids)
 
   # Creating the training process (and wiring in a dataset computation)
   @tff.tf_computation(tf.string)
   def build_train_dataset_from_client_id(client_id):
-    raw_client_data = extended_train_data.dataset_computation(client_id)
+    raw_client_data = client_data.dataset_computation(client_id)
     return train_preprocess_fn(raw_client_data)
 
   learning_process = _create_train_algorithm(task.model_fn)
@@ -262,7 +240,7 @@ def main(argv):
 
   @tff.tf_computation(tf.string)
   def build_eval_datasets_from_client_id(client_id):
-    raw_data = extended_eval_data.dataset_computation(client_id)
+    raw_data = client_data.dataset_computation(client_id)
     # Unbatching before splitting the data into half. This allows splitting at
     # the example level instead of at the batch level.
     reshaped_data = eval_preprocess_fn(raw_data).unbatch()
@@ -294,7 +272,7 @@ def main(argv):
 
   evaluation_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
-          extended_eval_data.client_ids, random_seed=FLAGS.base_random_seed),
+          eval_client_ids, random_seed=FLAGS.base_random_seed),
       size=FLAGS.clients_per_evaluation)
 
   # Configuring release managers and performing training/eval
