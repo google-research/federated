@@ -13,7 +13,6 @@
 # limitations under the License.
 """Runs HypCluster on EMNIST with varying levels of data paucity."""
 
-import asyncio
 import collections
 import functools
 import math
@@ -122,8 +121,6 @@ def _load_init_model_weights(
     model_fn: Callable[[],
                        tff.learning.Model]) -> List[tff.learning.ModelWeights]:
   """Load model weights to warm-start HypCluster."""
-  loop = asyncio.get_event_loop()
-
   state_manager = tff.program.FileProgramStateManager(FLAGS.warmstart_root_dir)
   learning_process_for_metedata = tff.learning.algorithms.build_weighted_fed_avg(
       model_fn=model_fn,
@@ -133,21 +130,19 @@ def _load_init_model_weights(
       model_aggregator=tff.learning.robust_aggregator(
           zeroing=True, clipping=True, add_debug_measurements=True))
   init_state = learning_process_for_metedata.initialize()
-
-  versions_saved = loop.run_until_complete(state_manager.versions())
+  loaded_models = []
+  versions_saved = state_manager.versions()
   if FLAGS.num_clusters >= len(versions_saved):
     raise ValueError(
         f'The checkpoint directory {FLAGS.warmstart_root_dir} only has '
         f'{len(versions_saved)-1} checkpoints, but expected to load '
         f'{FLAGS.num_clusters} models. Please use a smaller value for '
         'FLAGS.num_clusters, or use a different checkpoint directory.')
-
-  coros = [
-      state_manager.load(version=versions_saved[-i], structure=init_state)
-      for i in range(1, FLAGS.num_clusters + 1)
-  ]
-  states = loop.run_until_complete(asyncio.gather(*coros))
-  return [learning_process_for_metedata.get_model_weights(v) for v in states]
+  for i in range(1, FLAGS.num_clusters + 1):
+    version = versions_saved[-i]
+    state = state_manager.load(version=version, structure=init_state)
+    loaded_models.append(learning_process_for_metedata.get_model_weights(state))
+  return loaded_models
 
 
 def _create_train_algorithm(

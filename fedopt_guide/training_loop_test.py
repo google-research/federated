@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import collections
 import csv
 import os
@@ -323,8 +322,6 @@ class ExperimentRunnerTest(tf.test.TestCase):
         test_fn(initial_model)['loss'])
 
   def test_checkpoint_manager_saves_state(self):
-    loop = asyncio.get_event_loop()
-
     experiment_name = 'checkpoint_manager_saves_state'
     iterative_process = _build_federated_averaging_process()
 
@@ -348,8 +345,8 @@ class ExperimentRunnerTest(tf.test.TestCase):
 
     program_state_manager = tff.program.FileProgramStateManager(
         os.path.join(root_output_dir, 'checkpoints', experiment_name))
-    restored_state, restored_round = loop.run_until_complete(
-        program_state_manager.load_latest(final_state))
+    restored_state, restored_round = program_state_manager.load_latest(
+        final_state)
 
     self.assertEqual(restored_round, 0)
 
