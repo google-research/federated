@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Runs global training on EMNIST with varying levels of data paucity."""
+"""Runs global training/evaluation via HypCluster."""
 
 import functools
 from typing import Callable
@@ -21,6 +21,8 @@ from absl import flags
 import tensorflow as tf
 import tensorflow_federated as tff
 
+from data_poor_fl import hypcluster_eval
+from data_poor_fl import hypcluster_train
 from data_poor_fl import optimizer_flag_utils
 from data_poor_fl.pseudo_client_tasks import emnist_pseudo_client
 from utils import training_utils
@@ -35,7 +37,10 @@ with utils_impl.record_hparam_flags() as training_flags:
                       'Root directory for writing experiment output.')
   flags.DEFINE_integer('total_rounds', 100, 'Number of total training rounds.')
 
-  # Train client configuration
+  # HypCluster configuration
+  flags.DEFINE_integer('num_clusters', 1, 'How many clusters to use.')
+
+  # Train configuration
   flags.DEFINE_integer('clients_per_train_round', 10,
                        'How many clients to sample at each training round.')
   flags.DEFINE_integer(
@@ -52,12 +57,9 @@ with utils_impl.record_hparam_flags() as training_flags:
       'should only be set if the use_pseudo_clients flag is '
       'set to True.')
 
-  # Training algorithm configuration
-  flags.DEFINE_bool(
-      'example_weighting', True, 'Whether to use example weighting when '
-      'aggregating client updates (True) or uniform weighting (False).')
-  flags.DEFINE_bool('clipping', True, 'Whether to use adaptive clipping.')
-  flags.DEFINE_bool('zeroing', True, 'Whether to use adaptive zeroing.')
+  # Evaluation configuration
+  flags.DEFINE_integer('clients_per_eval_round', 100,
+                       'How many clients to sample at each evaluation round.')
 
   # Random seeds for reproducibility
   flags.DEFINE_integer(
@@ -65,9 +67,6 @@ with utils_impl.record_hparam_flags() as training_flags:
       ' the randomness in the simulation.')
 
   # Debugging flags
-  flags.DEFINE_bool(
-      'use_aggregator_debug_measurements', True, 'Whether to compute debugging '
-      'measurements for the model update aggregator.')
   flags.DEFINE_bool(
       'use_synthetic_data', False, 'Whether to use synthetic data. This should '
       'only be set to True for debugging purposes.')
@@ -101,28 +100,19 @@ def _write_hparams():
                                       FLAGS.experiment_name)
 
 
-def _create_train_algorithm(
-    model_fn: Callable[[], tff.learning.Model]
-) -> tff.learning.templates.LearningProcess:
+def _create_train_computation(
+    model_fn: Callable[[], tff.learning.Model],
+    num_clusters: int = 1) -> tff.learning.templates.LearningProcess:
   """Creates a learning process for client training."""
-  client_optimizer_fn = optimizer_flag_utils.create_optimizer_from_flags(
-      'client')
-  server_optimizer_fn = optimizer_flag_utils.create_optimizer_from_flags(
-      'server')
-  model_aggregator = tff.learning.robust_aggregator(
-      zeroing=FLAGS.zeroing,
-      clipping=FLAGS.clipping,
-      add_debug_measurements=FLAGS.use_aggregator_debug_measurements)
+  client_optimizer = optimizer_flag_utils.create_optimizer_from_flags('client')
+  server_optimizer = optimizer_flag_utils.create_optimizer_from_flags('server')
+  model_aggregator = tff.aggregators.MeanFactory(no_nan_division=True)
 
-  if FLAGS.example_weighting:
-    client_weighting = tff.learning.ClientWeighting.NUM_EXAMPLES
-  else:
-    client_weighting = tff.learning.ClientWeighting.UNIFORM
-  return tff.learning.algorithms.build_weighted_fed_avg(
+  return hypcluster_train.build_hypcluster_train(
       model_fn=model_fn,
-      client_optimizer_fn=client_optimizer_fn,
-      server_optimizer_fn=server_optimizer_fn,
-      client_weighting=client_weighting,
+      num_clusters=num_clusters,
+      client_optimizer=client_optimizer,
+      server_optimizer=server_optimizer,
       model_aggregator=model_aggregator)
 
 
@@ -153,46 +143,70 @@ def main(argv):
     raise ValueError('FLAGS.experiment_name must be set.')
 
   task = _create_task()
-  train_preprocess_fn = task.datasets.train_preprocess_fn
+
+  # Building train artifacts
   train_data = task.datasets.train_data
-  centralized_test_data = task.datasets.get_centralized_test_data()
+  train_preprocess_fn = task.datasets.train_preprocess_fn
+  train_sampling_seed = int('{}{}'.format(FLAGS.clients_per_train_round,
+                                          FLAGS.base_random_seed))
   training_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
-          train_data.client_ids, random_seed=FLAGS.base_random_seed),
+          train_data.client_ids, random_seed=train_sampling_seed),
       size=FLAGS.clients_per_train_round)
 
-  # Creating the training process (and wiring in a dataset computation)
   @tff.tf_computation(tf.string)
   def build_train_dataset_from_client_id(client_id):
     raw_client_data = train_data.dataset_computation(client_id)
     return train_preprocess_fn(raw_client_data)
 
-  learning_process = _create_train_algorithm(task.model_fn)
+  learning_process = _create_train_computation(task.model_fn,
+                                               FLAGS.num_clusters)
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
       build_train_dataset_from_client_id, learning_process)
   training_process.get_model_weights = learning_process.get_model_weights
 
   # Defining eval artifacts
-  federated_eval = tff.learning.build_federated_evaluation(task.model_fn)
+  eval_data = task.datasets.test_data
+  eval_preprocess_fn = task.datasets.eval_preprocess_fn
+  eval_sampling_seed = int('{}{}'.format(FLAGS.clients_per_eval_round,
+                                         FLAGS.base_random_seed))
+  evaluation_selection_fn = functools.partial(
+      tff.simulation.build_uniform_sampling_fn(
+          eval_data.client_ids, random_seed=eval_sampling_seed),
+      size=FLAGS.clients_per_eval_round)
+
+  @tff.tf_computation(tf.string)
+  def build_eval_dataset_from_client_id(client_id):
+    raw_client_data = eval_data.dataset_computation(client_id)
+    return eval_preprocess_fn(raw_client_data)
+
+  base_eval_computation = hypcluster_eval.build_hypcluster_eval(
+      task.model_fn, FLAGS.num_clusters)
+  build_dataset_and_eval = tff.simulation.compose_dataset_computation_with_computation(
+      build_eval_dataset_from_client_id, base_eval_computation)
 
   def evaluation_fn(state, evaluation_data):
-    return federated_eval(
+    return build_dataset_and_eval(
         training_process.get_model_weights(state), evaluation_data)
 
   # Configuring release managers and performing training/eval
   program_state_manager, metrics_managers = training_utils.create_managers(
       FLAGS.root_output_dir, FLAGS.experiment_name)
   _write_hparams()
-  tff.simulation.run_training_process(
+  final_state = tff.simulation.run_training_process(
       training_process=training_process,
       training_selection_fn=training_selection_fn,
       total_rounds=FLAGS.total_rounds,
       evaluation_fn=evaluation_fn,
-      evaluation_selection_fn=lambda round_num: [centralized_test_data],
+      evaluation_selection_fn=evaluation_selection_fn,
       rounds_per_evaluation=_ROUNDS_PER_EVALUATION,
       program_state_manager=program_state_manager,
       rounds_per_saving_program_state=_ROUNDS_PER_CHECKPOINT,
       metrics_managers=metrics_managers)
+
+  final_eval_metrics = evaluation_fn(final_state, eval_data.client_ids)
+  for metrics_manager in metrics_managers:
+    metrics_manager.release(final_eval_metrics, FLAGS.total_rounds + 1)
 
 if __name__ == '__main__':
   app.run(main)

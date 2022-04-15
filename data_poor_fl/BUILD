@@ -15,6 +15,8 @@ py_library(
     srcs = ["global_trainer.py"],
     srcs_version = "PY3",
     deps = [
+        ":hypcluster_eval",
+        ":hypcluster_train",
         ":optimizer_flag_utils",
         "//data_poor_fl/pseudo_client_tasks:emnist_pseudo_client",
         "//utils:training_utils",
