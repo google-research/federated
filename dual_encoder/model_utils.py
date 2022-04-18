@@ -52,11 +52,10 @@ def get_predicted_embeddings(y_pred, y_true, normalization_fn=l2_normalize_fn):
 
 
 @tf.function
-def get_embeddings_and_similarities(
-    y_pred,
-    y_true,
-    expect_embeddings=True,
-    normalization_fn=l2_normalize_fn):
+def get_embeddings_and_similarities(y_pred,
+                                    y_true,
+                                    expect_embeddings=True,
+                                    normalization_fn=l2_normalize_fn):
   """Retrieving the context and label embeddings and the similarities between them.
 
   Args:
@@ -110,10 +109,9 @@ class Similarities(tf.keras.layers.Layer):
   instead of dot product.
   """
 
-  def __init__(
-      self,
-      normalization_fn: NormalizationFnType = l2_normalize_fn,
-      **kwargs):
+  def __init__(self,
+               normalization_fn: NormalizationFnType = l2_normalize_fn,
+               **kwargs):
     super().__init__(**kwargs)
     self.normalization_fn = normalization_fn
 
@@ -136,6 +134,13 @@ class Similarities(tf.keras.layers.Layer):
     similarities = tf.matmul(
         context_embedding, label_embedding, transpose_b=True)
     return similarities
+
+  def get_config(self):
+    config = super().get_config()
+    config.update({
+        'normalization_fn': self.normalization_fn,
+    })
+    return config
 
 
 NORMALIZATION_FN_MAP = {

@@ -18,6 +18,7 @@ from typing import Callable, Optional
 import tensorflow as tf
 
 
+@tf.keras.utils.register_keras_serializable()
 class MaskedAverage(tf.keras.layers.Layer):
   """Keras layer for computing the average of a masked tensor along an axis.
 
@@ -64,6 +65,7 @@ class MaskedAverage(tf.keras.layers.Layer):
     return config
 
 
+@tf.keras.utils.register_keras_serializable()
 class MaskedReshape(tf.keras.layers.Layer):
   """Keras layer for reshaping a tensor along with its mask.
 
@@ -98,6 +100,7 @@ class MaskedReshape(tf.keras.layers.Layer):
     return config
 
 
+@tf.keras.utils.register_keras_serializable()
 class EmbeddingSpreadoutRegularizer(tf.keras.regularizers.Regularizer):
   """Regularizer for ensuring embeddings are spreadout within embedding space.
 
