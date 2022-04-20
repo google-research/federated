@@ -25,6 +25,7 @@ from data_poor_fl import hypcluster_eval
 from data_poor_fl import hypcluster_train
 from data_poor_fl import optimizer_flag_utils
 from data_poor_fl.pseudo_client_tasks import emnist_pseudo_client
+from utils import task_utils
 from utils import training_utils
 from utils import utils_impl
 
@@ -47,6 +48,10 @@ with utils_impl.record_hparam_flags() as training_flags:
       'train_epochs', 1,
       'Number of epochs performed by a client during a round of training.')
   flags.DEFINE_integer('train_batch_size', 10, 'Batch size on train clients.')
+  flags.DEFINE_integer(
+      'max_train_elements', None, 'Max number of examples used by each client '
+      'when training. If set to `None`, all examples are used. This should only'
+      ' be set to a positive value for Stack Overflow tasks.')
 
   # Pseudo-client configuration
   flags.DEFINE_bool('use_pseudo_clients', False, 'Whether to split the data '
@@ -58,8 +63,9 @@ with utils_impl.record_hparam_flags() as training_flags:
       'set to True.')
 
   # Evaluation configuration
-  flags.DEFINE_integer('clients_per_eval_round', 100,
+  flags.DEFINE_integer('clients_per_eval_round', None,
                        'How many clients to sample at each evaluation round.')
+  flags.DEFINE_integer('eval_batch_size', 100, 'Batch size for evaluation.')
 
   # Random seeds for reproducibility
   flags.DEFINE_integer(
@@ -75,12 +81,14 @@ with utils_impl.record_hparam_flags() as optimizer_flags:
   optimizer_flag_utils.define_optimizer_flags('client')
   optimizer_flag_utils.define_optimizer_flags('server')
 
+with utils_impl.record_hparam_flags() as task_flags:
+  task_utils.define_task_flags()
+
 FLAGS = flags.FLAGS
 
 # Change constant to a flag if needs to be configured.
 _ROUNDS_PER_EVALUATION = 50
 _ROUNDS_PER_CHECKPOINT = 50
-_EMNIST_MAX_ELEMENTS_PER_CLIENT = 418
 
 
 def _write_hparams():
@@ -94,6 +102,10 @@ def _write_hparams():
   opt_flag_dict = optimizer_flag_utils.remove_unused_flags(
       'server', opt_flag_dict)
   hparam_dict.update(opt_flag_dict)
+
+  # Update with task flags
+  task_flag_dict = utils_impl.lookup_flag_values(task_flags)
+  hparam_dict.update(task_flag_dict)
 
   # Write the updated hyperparameters to a file.
   training_utils.write_hparams_to_csv(hparam_dict, FLAGS.root_output_dir,
@@ -121,14 +133,15 @@ def _create_task() -> tff.simulation.baselines.BaselineTask:
   train_client_spec = tff.simulation.baselines.ClientSpec(
       num_epochs=FLAGS.train_epochs,
       batch_size=FLAGS.train_batch_size,
-      shuffle_buffer_size=_EMNIST_MAX_ELEMENTS_PER_CLIENT)
-  task = tff.simulation.baselines.emnist.create_character_recognition_task(
-      train_client_spec,
-      model_id='cnn',
-      only_digits=False,
-      use_synthetic_data=FLAGS.use_synthetic_data)
+      max_elements=FLAGS.max_train_elements)
+  eval_client_spec = tff.simulation.baselines.ClientSpec(
+      num_epochs=1, batch_size=FLAGS.eval_batch_size)
 
-  if FLAGS.use_pseudo_clients:
+  task = task_utils.create_task_from_flags(
+      train_client_spec,
+      eval_client_spec=eval_client_spec,
+      use_synthetic_data=FLAGS.use_synthetic_data)
+  if FLAGS.task == 'emnist_character' and FLAGS.use_pseudo_clients:
     task = emnist_pseudo_client.build_task(
         base_task=task,
         examples_per_pseudo_client=FLAGS.examples_per_pseudo_client)
@@ -168,7 +181,15 @@ def main(argv):
   # Building eval artifacts
   eval_data = task.datasets.test_data
   eval_preprocess_fn = task.datasets.eval_preprocess_fn
-  evaluation_selection_fn = lambda x: eval_data.client_ids
+  if FLAGS.clients_per_eval_round:
+    eval_sampling_seed = int('{}{}'.format(FLAGS.clients_per_eval_round,
+                                           FLAGS.base_random_seed))
+    evaluation_selection_fn = functools.partial(
+        tff.simulation.build_uniform_sampling_fn(
+            eval_data.client_ids, random_seed=eval_sampling_seed),
+        size=FLAGS.clients_per_eval_round)
+  else:
+    evaluation_selection_fn = lambda x: eval_data.client_ids
 
   @tff.tf_computation(tf.string)
   def build_eval_dataset_from_client_id(client_id):

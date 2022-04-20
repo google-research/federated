@@ -31,8 +31,37 @@ class GlobalTrainerTest(absltest.TestCase):
       client_learning_rate=0.01,
       server_optimizer='sgd',
       server_learning_rate=1.0,
+      task='cifar100_image',
       use_synthetic_data=True)
-  def test_executes(self):
+  def test_cifar100_image_task_executes(self):
+    global_trainer.main([])
+
+  @flagsaver.flagsaver(
+      root_output_dir=tempfile.mkdtemp(),
+      experiment_name='test_experiment',
+      clients_per_train_round=1,
+      total_rounds=2,
+      client_optimizer='sgd',
+      client_learning_rate=0.01,
+      server_optimizer='sgd',
+      server_learning_rate=1.0,
+      task='emnist_character',
+      use_synthetic_data=True)
+  def test_emnist_character_task_executes(self):
+    global_trainer.main([])
+
+  @flagsaver.flagsaver(
+      root_output_dir=tempfile.mkdtemp(),
+      experiment_name='test_experiment',
+      clients_per_train_round=1,
+      total_rounds=2,
+      client_optimizer='sgd',
+      client_learning_rate=0.01,
+      server_optimizer='sgd',
+      server_learning_rate=1.0,
+      task='shakespeare_character',
+      use_synthetic_data=True)
+  def test_shakespeare_character_task_executes(self):
     global_trainer.main([])
 
 

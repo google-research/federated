@@ -19,6 +19,7 @@ py_library(
         ":hypcluster_train",
         ":optimizer_flag_utils",
         "//data_poor_fl/pseudo_client_tasks:emnist_pseudo_client",
+        "//utils:task_utils",
         "//utils:training_utils",
         "//utils:utils_impl",
     ],
