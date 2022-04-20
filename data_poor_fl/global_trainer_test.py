@@ -26,7 +26,6 @@ class GlobalTrainerTest(absltest.TestCase):
       root_output_dir=tempfile.mkdtemp(),
       experiment_name='test_experiment',
       clients_per_train_round=1,
-      clients_per_eval_round=1,
       total_rounds=2,
       client_optimizer='sgd',
       client_learning_rate=0.01,

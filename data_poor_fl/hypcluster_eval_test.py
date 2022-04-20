@@ -81,10 +81,17 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
       ('clusters3', 3),
       ('clusters5', 5),
   )
-  def test_constructs(self, num_clusters):
+  def test_returns_expected_metrics_keys(self, num_clusters):
     hyp_eval = hypcluster_eval.build_hypcluster_eval(
         model_fn=model_fn, num_clusters=num_clusters)
     self.assertLen(hyp_eval.type_signature.parameter[0].member, num_clusters)
+    model_weights = tff.learning.ModelWeights.from_model(model_fn())
+    federated_data = [create_dataset(), create_dataset()]
+    hyp_metrics = hyp_eval([model_weights] * num_clusters, federated_data)
+    choose_metrics_keys = ['choose_' + str(i) for i in range(num_clusters)]
+    model_metrics_keys = ['model_' + str(i) for i in range(num_clusters)]
+    expected_keys = choose_metrics_keys + model_metrics_keys + ['best']
+    self.assertCountEqual(list(hyp_metrics.keys()), expected_keys)
 
   def test_matches_federated_eval_with_one_cluster(self):
     hyp_eval = hypcluster_eval.build_hypcluster_eval(
@@ -93,8 +100,14 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
     model_weights = tff.learning.ModelWeights.from_model(model_fn())
     federated_data = [create_dataset(), create_dataset()]
     hyp_metrics = hyp_eval([model_weights], federated_data)
-    reference_metrics = federated_eval(model_weights, federated_data)
-    self.assertAllClose(hyp_metrics, reference_metrics)
+    self.assertCountEqual(
+        list(hyp_metrics.keys()), ['best', 'choose_0', 'model_0'])
+    self.assertEqual(hyp_metrics['choose_0'], 1.0)
+    best_hyp_metrics = hyp_metrics['best']
+    model_0_metrics = hyp_metrics['model_0']
+    reference_metrics = federated_eval(model_weights, federated_data)['eval']
+    self.assertAllClose(best_hyp_metrics, reference_metrics)
+    self.assertAllClose(best_hyp_metrics, model_0_metrics)
 
   def test_selects_best_model(self):
     hyp_eval = hypcluster_eval.build_hypcluster_eval(
@@ -105,9 +118,16 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
     ones_weights = tff.learning.ModelWeights.from_model(ones_model)
     federated_data = [create_dataset()]
     hyp_metrics = hyp_eval([zero_weights, ones_weights], federated_data)
+    self.assertEqual(hyp_metrics['choose_0'], 0.0)
+    self.assertEqual(hyp_metrics['choose_1'], 1.0)
     federated_eval = tff.learning.build_federated_evaluation(model_fn)
-    reference_metrics = federated_eval(ones_weights, federated_data)
-    self.assertAllClose(hyp_metrics, reference_metrics)
+    reference_metrics = federated_eval(ones_weights, federated_data)['eval']
+    self.assertAllClose(hyp_metrics['best'], hyp_metrics['model_1'])
+    self.assertAllClose(hyp_metrics['best'], reference_metrics)
+
+
+class HypClusterEvalWithDatasetSplitTest(tf.test.TestCase,
+                                         parameterized.TestCase):
 
   def test_get_metrics_for_select_and_test_returns_correct_metrics(self):
     model_list = [model_fn(), model_fn()]

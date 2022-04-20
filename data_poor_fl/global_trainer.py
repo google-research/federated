@@ -78,7 +78,7 @@ with utils_impl.record_hparam_flags() as optimizer_flags:
 FLAGS = flags.FLAGS
 
 # Change constant to a flag if needs to be configured.
-_ROUNDS_PER_EVALUATION = 10
+_ROUNDS_PER_EVALUATION = 50
 _ROUNDS_PER_CHECKPOINT = 50
 _EMNIST_MAX_ELEMENTS_PER_CLIENT = 418
 
@@ -165,15 +165,10 @@ def main(argv):
       build_train_dataset_from_client_id, learning_process)
   training_process.get_model_weights = learning_process.get_model_weights
 
-  # Defining eval artifacts
+  # Building eval artifacts
   eval_data = task.datasets.test_data
   eval_preprocess_fn = task.datasets.eval_preprocess_fn
-  eval_sampling_seed = int('{}{}'.format(FLAGS.clients_per_eval_round,
-                                         FLAGS.base_random_seed))
-  evaluation_selection_fn = functools.partial(
-      tff.simulation.build_uniform_sampling_fn(
-          eval_data.client_ids, random_seed=eval_sampling_seed),
-      size=FLAGS.clients_per_eval_round)
+  evaluation_selection_fn = lambda x: eval_data.client_ids
 
   @tff.tf_computation(tf.string)
   def build_eval_dataset_from_client_id(client_id):
@@ -193,7 +188,7 @@ def main(argv):
   program_state_manager, metrics_managers = training_utils.create_managers(
       FLAGS.root_output_dir, FLAGS.experiment_name)
   _write_hparams()
-  final_state = tff.simulation.run_training_process(
+  tff.simulation.run_training_process(
       training_process=training_process,
       training_selection_fn=training_selection_fn,
       total_rounds=FLAGS.total_rounds,
@@ -203,10 +198,6 @@ def main(argv):
       program_state_manager=program_state_manager,
       rounds_per_saving_program_state=_ROUNDS_PER_CHECKPOINT,
       metrics_managers=metrics_managers)
-
-  final_eval_metrics = evaluation_fn(final_state, eval_data.client_ids)
-  for metrics_manager in metrics_managers:
-    metrics_manager.release(final_eval_metrics, FLAGS.total_rounds + 1)
 
 if __name__ == '__main__':
   app.run(main)

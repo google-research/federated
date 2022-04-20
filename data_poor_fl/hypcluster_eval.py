@@ -65,7 +65,16 @@ def build_hypcluster_eval(
     eval_models_outputs = hypcluster_utils.multi_model_eval(
         eval_models, model_weights, dataset)
     best_model_index = hypcluster_utils.select_best_model(eval_models_outputs)
-    return metrics_gather_fn(eval_models_outputs, best_model_index)
+
+    local_metrics = collections.OrderedDict(
+        best=metrics_gather_fn(eval_models_outputs, best_model_index))
+
+    for i in range(num_clusters):
+      local_metrics[f'model_{i}'] = metrics_gather_fn(eval_models_outputs, i)
+    for i in range(num_clusters):
+      local_metrics[f'choose_{i}'] = tf.cast(
+          tf.equal(best_model_index, i), tf.float32)
+    return local_metrics
 
   @tff.federated_computation(
       tff.type_at_server(list_weights_type), tff.type_at_clients(data_type))
@@ -73,8 +82,16 @@ def build_hypcluster_eval(
     client_model_weights = tff.federated_broadcast(server_model_weights)
     client_metrics = tff.federated_map(local_hypcluster_eval,
                                        (client_model_weights, client_datasets))
-    eval_metrics = metrics_aggregation_fn(client_metrics)
-    return tff.federated_zip(collections.OrderedDict(eval=eval_metrics))
+    eval_metrics = collections.OrderedDict()
+    metric_names = tff.structure.name_list(
+        local_hypcluster_eval.type_signature.result)
+    for name in metric_names:
+      if 'choose' in name:
+        eval_metrics[name] = tff.federated_mean(client_metrics[name])
+      else:
+        eval_metrics[name] = metrics_aggregation_fn(client_metrics[name])
+
+    return tff.federated_zip(eval_metrics)
 
   return hypcluster_eval
 
@@ -103,13 +120,12 @@ def build_hypcluster_eval_with_dataset_split(
     num_clusters: int) -> tff.Computation:
   """Builds a computation for performing a special HypCluster evaluation.
 
-  This is different from the standard `build_hypcluster_evel`:
-  1. The client-side input is an `OrderedDict` of two keys `SELECTION_DATA_KEY`
-     and `TEST_DATA_KEY`, each mapped to a dataset. The selection data is used
-     to select the best model; the test data is used to evaluate the selected
-     model. Evaluation metrics on the test data is reported.
-  2. This function adds additional metrics, including the performance of
-     individual models, and the percentage that each model is selected.
+  This differs notably from `build_hypcluster_evel` in how the metrics are
+  computed. The client-side input is a `collections.OrderedDict` with two keys:
+  `SELECTION_DATA_KEY` and `TEST_DATA_KEY`, each one of corresponds to a
+  `tf.data.Dataset` value. The selection data is used to select the best model,
+  while the test data is used to evaluate the selected model. Evaluation metrics
+  on the test data is reported.
 
   Args:
     model_fn: A no-arg function that returns a `tff.learning.Model`. This method
