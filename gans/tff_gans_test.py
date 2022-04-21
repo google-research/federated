@@ -125,9 +125,6 @@ class TffGansTest(tf.test.TestCase, parameterized.TestCase):
         aggregation_state=gan.aggregation_process.initialize())
     server_state_type = tff.framework.type_from_tensors(server_state)
 
-    # TODO(b/131700944): Remove this workaround, and directly instantiate a
-    # ClientOutput instance (once TFF has a utility to infer TFF types of
-    # objects directly).
     @tff.tf_computation
     def client_output_fn():
       discriminator = gan.discriminator_model_fn()
