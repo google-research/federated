@@ -13,6 +13,7 @@
 # limitations under the License.
 """Training loop for fedopt-guide experiments."""
 
+import asyncio
 import os.path
 import pprint
 import time
@@ -68,14 +69,16 @@ def _setup_outputs(root_output_dir, experiment_name, hparam_dict):
 
 def _write_metrics(metrics_mngrs, metrics, round_num):
   """Atomic metrics writer which inlines logic from MetricsHook class."""
+  loop = asyncio.get_event_loop()
+
   if not isinstance(metrics, dict):
     raise TypeError('metrics should be type `dict`.')
   if not isinstance(round_num, int):
     raise TypeError('round_num should be type `int`.')
   logging.info('Metrics at round {:d}:\n{!s}'.format(round_num,
                                                      pprint.pformat(metrics)))
-  for metrics_mngr in metrics_mngrs:
-    metrics_mngr.release(metrics, round_num)
+  loop.run_until_complete(
+      asyncio.gather(*[m.release(metrics, round_num) for m in metrics_mngrs]))
 
 
 def _compute_numpy_l2_difference(model, previous_model):
@@ -173,6 +176,8 @@ def run(iterative_process: tff.templates.IterativeProcess,
   if test_fn is not None and not callable(test_fn):
     raise TypeError('test_fn should be callable.')
 
+  loop = asyncio.get_event_loop()
+
   logging.info('Starting iterative_process training loop...')
   initial_state = iterative_process.initialize()
 
@@ -184,7 +189,8 @@ def run(iterative_process: tff.templates.IterativeProcess,
                                                      hparam_dict)
 
   logging.info('Asking checkpoint manager to load checkpoint.')
-  state, round_num = program_state_mngr.load_latest(initial_state)
+  state, round_num = loop.run_until_complete(
+      program_state_mngr.load_latest(initial_state))
 
   if state is None:
     logging.info('Initializing experiment from scratch.')
@@ -219,7 +225,7 @@ def run(iterative_process: tff.templates.IterativeProcess,
     if (round_num % rounds_per_checkpoint == 0 or
         round_num == total_rounds - 1):
       save_checkpoint_start_time = time.time()
-      program_state_mngr.save(state, round_num)
+      loop.run_until_complete(program_state_mngr.save(state, round_num))
       train_metrics['save_checkpoint_secs'] = (
           time.time() - save_checkpoint_start_time)
 

@@ -15,6 +15,7 @@
 
 # TODO(b/193904908): add unit tests.
 
+import asyncio
 import collections
 import pprint
 import time
@@ -63,7 +64,9 @@ def _load_initial_checkpoint(
     structure in `initial_state`, and `start_round` is a nonnegative integer
     indicating the round at which training starts.
   """
-  ckpt_state, ckpt_round = file_checkpoint_manager.load_latest(template_state)
+  loop = asyncio.get_event_loop()
+  ckpt_state, ckpt_round = loop.run_until_complete(
+      file_checkpoint_manager.load_latest(template_state))
   if ckpt_state is None:
     start_state = template_state
     start_round = 0
@@ -146,6 +149,7 @@ def _create_on_loop_start_fn(
 
   def on_loop_start(initial_state):
     """Attempts to load a checkpoint before resuming training."""
+    loop = asyncio.get_event_loop()
 
     if file_checkpoint_manager is not None:
       start_state, start_round = _load_initial_checkpoint(
@@ -160,11 +164,12 @@ def _create_on_loop_start_fn(
       if validation_fn is not None:
         validation_metrics = _compute_validation_metrics(
             start_state, 0, validation_fn)
-        for metrics_mngr in metrics_managers:
-          metrics_mngr.release(validation_metrics, 0)
+        loop.run_until_complete(
+            asyncio.gather(
+                *[m.release(validation_metrics, 0) for m in metrics_managers]))
 
       if file_checkpoint_manager is not None:
-        file_checkpoint_manager.save(start_state, 0)
+        loop.run_until_complete(file_checkpoint_manager.save(start_state, 0))
       start_round = 1
 
     return start_state, start_round
@@ -200,6 +205,8 @@ def _create_on_round_end_fn(
     mapping of metrics with key-valued strings, potentially updated to include
     validation metrics.
   """
+  loop = asyncio.get_event_loop()
+
   if metrics_managers is None:
     metrics_managers = []
 
@@ -210,11 +217,12 @@ def _create_on_round_end_fn(
                                                        validation_fn)
       round_metrics.update(validation_metrics)
 
-    for metrics_mngr in metrics_managers:
-      metrics_mngr.release(round_metrics, round_num)
+    loop.run_until_complete(
+        asyncio.gather(
+            *[m.release(round_metrics, round_num) for m in metrics_managers]))
 
     if file_checkpoint_manager is not None:
-      file_checkpoint_manager.save(state, round_num)
+      loop.run_until_complete(file_checkpoint_manager.save(state, round_num))
 
     return state, round_metrics
 

@@ -13,6 +13,7 @@
 # limitations under the License.
 """Training loops for iterative process simulations."""
 
+import asyncio
 import collections
 import pprint
 import time
@@ -51,7 +52,10 @@ def _load_initial_program_state(
     structure in `initial_state`, and `start_round` is a nonnegative integer
     indicating the round at which training starts.
   """
-  ckpt_state, ckpt_round = program_state_manager.load_latest(template_state)
+  loop = asyncio.get_event_loop()
+
+  ckpt_state, ckpt_round = loop.run_until_complete(
+      program_state_manager.load_latest(template_state))
   if ckpt_state is None:
     start_state = template_state
     start_round = 0
@@ -138,6 +142,8 @@ def _create_on_loop_start_fn(
     callable performs the tasks descreibed above, and returns a starting state
     and a positive integer round number at which the training loop should start.
   """
+  loop = asyncio.get_event_loop()
+
   if metrics_managers is None:
     metrics_managers = []
 
@@ -165,11 +171,11 @@ def _create_on_loop_start_fn(
           metrics.update(_compute_eval_metrics(start_state, 0, eval_fn, prefix))
 
       if metrics:
-        for metrics_mngr in metrics_managers:
-          metrics_mngr.release(metrics, 0)
+        loop.run_until_complete(
+            asyncio.gather(*[m.release(metrics, 0) for m in metrics_managers]))
 
       if program_state_manager is not None:
-        program_state_manager.save(start_state, 0)
+        loop.run_until_complete(program_state_manager.save(start_state, 0))
       start_round = 1
 
     return start_state, start_round
@@ -218,6 +224,8 @@ def _create_on_round_end_fn(
     mapping of metrics with key-valued strings, potentially updated to include
     validation metrics.
   """
+  loop = asyncio.get_event_loop()
+
   if metrics_managers is None:
     metrics_managers = []
 
@@ -232,12 +240,13 @@ def _create_on_round_end_fn(
         round_metrics.update(
             _compute_eval_metrics(state, round_num, eval_fn, prefix))
 
-    for metrics_mngr in metrics_managers:
-      metrics_mngr.release(round_metrics, round_num)
+    loop.run_until_complete(
+        asyncio.gather(
+            *[m.release(round_metrics, round_num) for m in metrics_managers]))
 
     if program_state_manager is not None:
       if round_num % rounds_per_saving_program_state == 0:
-        program_state_manager.save(state, round_num)
+        loop.run_until_complete(program_state_manager.save(state, round_num))
 
     return state, round_metrics
 
@@ -259,6 +268,7 @@ def _record_test_metrics(
     metrics_managers: An optional list of `tff.program.ReleaseManager` objects
       used to save training metrics throughout the simulation.
   """
+  loop = asyncio.get_event_loop()
 
   if metrics_managers is None:
     metrics_managers = []
@@ -270,8 +280,11 @@ def _record_test_metrics(
                                                metric_utils.TEST_METRICS_PREFIX)
     logging.info('Final test metrics:\n %s', pprint.pformat(test_final_metrics))
 
-    for metrics_manager in metrics_managers:
-      metrics_manager.release(test_final_metrics, total_rounds + 1)
+    loop.run_until_complete(
+        asyncio.gather(*[
+            m.release(test_final_metrics, total_rounds + 1)
+            for m in metrics_managers
+        ]))
 
 
 def _run_simulation_with_callbacks(

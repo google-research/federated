@@ -13,6 +13,7 @@
 # limitations under the License.
 """Utility functions and classes for logging hyperparameters and metrics."""
 
+import asyncio
 import collections
 import os
 import time
@@ -105,7 +106,9 @@ class MetricWriterCallback(tf.keras.callbacks.Callback):
         summary_dir)
 
   def on_epoch_end(self, epoch: int, logs=None):
-    self._tensorboard_writer.release(value=logs, key=epoch)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(
+        self._tensorboard_writer.release(value=logs, key=epoch))
 
 
 def _make_output_dirs(root_output_dir, experiment_name):
