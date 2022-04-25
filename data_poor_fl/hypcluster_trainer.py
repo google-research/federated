@@ -131,7 +131,7 @@ def _load_init_model_weights(
           zeroing=True, clipping=True, add_debug_measurements=True))
   init_state = learning_process_for_metedata.initialize()
   loaded_models = []
-  versions_saved = state_manager.versions()
+  versions_saved = state_manager.get_versions()
   if FLAGS.num_clusters >= len(versions_saved):
     raise ValueError(
         f'The checkpoint directory {FLAGS.warmstart_root_dir} only has '
