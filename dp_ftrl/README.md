@@ -7,7 +7,8 @@ private follow-the-regularized-leader) in federated learning. See "Practical and
 Private (Deep) Learning without Sampling or Shuffling"
 ([arXiv link](https://arxiv.org/abs/2103.00039)) for algorithmic details. The
 code in this folder is for the StackOverflow federated learning (FL) experiments
-in the paper.
+in the paper, and is intended to reproduce these experiments. As such, it is not
+under active development.
 
 NOTE: The implementation and experiments for centralized setting on image
 datasets can be found at
