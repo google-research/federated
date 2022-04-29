@@ -32,6 +32,7 @@ from utils import task_utils
 from utils import training_utils
 
 with flag_utils.record_hparam_flags() as shared_flags:
+  flags.DEFINE_integer('total_rounds', 10, 'Number of total training rounds.')
   # Client configuration
   flags.DEFINE_integer(
       'train_epochs', 1,
@@ -62,12 +63,10 @@ with flag_utils.record_hparam_flags() as shared_flags:
   flags.DEFINE_string(
       'experiment_name', None, 'The name of this experiment. Will be append to '
       '--root_output_dir to separate experiment results.')
-  flags.mark_flag_as_required('experiment_name')
   flags.DEFINE_string('root_output_dir', '/tmp/large_cohort/',
                       'Root directory for writing experiment output.')
   flags.DEFINE_integer('rounds_per_checkpoint', 50,
                        'How often to checkpoint the global model.')
-  flags.DEFINE_integer('total_rounds', 10, 'Number of total training rounds.')
 
   # Training configuration
   flags.DEFINE_integer('clients_per_train_round', 10,
