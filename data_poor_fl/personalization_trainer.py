@@ -130,7 +130,8 @@ def _create_train_algorithm(
   model_aggregator = tff.learning.robust_aggregator(
       zeroing=FLAGS.zeroing,
       clipping=FLAGS.clipping,
-      add_debug_measurements=FLAGS.use_aggregator_debug_measurements)
+      debug_measurements_fn=(tff.learning.add_debug_measurements if
+                             FLAGS.use_aggregator_debug_measurements else None))
 
   if FLAGS.example_weighting:
     client_weighting = tff.learning.ClientWeighting.NUM_EXAMPLES

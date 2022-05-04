@@ -131,7 +131,9 @@ def _load_init_model_weights(
       server_optimizer_fn=lambda: tf.keras.optimizers.Adam(1.0),
       client_weighting=tff.learning.ClientWeighting.NUM_EXAMPLES,
       model_aggregator=tff.learning.robust_aggregator(
-          zeroing=True, clipping=True, add_debug_measurements=True))
+          zeroing=True,
+          clipping=True,
+          debug_measurements_fn=tff.learning.add_debug_measurements))
   init_state = learning_process_for_metedata.initialize()
 
   versions_saved = loop.run_until_complete(state_manager.get_versions())
