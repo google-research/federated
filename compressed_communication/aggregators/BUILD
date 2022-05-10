@@ -2,7 +2,6 @@ load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 package(
     default_visibility = [
-        "//inputmethod/keyboard/tensorflow/federated:__subpackages__",
         "//compressed_communication:__subpackages__",
     ],
 )
