@@ -43,7 +43,7 @@ could run
 
 ```
 bazel run :trainer -- --task=emnist_character --total_rounds=100 --aggregator=quantize_entropy_code --step_size=0.5 --rounding_type=stochastic
---client_optimizer=sgd --client_learning_rate=0.1 --client_batch_size=20
+--client_optimizer=sgd --client_learning_rate=0.1 --train_batch_size=20
 --server_optimizer=sgd --server_learning_rate=1.0 --clients_per_train_round=10 --experiment_name=emnist_compression
 ```
 
