@@ -13,6 +13,7 @@
 # limitations under the License.
 """Federated Stack Overflow next word prediction library using TFF."""
 
+import asyncio
 import functools
 from typing import Callable
 
@@ -277,6 +278,13 @@ def run_federated(
       rounds_per_saving_program_state=rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
+  loop = asyncio.get_event_loop()
+
+  async def write_final_metrics(metrics, round_num):
+    await asyncio.gather(*[
+        manager.release(value=metrics, key=round_num)
+        for manager in metrics_managers
+    ])
+
   test_metrics = test_fn(state)
-  for metrics_manager in metrics_managers:
-    metrics_manager.release(test_metrics, total_rounds + 1)
+  loop.run_until_complete(write_final_metrics(test_metrics, total_rounds + 1))

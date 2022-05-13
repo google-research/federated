@@ -13,6 +13,7 @@
 # limitations under the License.
 """Runs federated training with large cohorts on a number of tasks."""
 
+import asyncio
 import collections
 import functools
 import os.path
@@ -286,6 +287,14 @@ def main(argv):
       rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
+  loop = asyncio.get_event_loop()
+
+  async def write_final_metrics(metrics, round_num):
+    await asyncio.gather(*[
+        manager.release(value=metrics, key=round_num)
+        for manager in metrics_managers
+    ])
+
   # Perform post-training evaluation
   full_train_dataset = task.datasets.eval_preprocess_fn(
       train_data.create_tf_dataset_from_all_clients())
@@ -305,8 +314,8 @@ def main(argv):
     post_training_metrics['validation'] = federated_evaluation_fn(
         state.model, [full_validation_dataset])
 
-  for metrics_manager in metrics_managers:
-    metrics_manager.release(post_training_metrics, FLAGS.total_rounds + 1)
+  loop.run_until_complete(
+      write_final_metrics(post_training_metrics, FLAGS.total_rounds + 1))
 
 
 if __name__ == '__main__':

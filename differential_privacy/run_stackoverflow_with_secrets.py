@@ -13,6 +13,7 @@
 # limitations under the License.
 """Runs federated training with differential privacy on various tasks."""
 
+import asyncio
 import collections
 import functools
 import itertools
@@ -320,6 +321,14 @@ def train_and_eval():
       rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
       metrics_managers=metrics_managers)
 
+  loop = asyncio.get_event_loop()
+
+  async def write_final_metrics(metrics, round_num):
+    await asyncio.gather(*[
+        manager.release(value=metrics, key=round_num)
+        for manager in metrics_managers
+    ])
+
   orig_test_fn = training_utils.create_test_fn(task)
 
   def test_fn(model_weights):
@@ -351,8 +360,8 @@ def train_and_eval():
     return test_metric_dict
 
   test_metrics = test_fn(state.model)
-  for metrics_manager in metrics_managers:
-    metrics_manager.release(test_metrics, FLAGS.total_rounds + 1)
+  loop.run_until_complete(
+      write_final_metrics(test_metrics, FLAGS.total_rounds + 1))
 
 
 def main(argv):
