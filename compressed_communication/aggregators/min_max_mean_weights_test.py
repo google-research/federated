@@ -51,8 +51,8 @@ class MinMaxMeanWeightsComputationTest(tff.test.TestCase,
     server_state_type = tff.type_at_server(())
     expected_initialize_type = tff.FunctionType(
         parameter=None, result=server_state_type)
-    self.assert_types_equivalent(process.initialize.type_signature,
-                                 expected_initialize_type)
+    tff.test.assert_types_equivalent(process.initialize.type_signature,
+                                     expected_initialize_type)
 
     expected_measurements_type = tff.to_type(expected_measurements_type)
     expected_next_type = tff.FunctionType(
@@ -65,8 +65,8 @@ class MinMaxMeanWeightsComputationTest(tff.test.TestCase,
                 min=expected_measurements_type,
                 max=expected_measurements_type,
                 mean=expected_measurements_type))))
-    self.assert_types_equivalent(process.next.type_signature,
-                                 expected_next_type)
+    tff.test.assert_types_equivalent(process.next.type_signature,
+                                     expected_next_type)
 
 
 class MinMaxMeanWeightsExecutionTest(tff.test.TestCase, parameterized.TestCase):

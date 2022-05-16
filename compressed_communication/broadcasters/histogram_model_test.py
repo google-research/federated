@@ -53,8 +53,8 @@ class HistogramModelComputationTest(tff.test.TestCase, parameterized.TestCase):
     server_state_type = tff.type_at_server(())
     expected_initialize_type = tff.FunctionType(
         parameter=None, result=server_state_type)
-    self.assert_types_equivalent(broadcast_process.initialize.type_signature,
-                                 expected_initialize_type)
+    tff.test.assert_types_equivalent(
+        broadcast_process.initialize.type_signature, expected_initialize_type)
 
     expected_measurements_type = tff.to_type(expected_measurements_type)
     expected_next_type = tff.FunctionType(
@@ -64,8 +64,8 @@ class HistogramModelComputationTest(tff.test.TestCase, parameterized.TestCase):
             state=server_state_type,
             result=tff.type_at_clients(weights_type, all_equal=True),
             measurements=tff.type_at_server(expected_measurements_type)))
-    self.assert_types_equivalent(broadcast_process.next.type_signature,
-                                 expected_next_type)
+    tff.test.assert_types_equivalent(broadcast_process.next.type_signature,
+                                     expected_next_type)
 
 
 class HistogramModelExecutionTest(tff.test.TestCase, parameterized.TestCase):

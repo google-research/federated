@@ -49,11 +49,12 @@ class QuantizationEncodeAggregatorTest(tff.test.TestCase):
         quantize_encode.QuantizeEncodeFactory(initial_step_size=0.5)).create(
             test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class HistogramAggregatorTest(tff.test.TestCase):
@@ -73,11 +74,12 @@ class HistogramAggregatorTest(tff.test.TestCase):
             mn=-1.0, mx=1.0, nbins=2001)).create(
                 test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class EntropyCrossEntropyAggregatorTest(tff.test.TestCase):
@@ -115,11 +117,12 @@ class EntropyCrossEntropyAggregatorTest(tff.test.TestCase):
                 bias=reference_inner_factory))).create(
                     test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class VoteQStepSizeAggregatorTest(tff.test.TestCase):
@@ -142,11 +145,12 @@ class VoteQStepSizeAggregatorTest(tff.test.TestCase):
             step_size_options=step_size_options)).create(
                 test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class RotationAblationAggregatorTest(tff.test.TestCase):
@@ -171,11 +175,12 @@ class RotationAblationAggregatorTest(tff.test.TestCase):
                                          test_model_weights,
                                          weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class NoCompressionAggregatorTest(tff.test.TestCase):
@@ -194,11 +199,12 @@ class NoCompressionAggregatorTest(tff.test.TestCase):
         tff.aggregators.SumFactory()).create(
             test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class DRIVEAggregatorTest(tff.test.TestCase):
@@ -217,11 +223,12 @@ class DRIVEAggregatorTest(tff.test.TestCase):
         tff.aggregators.HadamardTransformFactory(drive.DRIVEFactory())).create(
             test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class OneBitSGDAggregatorTest(tff.test.TestCase):
@@ -240,11 +247,12 @@ class OneBitSGDAggregatorTest(tff.test.TestCase):
         one_bit_sgd.OneBitSGDFactory()).create(
             test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class QSGDAggregatorTest(tff.test.TestCase):
@@ -264,11 +272,12 @@ class QSGDAggregatorTest(tff.test.TestCase):
         qsgd.QSGDFactory(num_steps=32.)).create(
             test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class TernGradAggregatorTest(tff.test.TestCase):
@@ -287,11 +296,12 @@ class TernGradAggregatorTest(tff.test.TestCase):
         terngrad.TernGradFactory()).create(
             test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class ThreeLCAggregatorTest(tff.test.TestCase):
@@ -311,11 +321,12 @@ class ThreeLCAggregatorTest(tff.test.TestCase):
         three_lc.ThreeLCFactory(sparsity_factor=1.)).create(
             test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 class TopKAggregatorTest(tff.test.TestCase):
@@ -335,11 +346,12 @@ class TopKAggregatorTest(tff.test.TestCase):
         top_k.TopKFactory(fraction_to_select=0.05)).create(
             test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(aggregation_process.initialize.type_signature,
-                                reference_process.initialize.type_signature)
+    tff.test.assert_types_identical(
+        aggregation_process.initialize.type_signature,
+        reference_process.initialize.type_signature)
     # `next` function should be identical.
-    self.assert_types_identical(aggregation_process.next.type_signature,
-                                reference_process.next.type_signature)
+    tff.test.assert_types_identical(aggregation_process.next.type_signature,
+                                    reference_process.next.type_signature)
 
 
 if __name__ == '__main__':

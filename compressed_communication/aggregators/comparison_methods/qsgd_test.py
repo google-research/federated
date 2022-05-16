@@ -40,8 +40,8 @@ class QSGDComputationTest(tff.test.TestCase, parameterized.TestCase):
     server_state_type = tff.type_at_server(())
     expected_initialize_type = tff.FunctionType(
         parameter=None, result=server_state_type)
-    self.assert_types_equivalent(process.initialize.type_signature,
-                                 expected_initialize_type)
+    tff.test.assert_types_equivalent(process.initialize.type_signature,
+                                     expected_initialize_type)
 
     expected_measurements_type = tff.type_at_server(
         collections.OrderedDict(
@@ -55,8 +55,8 @@ class QSGDComputationTest(tff.test.TestCase, parameterized.TestCase):
             state=server_state_type,
             result=tff.type_at_server(value_type),
             measurements=expected_measurements_type))
-    self.assert_types_equivalent(process.next.type_signature,
-                                 expected_next_type)
+    tff.test.assert_types_equivalent(process.next.type_signature,
+                                     expected_next_type)
 
   @parameterized.named_parameters(
       ("integer_tensor", _test_integer_tensor_type),

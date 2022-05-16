@@ -49,8 +49,8 @@ class GroupComputationTest(tff.test.TestCase, parameterized.TestCase):
     server_state_type = tff.type_at_server(states_type)
     expected_initialize_type = tff.FunctionType(
         parameter=None, result=server_state_type)
-    self.assert_types_equivalent(process.initialize.type_signature,
-                                 expected_initialize_type)
+    tff.test.assert_types_equivalent(process.initialize.type_signature,
+                                     expected_initialize_type)
 
     expected_measurements_type = tff.type_at_server(measurements_type)
     expected_next_type = tff.FunctionType(
@@ -60,8 +60,8 @@ class GroupComputationTest(tff.test.TestCase, parameterized.TestCase):
             state=server_state_type,
             result=tff.type_at_server(value_type),
             measurements=expected_measurements_type))
-    self.assert_types_equivalent(process.next.type_signature,
-                                 expected_next_type)
+    tff.test.assert_types_equivalent(process.next.type_signature,
+                                     expected_next_type)
 
   @parameterized.named_parameters(
       ("group_name_mismatch",

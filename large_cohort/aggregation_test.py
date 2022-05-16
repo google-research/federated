@@ -32,21 +32,21 @@ class AggregationTest(tff.test.TestCase):
     learning_aggregation_process = tff.learning.robust_aggregator().create(
         test_model_weights, weight_type=tff.TensorType(tf.float32))
     # `initialize` function should be identical.
-    self.assert_types_identical(
+    tff.test.assert_types_identical(
         experiment_aggregation_process.initialize.type_signature,
         learning_aggregation_process.initialize.type_signature)
     # `next` is slightly different because of measurements, so we assert
     # piecewise.
-    self.assert_types_identical(
+    tff.test.assert_types_identical(
         experiment_aggregation_process.next.type_signature.parameter,
         learning_aggregation_process.next.type_signature.parameter)
     experiment_result_type = experiment_aggregation_process.next.type_signature.result
     learning_result_type = learning_aggregation_process.next.type_signature.result
-    self.assert_types_identical(experiment_result_type.state,
-                                learning_result_type.state)
-    self.assert_types_identical(experiment_result_type.result,
-                                learning_result_type.result)
-    self.assert_types_identical(
+    tff.test.assert_types_identical(experiment_result_type.state,
+                                    learning_result_type.state)
+    tff.test.assert_types_identical(experiment_result_type.result,
+                                    learning_result_type.result)
+    tff.test.assert_types_identical(
         experiment_result_type.measurements.member.zeroing.clipping,
         tff.to_type(
             collections.OrderedDict(
