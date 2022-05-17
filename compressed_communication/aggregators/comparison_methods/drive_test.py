@@ -26,7 +26,7 @@ _test_float_struct_type = [(tf.float32, (2,)), (tf.float32, (3,))]
 _test_float_tensor_type = (tf.float32, (3,))
 
 
-class DRIVEComputationTest(tff.test.TestCase, parameterized.TestCase):
+class DRIVEComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("float_tensor", _test_float_tensor_type))
@@ -65,7 +65,7 @@ class DRIVEComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class DRIVEExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class DRIVEExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("float_tensor", _test_float_tensor_type))
@@ -201,4 +201,4 @@ class DRIVEExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == "__main__":
-  tff.test.main()
+  tf.test.main()

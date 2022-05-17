@@ -33,7 +33,7 @@ def _stdev_weights():
   return stdev_weights.StdevWeightsFactory()
 
 
-class StdevWeightsComputationTest(tff.test.TestCase, parameterized.TestCase):
+class StdevWeightsComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('struct_float_tensor', _test_value_type_struct_float_tensor,
@@ -65,7 +65,7 @@ class StdevWeightsComputationTest(tff.test.TestCase, parameterized.TestCase):
                                      expected_next_type)
 
 
-class StdevWeightsExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class StdevWeightsExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('struct_list_float_scalars', _test_value_type_struct_float_tensor,
@@ -85,4 +85,4 @@ class StdevWeightsExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

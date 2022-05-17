@@ -38,8 +38,7 @@ def _histogram_weights():
   return histogram_weights.HistogramWeightsFactory(_mn, _mx, _nbins)
 
 
-class HistogramWeightsComputationTest(tff.test.TestCase,
-                                      parameterized.TestCase):
+class HistogramWeightsComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('struct_float_tensor', _test_value_type_struct_float_tensor,
@@ -71,7 +70,7 @@ class HistogramWeightsComputationTest(tff.test.TestCase,
                                      expected_next_type)
 
 
-class HistogramWeightsExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class HistogramWeightsExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('struct_list_float_scalars', _test_value_type_struct_float_tensor,
@@ -91,4 +90,4 @@ class HistogramWeightsExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

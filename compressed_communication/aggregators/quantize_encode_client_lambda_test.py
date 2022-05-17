@@ -29,7 +29,7 @@ _test_float_struct_type = [(tf.float32, (2,)), (tf.float32, (3,))]
 _test_float_tensor_type = (tf.float32, (3,))
 
 
-class QuantizeEncodeClientLambdaComputationTest(tff.test.TestCase,
+class QuantizeEncodeClientLambdaComputationTest(tf.test.TestCase,
                                                 parameterized.TestCase):
 
   @parameterized.named_parameters(
@@ -74,7 +74,7 @@ class QuantizeEncodeClientLambdaComputationTest(tff.test.TestCase,
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class QuantizeEncodeClientLambdaExecutionTest(tff.test.TestCase,
+class QuantizeEncodeClientLambdaExecutionTest(tf.test.TestCase,
                                               parameterized.TestCase):
 
   @parameterized.named_parameters(
@@ -162,4 +162,4 @@ class QuantizeEncodeClientLambdaExecutionTest(tff.test.TestCase,
     self.assertNotEqual(sum(votes), max(votes))
 
 if __name__ == "__main__":
-  tff.test.main()
+  tf.test.main()

@@ -28,7 +28,7 @@ _test_value_type_list_integer_tensors = [(tf.int32, (2,)),
                                          (tf.int32, (3,))]
 
 
-class EntropyUtilityTest(tff.test.TestCase, parameterized.TestCase):
+class EntropyUtilityTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('ragged', [[1, 1, 1, 1], [1, 1]]),
@@ -44,7 +44,7 @@ class EntropyUtilityTest(tff.test.TestCase, parameterized.TestCase):
     self.assertAllClose(result, [2, 2, 1, 1])
 
 
-class EntropyComputationTest(tff.test.TestCase, parameterized.TestCase):
+class EntropyComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('integer_tensor', _test_value_type_integer_tensor))
@@ -114,7 +114,7 @@ class EntropyComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class EntropyExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class EntropyExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('integer_tensor', _test_value_type_integer_tensor))
@@ -173,4 +173,4 @@ class EntropyExecutionTest(tff.test.TestCase, parameterized.TestCase):
     self.assertAllClose(result, expected_result)
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

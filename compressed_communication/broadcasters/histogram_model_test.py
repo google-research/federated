@@ -37,7 +37,7 @@ def _histogram_model():
       _test_weights_type_struct_float_tensor, _mn, _mx, _nbins)
 
 
-class HistogramModelComputationTest(tff.test.TestCase, parameterized.TestCase):
+class HistogramModelComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('float_tensor', _test_weights_type_float_tensor,
@@ -68,7 +68,7 @@ class HistogramModelComputationTest(tff.test.TestCase, parameterized.TestCase):
                                      expected_next_type)
 
 
-class HistogramModelExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class HistogramModelExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('float_tensor', _test_weights_type_float_tensor,
@@ -88,4 +88,4 @@ class HistogramModelExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 if __name__ == '__main__':
   tff.backends.native.set_local_python_execution_context(10)
-  tff.test.main()
+  tf.test.main()

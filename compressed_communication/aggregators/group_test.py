@@ -26,7 +26,7 @@ _measurement_aggregator = tff.aggregators.add_measurements(
     tff.aggregators.SumFactory(), client_measurement_fn=_measurement_fn)
 
 
-class GroupComputationTest(tff.test.TestCase, parameterized.TestCase):
+class GroupComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("two_groups",
@@ -75,6 +75,7 @@ class GroupComputationTest(tff.test.TestCase, parameterized.TestCase):
       )
   def test_group_init_raises(self, grouped_indices, inner_agg_factories,
                              value_type):
+    del value_type  # Unused.
     self.assertRaises(ValueError, group.GroupFactory, grouped_indices,
                       inner_agg_factories)
 
@@ -101,7 +102,7 @@ class GroupComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class GroupExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class GroupExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("two_groups",
@@ -183,4 +184,4 @@ class GroupExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == "__main__":
-  tff.test.main()
+  tf.test.main()

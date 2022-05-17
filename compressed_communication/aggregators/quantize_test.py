@@ -31,7 +31,7 @@ _measurement_aggregator = tff.aggregators.add_measurements(
     tff.aggregators.SumFactory(), client_measurement_fn=tff.federated_sum)
 
 
-class QuantizeComputationTest(tff.test.TestCase, parameterized.TestCase):
+class QuantizeComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("float_tensor_uniform", _test_float_tensor_type,
@@ -74,7 +74,7 @@ class QuantizeComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class QuantizeExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class QuantizeExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("float_tensor_uniform", _test_float_tensor_type,
@@ -103,4 +103,4 @@ class QuantizeExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == "__main__":
-  tff.test.main()
+  tf.test.main()

@@ -37,7 +37,7 @@ def _clipped_sum(clip_lower=DEFAULT_CLIP_LOWER, clip_upper=DEFAULT_CLIP_UPPER):
       clip_lower, clip_upper, tff.aggregators.SumFactory())
 
 
-class ModularClippingSumFactoryComputationTest(tff.test.TestCase,
+class ModularClippingSumFactoryComputationTest(tf.test.TestCase,
                                                parameterized.TestCase):
 
   def test_raise_on_invalid_clip_range(self):
@@ -87,7 +87,7 @@ class ModularClippingSumFactoryComputationTest(tff.test.TestCase,
         process.next.type_signature.is_equivalent_to(expected_next_type))
 
 
-class ClippingFactoryExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class ClippingFactoryExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   def _check_result(self, expected, result):
     for exp, res in zip(_make_test_struct_value(expected), result):
@@ -155,4 +155,4 @@ class ClippingFactoryExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

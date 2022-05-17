@@ -20,7 +20,7 @@ import tensorflow_federated as tff
 from large_cohort import aggregation
 
 
-class AggregationTest(tff.test.TestCase):
+class AggregationTest(tf.test.TestCase):
 
   def test_experiment_aggregator_matches_tff_learning(self):
     test_model_weights = tff.to_type(
@@ -146,4 +146,4 @@ class AggregationTest(tff.test.TestCase):
 
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

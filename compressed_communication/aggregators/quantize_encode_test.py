@@ -27,7 +27,7 @@ _test_float_tensor_type = (tf.float32, (3,))
 _test_float_tensor_quantized_type = (tf.int32, (3,))
 
 
-class QuantizeEncodeComputationTest(tff.test.TestCase, parameterized.TestCase):
+class QuantizeEncodeComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("float_tensor", _test_float_tensor_type,
@@ -146,7 +146,7 @@ class QuantizeEncodeComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class QuantizeEncodeExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class QuantizeEncodeExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("float_tensor", _test_float_tensor_type,
@@ -227,4 +227,4 @@ class QuantizeEncodeExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == "__main__":
-  tff.test.main()
+  tf.test.main()

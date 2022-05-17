@@ -55,7 +55,7 @@ _test_mixed_zeros_ce_gamma = (3. + (1. + 1. + 3.) / 3. + (1. + 3.) / 2.) / 3.
 _test_mixed_zeros_ce_delta = (4. + (1. + 1. + 4.) / 3. + (1. + 4.) / 2.) / 3.
 
 
-class ZeroRunLengthComputationTest(tff.test.TestCase, parameterized.TestCase):
+class ZeroRunLengthComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('integer_tensor', _test_value_type_integer_tensor))
@@ -97,7 +97,7 @@ class ZeroRunLengthComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class ZeroRunLengthExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class ZeroRunLengthExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('leading_zeros', _test_value_type_integer_tensor,
@@ -142,4 +142,4 @@ class ZeroRunLengthExecutionTest(tff.test.TestCase, parameterized.TestCase):
     self.assertAllClose(result, expected_result)
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

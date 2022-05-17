@@ -33,7 +33,7 @@ from compressed_communication.aggregators.comparison_methods import three_lc
 from compressed_communication.aggregators.comparison_methods import top_k
 
 
-class QuantizationEncodeAggregatorTest(tff.test.TestCase):
+class QuantizationEncodeAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -57,7 +57,7 @@ class QuantizationEncodeAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class HistogramAggregatorTest(tff.test.TestCase):
+class HistogramAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -82,7 +82,7 @@ class HistogramAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class EntropyCrossEntropyAggregatorTest(tff.test.TestCase):
+class EntropyCrossEntropyAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.StructType([
@@ -125,7 +125,7 @@ class EntropyCrossEntropyAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class VoteQStepSizeAggregatorTest(tff.test.TestCase):
+class VoteQStepSizeAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -153,7 +153,7 @@ class VoteQStepSizeAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class RotationAblationAggregatorTest(tff.test.TestCase):
+class RotationAblationAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -183,7 +183,7 @@ class RotationAblationAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class NoCompressionAggregatorTest(tff.test.TestCase):
+class NoCompressionAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -207,7 +207,7 @@ class NoCompressionAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class DRIVEAggregatorTest(tff.test.TestCase):
+class DRIVEAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -231,7 +231,7 @@ class DRIVEAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class OneBitSGDAggregatorTest(tff.test.TestCase):
+class OneBitSGDAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -255,7 +255,7 @@ class OneBitSGDAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class QSGDAggregatorTest(tff.test.TestCase):
+class QSGDAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -280,7 +280,7 @@ class QSGDAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class TernGradAggregatorTest(tff.test.TestCase):
+class TernGradAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -304,7 +304,7 @@ class TernGradAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class ThreeLCAggregatorTest(tff.test.TestCase):
+class ThreeLCAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -329,7 +329,7 @@ class ThreeLCAggregatorTest(tff.test.TestCase):
                                     reference_process.next.type_signature)
 
 
-class TopKAggregatorTest(tff.test.TestCase):
+class TopKAggregatorTest(tf.test.TestCase):
 
   def test_types_expected(self):
     test_model_weights = tff.TensorType(shape=[10], dtype=tf.float32)
@@ -355,4 +355,4 @@ class TopKAggregatorTest(tff.test.TestCase):
 
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

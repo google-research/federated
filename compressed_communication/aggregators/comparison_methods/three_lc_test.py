@@ -27,7 +27,7 @@ _test_value_type_list_integer_tensors = [(tf.int32, (2,)),
                                          (tf.int32, (3,))]
 
 
-class ThreeLCComputationTest(tff.test.TestCase, parameterized.TestCase):
+class ThreeLCComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('float_tensor', _test_value_type_float_tensor))
@@ -67,7 +67,7 @@ class ThreeLCComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class ThreeLCExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class ThreeLCExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('float_tensor', _test_value_type_float_tensor))
@@ -143,4 +143,4 @@ class ThreeLCExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

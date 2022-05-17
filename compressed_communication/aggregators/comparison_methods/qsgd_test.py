@@ -27,7 +27,7 @@ _test_one_float_tensor_type = (tf.float32, (1,))
 _test_three_float_tensor_type = (tf.float32, (3,))
 
 
-class QSGDComputationTest(tff.test.TestCase, parameterized.TestCase):
+class QSGDComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("float_tensor", _test_three_float_tensor_type))
@@ -67,7 +67,7 @@ class QSGDComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class QSGDExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class QSGDExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("float_tensor", _test_one_float_tensor_type))
@@ -172,4 +172,4 @@ class QSGDExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == "__main__":
-  tff.test.main()
+  tf.test.main()

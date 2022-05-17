@@ -33,7 +33,7 @@ def _min_max_mean_weights():
   return min_max_mean_weights.MinMaxMeanWeightsFactory()
 
 
-class MinMaxMeanWeightsComputationTest(tff.test.TestCase,
+class MinMaxMeanWeightsComputationTest(tf.test.TestCase,
                                        parameterized.TestCase):
 
   @parameterized.named_parameters(
@@ -69,7 +69,7 @@ class MinMaxMeanWeightsComputationTest(tff.test.TestCase,
                                      expected_next_type)
 
 
-class MinMaxMeanWeightsExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class MinMaxMeanWeightsExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('struct_list_float_scalars', _test_value_type_struct_float_tensor,
@@ -92,4 +92,4 @@ class MinMaxMeanWeightsExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

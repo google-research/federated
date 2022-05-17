@@ -37,7 +37,7 @@ _test_avg_bitstring_len_integer_tensor_rank_1 = 16
 _test_avg_bitstring_len_integer_tensor_rank_2 = 32
 
 
-class EncodeComputationTest(tff.test.TestCase, parameterized.TestCase):
+class EncodeComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('integer_tensor_rank_1', _test_value_type_integer_tensor_rank_1),
@@ -77,7 +77,7 @@ class EncodeComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class EncodeExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class EncodeExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('integer_tensor_rank_1',
@@ -117,4 +117,4 @@ class EncodeExecutionTest(tff.test.TestCase, parameterized.TestCase):
 
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

@@ -27,7 +27,7 @@ _test_value_type_list_integer_tensors = [(tf.int32, (2,)),
                                          (tf.int32, (3,))]
 
 
-class CrossEntropyComputationTest(tff.test.TestCase, parameterized.TestCase):
+class CrossEntropyComputationTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('integer_tensor', _test_value_type_integer_tensor))
@@ -67,7 +67,7 @@ class CrossEntropyComputationTest(tff.test.TestCase, parameterized.TestCase):
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class CrossEntropyExecutionTest(tff.test.TestCase, parameterized.TestCase):
+class CrossEntropyExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('integer_tensor', _test_value_type_integer_tensor))
@@ -108,4 +108,4 @@ class CrossEntropyExecutionTest(tff.test.TestCase, parameterized.TestCase):
     self.assertAllClose(result, expected_result)
 
 if __name__ == '__main__':
-  tff.test.main()
+  tf.test.main()

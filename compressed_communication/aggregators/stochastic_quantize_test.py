@@ -34,7 +34,7 @@ _measurement_aggregator = tff.aggregators.add_measurements(
     tff.aggregators.SumFactory(), client_measurement_fn=tff.federated_sum)
 
 
-class StochasticQuantizeComputationTest(tff.test.TestCase,
+class StochasticQuantizeComputationTest(tf.test.TestCase,
                                         parameterized.TestCase):
 
   @parameterized.named_parameters(
@@ -76,8 +76,7 @@ class StochasticQuantizeComputationTest(tff.test.TestCase,
     self.assertRaises(ValueError, factory.create, value_type)
 
 
-class StochasticQuantizeExecutionTest(tff.test.TestCase,
-                                      parameterized.TestCase):
+class StochasticQuantizeExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ("float_tensor", _test_float_tensor_type,
@@ -112,4 +111,4 @@ class StochasticQuantizeExecutionTest(tff.test.TestCase,
 
 
 if __name__ == "__main__":
-  tff.test.main()
+  tf.test.main()
