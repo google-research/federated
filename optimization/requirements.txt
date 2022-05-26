@@ -1,5 +1,5 @@
-absl-py
-numpy
-pandas
-tensorflow
-tensorflow-federated
+absl-py~=1.0.0
+numpy~=1.21.4
+pandas~=1.1.4
+tensorflow~=2.8.0
+tensorflow-federated~=0.24.0

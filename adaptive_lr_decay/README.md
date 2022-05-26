@@ -10,18 +10,12 @@ assumes some familiarity with libraries such as
 
 ## Dependencies
 
-To use this library, one should first follow the instructions
-[here](https://github.com/tensorflow/federated/blob/main/docs/install.md) to
-install TensorFlow Federated using pip. Other pip packages are required by this
-library, and may need to be installed. They can be installed via the following
-commands:
+Some pip packages are required by this library, and may need to be installed.
+See the [requirements](requirements.txt) file for details.
 
-```
-pip install absl-py
-pip install attr
-pip install numpy
-pip install tensorflow
-```
+We also require [Bazel](https://www.bazel.build/) in order to run the code.
+Please see the guide [here](https://docs.bazel.build/versions/main/install.html)
+for installation instructions.
 
 ## General description
 
