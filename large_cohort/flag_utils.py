@@ -21,7 +21,6 @@ from typing import Any, Callable, Dict, Iterable, List, Optional
 from absl import flags
 from absl import logging
 import tensorflow as tf
-import tensorflow_addons.optimizers as tfao
 
 from utils.optimizers import lars
 from utils.optimizers import shampoo
@@ -88,7 +87,6 @@ _SUPPORTED_OPTIMIZERS_CLS = [
     tf.keras.optimizers.Adam,
     yogi.Yogi,
     lars.LARS,
-    tfao.lamb.LAMB,
     shampoo.Shampoo,
 ]
 

@@ -10,4 +10,3 @@ tensorflow-privacy
 tensorflow-probability
 tensorflow-text-nightly
 tf-nightly
-tfa-nightly

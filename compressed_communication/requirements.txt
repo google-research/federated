@@ -2,6 +2,5 @@ absl-py
 numpy
 pandas
 tensorflow
-tensorflow-addons
 tensorflow-compression
 tensorflow-federated
