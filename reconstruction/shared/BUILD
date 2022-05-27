@@ -4,10 +4,9 @@ licenses(["notice"])
 
 package(default_visibility = ["//reconstruction:__subpackages__"])
 
-py_binary(
-    name = "federated_trainer",
+py_library(
+    name = "federated_trainer_lib",
     srcs = ["federated_trainer.py"],
-    python_version = "PY3",
     srcs_version = "PY3",
     deps = [
         ":federated_evaluation",
@@ -20,6 +19,16 @@ py_binary(
         "//reconstruction/stackoverflow:federated_stackoverflow",
         "//utils:utils_impl",
         "//utils/optimizers:optimizer_utils",
+    ],
+)
+
+py_binary(
+    name = "federated_trainer",
+    srcs = ["federated_trainer.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":federated_trainer_lib",
     ],
 )
 

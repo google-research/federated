@@ -2,7 +2,9 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])
 
-package(default_visibility = ["//generalization:__subpackages__"])
+package(default_visibility = [
+    "//generalization:__subpackages__",
+])
 
 py_library(
     name = "dirichlet",
@@ -22,6 +24,18 @@ py_test(
 py_library(
     name = "synthesizer_lib",
     srcs = ["synthesizer.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":cifar_synthesis",
+        ":mnist_synthesis",
+        "//generalization/utils:sql_client_data_utils",
+    ],
+)
+
+py_binary(
+    name = "synthesizer",
+    srcs = ["synthesizer.py"],
+    python_version = "PY3",
     srcs_version = "PY3",
     deps = [
         ":cifar_synthesis",
@@ -84,16 +98,4 @@ py_test(
     shard_count = 8,
     srcs_version = "PY3",
     deps = [":gmm_embedding"],
-)
-
-py_binary(
-    name = "synthesizer",
-    srcs = ["synthesizer.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        ":cifar_synthesis",
-        ":mnist_synthesis",
-        "//generalization/utils:sql_client_data_utils",
-    ],
 )
