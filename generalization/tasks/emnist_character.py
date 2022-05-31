@@ -76,7 +76,6 @@ def create_conv_dropout_model(num_classes: int, seed: Optional[int] = None):
   data_format = 'channels_last'
   if seed is not None:
     tf.random.set_seed(seed)
-  initializer = tf.keras.initializers.GlorotNormal(seed=seed)
 
   model = tf.keras.models.Sequential([
       tf.keras.layers.Conv2D(
@@ -85,22 +84,25 @@ def create_conv_dropout_model(num_classes: int, seed: Optional[int] = None):
           activation='relu',
           data_format=data_format,
           input_shape=(28, 28, 1),
-          kernel_initializer=initializer),
+          kernel_initializer=tf.keras.initializers.GlorotNormal(seed=seed)),
       tf.keras.layers.Conv2D(
           64,
           kernel_size=(3, 3),
           activation='relu',
           data_format=data_format,
-          kernel_initializer=initializer),
+          kernel_initializer=tf.keras.initializers.GlorotNormal(seed=seed)),
       tf.keras.layers.MaxPool2D(pool_size=(2, 2), data_format=data_format),
       tf.keras.layers.Dropout(0.25, seed=seed),
       tf.keras.layers.Flatten(),
       tf.keras.layers.Dense(
-          128, activation='relu', kernel_initializer=initializer),
+          128,
+          activation='relu',
+          kernel_initializer=tf.keras.initializers.GlorotNormal(seed=seed)),
       tf.keras.layers.Dropout(0.5, seed=seed),
       tf.keras.layers.Dense(
-          num_classes, activation=tf.nn.softmax,
-          kernel_initializer=initializer),
+          num_classes,
+          activation=tf.nn.softmax,
+          kernel_initializer=tf.keras.initializers.GlorotNormal(seed=seed)),
   ])
 
   return model
