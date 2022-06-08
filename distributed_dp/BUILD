@@ -29,6 +29,7 @@ py_test(
 py_library(
     name = "compression_utils",
     srcs = ["compression_utils.py"],
+    visibility = ["//private_linear_compression:__subpackages__"],
 )
 
 py_test(

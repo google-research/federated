@@ -70,3 +70,18 @@ py_binary(
         "//utils/optimizers:optimizer_utils",
     ],
 )
+
+py_library(
+    name = "subsampled_random_hadamard",
+    srcs = ["subsampled_random_hadamard.py"],
+    srcs_version = "PY3",
+    deps = ["//distributed_dp:compression_utils"],
+)
+
+py_test(
+    name = "subsampled_random_hadamard_test",
+    srcs = ["subsampled_random_hadamard_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [":subsampled_random_hadamard"],
+)
