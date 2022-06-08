@@ -42,11 +42,11 @@ class SimpleFedavgTfTest(tf.test.TestCase):
 
     for x, y in zip(big_model.trainable_variables,
                     og_model.trainable_variables):
-      self.assertAllEqual(x, y)
+      self.assertAllEqual(x.shape, y.shape)
 
     for x, y in zip(big_model.non_trainable_variables,
                     og_model.non_trainable_variables):
-      self.assertAllEqual(x, y)
+      self.assertAllEqual(x.shape, y.shape)
 
     self.assertEqual(big_model.input_spec, og_model.input_spec)
     self.assertEqual(small_model.input_spec, og_model.input_spec)
@@ -74,11 +74,11 @@ class SimpleFedavgTfTest(tf.test.TestCase):
 
     for x, y in zip(big_model.trainable_variables,
                     og_model.trainable_variables):
-      self.assertAllEqual(x, y)
+      self.assertAllEqual(x.shape, y.shape)
 
     for x, y in zip(big_model.non_trainable_variables,
                     og_model.non_trainable_variables):
-      self.assertAllEqual(x, y)
+      self.assertAllEqual(x.shape, y.shape)
 
     self.assertEqual(big_model.input_spec, og_model.input_spec)
     self.assertEqual(small_model.input_spec, og_model.input_spec)
@@ -106,11 +106,11 @@ class SimpleFedavgTfTest(tf.test.TestCase):
 
     for x, y in zip(big_model.trainable_variables,
                     og_model.trainable_variables):
-      self.assertAllEqual(x, y)
+      self.assertAllEqual(x.shape, y.shape)
 
     for x, y in zip(big_model.non_trainable_variables,
                     og_model.non_trainable_variables):
-      self.assertAllEqual(x, y)
+      self.assertAllEqual(x.shape, y.shape)
 
     self.assertEqual(big_model.input_spec, og_model.input_spec)
     self.assertEqual(small_model.input_spec, og_model.input_spec)
@@ -139,12 +139,12 @@ class SimpleFedavgTfTest(tf.test.TestCase):
     for x, y in zip(big_model.trainable_variables,
                     og_model.trainable_variables):
       self.assertAllEqual(tf.shape(x), tf.shape(y))
-      self.assertAllEqual(x, y)
+      self.assertAllEqual(x.shape, y.shape)
 
     for x, y in zip(big_model.non_trainable_variables,
                     og_model.non_trainable_variables):
       self.assertAllEqual(tf.shape(x), tf.shape(y))
-      self.assertAllEqual(x, y)
+      self.assertAllEqual(x.shape, y.shape)
 
     self.assertEqual(big_model.input_spec, og_model.input_spec)
     self.assertEqual(small_model.input_spec, og_model.input_spec)

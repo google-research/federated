@@ -22,6 +22,7 @@ py_library(
     name = "emnist_ae_models",
     srcs = ["emnist_ae_models.py"],
     srcs_version = "PY3",
+    deps = [":utils"],
 )
 
 py_test(
@@ -56,6 +57,7 @@ py_library(
     name = "shakespeare_models",
     srcs = ["shakespeare_models.py"],
     srcs_version = "PY3",
+    deps = [":utils"],
 )
 
 py_test(
@@ -73,6 +75,7 @@ py_library(
     name = "stackoverflow_models",
     srcs = ["stackoverflow_models.py"],
     srcs_version = "PY3",
+    deps = [":utils"],
 )
 
 py_test(
@@ -95,4 +98,10 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [":stackoverflow_lr_models"],
+)
+
+py_library(
+    name = "utils",
+    srcs = ["utils.py"],
+    srcs_version = "PY3",
 )

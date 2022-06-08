@@ -13,10 +13,11 @@
 # limitations under the License.
 """Build a model for EMNIST autoencoder classification."""
 
-import functools
 from typing import Optional
 
 import tensorflow as tf
+
+from utils.models import utils
 
 
 def create_autoencoder_model(seed: Optional[int] = None):
@@ -32,9 +33,12 @@ def create_autoencoder_model(seed: Optional[int] = None):
   """
   if seed is not None:
     tf.random.set_seed(seed)
-  initializer = tf.keras.initializers.GlorotNormal(seed=seed)
-  dense_layer = functools.partial(
-      tf.keras.layers.Dense, kernel_initializer=initializer)
+  initializer_fn = utils.DeterministicInitializer(
+      tf.keras.initializers.GlorotNormal, seed)
+
+  def dense_layer(*args, **kwargs):
+    return tf.keras.layers.Dense(
+        *args, kernel_initializer=initializer_fn(), **kwargs)
 
   model = tf.keras.models.Sequential([
       dense_layer(1000, activation='sigmoid', input_shape=(784,)),

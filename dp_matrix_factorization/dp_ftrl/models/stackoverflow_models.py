@@ -13,11 +13,10 @@
 # limitations under the License.
 """Sequence model functions for research baselines."""
 
+import functools
 from typing import Optional
 
 import tensorflow as tf
-
-from utils.models import utils
 
 
 class TransposableEmbedding(tf.keras.layers.Layer):
@@ -50,8 +49,7 @@ def create_recurrent_model(vocab_size: int = 10000,
     latent_size: The size of the recurrent state.
     num_layers: The number of layers.
     name: (Optional) string to name the returned `tf.keras.Model`.
-    shared_embedding: (Optional) Whether to tie the input and output
-      embeddings.
+    shared_embedding: (Optional) Whether to tie the input and output embeddings.
     seed: A random seed governing the model initialization and layer randomness.
       If not `None`, then the global random seed will be set before constructing
       the tensor initializer, in order to guarantee the same model is produced.
@@ -72,21 +70,16 @@ def create_recurrent_model(vocab_size: int = 10000,
   embedded = input_embedding(inputs)
   projected = embedded
 
-  def lstm_layer_builder():
-    return tf.keras.layers.LSTM(
-        units=latent_size,
-        return_sequences=True,
-        recurrent_initializer=utils.DeterministicInitializer(
-            tf.keras.initializers.Orthogonal, seed)(),
-        kernel_initializer=utils.DeterministicInitializer(
-            tf.keras.initializers.HeNormal, seed)())
+  lstm_layer_builder = functools.partial(
+      tf.keras.layers.LSTM,
+      units=latent_size,
+      return_sequences=True,
+      recurrent_initializer=tf.keras.initializers.Orthogonal(seed=seed),
+      kernel_initializer=tf.keras.initializers.HeNormal(seed=seed))
 
-  def dense_layer_builder(*args, **kwargs):
-    return tf.keras.layers.Dense(
-        *args,
-        kernel_initializer=utils.DeterministicInitializer(
-            tf.keras.initializers.GlorotNormal, seed)(),
-        **kwargs)
+  dense_layer_builder = functools.partial(
+      tf.keras.layers.Dense,
+      kernel_initializer=tf.keras.initializers.GlorotNormal(seed=seed))
 
   for _ in range(num_layers):
     layer = lstm_layer_builder()

@@ -1,7 +1,9 @@
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 package(
-    default_visibility = ["//rcc_dp:__subpackages__"],
+    default_visibility = [
+        "//rcc_dp:__subpackages__",
+    ],
 )
 
 licenses(["notice"])
