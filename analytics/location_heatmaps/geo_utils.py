@@ -33,17 +33,17 @@ from tqdm import tqdm
 DEFAULT_CHILDREN = ['00', '01', '10', '11']
 
 
-def get_default_children(aux_data=False, split=None):
-  """Returns a quad tree first 4 nodes. If aux_data (boolean) provided expands
+def get_default_children(has_aux_bit=False, split=None):
+  """Returns a quad tree first 4 nodes. If has_aux_bit (boolean) provided expands
   to 2 more bits or a specific pos/neg nodes.
   Args:
-    aux_data: a boolean to use additional bit for data, e.g. pos/neg.
-    split: specific subset of aux_data (pos/neg).
+    has_aux_bit: a boolean to use additional bit for data, e.g. pos/neg.
+    split: specific subset of has_aux_bit (pos/neg).
 
   Returns:
     A list of nodes to initialize the tree.
   """
-  if aux_data:
+  if has_aux_bit:
     if split == 'pos':
       return ['001', '011', '101', '111']
     elif split == 'neg':
@@ -95,14 +95,14 @@ def coordinates_to_binary_path(xy_tuple, depth=10):
   Returns:
     binary version of the coordinate.
   """
-  aux_data = ''
+  has_aux_bit = ''
   if len(xy_tuple) == 2:
     x_coord, y_coord = xy_tuple
   else:
-    x_coord, y_coord, aux_data = xy_tuple
+    x_coord, y_coord, has_aux_bit = xy_tuple
   path = ''
   for j in reversed(range(depth)):
-    path += f'{(x_coord >> j) & 1}{(y_coord >> j) & 1}{aux_data}/'
+    path += f'{(x_coord >> j) & 1}{(y_coord >> j) & 1}{has_aux_bit}/'
   path = path[:-1]
   
   return path
@@ -150,14 +150,14 @@ def report_coordinate_to_vector(xy, tree, tree_prefix_list, count_min):
   return vector
 
 
-def init_tree(aux_data=False):
+def init_tree(has_aux_bit=False):
   """Initializes tree to have four leaf nodes.
 
   Creates pgtrie with leafs from `DEFAULT_CHILDREN` and assigns each node
   a positional identifier using positions from the `DEFAULT_CHILDREN`.
 
   Args:
-    aux_data: Whether to account for pos and neg users.
+    has_aux_bit: Whether to account for pos and neg users.
 
   Returns:
     constructed pygtrie, reverse prefix of the trie.
@@ -165,9 +165,9 @@ def init_tree(aux_data=False):
 
   new_tree = pygtrie.StringTrie()
 
-  for i, z in enumerate(get_default_children(aux_data)):
+  for i, z in enumerate(get_default_children(has_aux_bit)):
     new_tree[z] = i
-  return new_tree, list(get_default_children(aux_data))
+  return new_tree, list(get_default_children(has_aux_bit))
 
 
 def transform_region_to_coordinates(x_coord,
@@ -199,7 +199,7 @@ def transform_region_to_coordinates(x_coord,
 
 
 def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold=0,
-                        aux_data=False, count_min=None):
+                        has_aux_bit=False, count_min=None):
   """Using coordinate vector and the tree produce a resulting image.
 
   For each value in the vector it finds the corresponding prefix and plots the
@@ -211,7 +211,7 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold
     image_size: desired final resolution of the image.
     contour: release only the contours of the grid (for debugging)
     split_threshold: reduces noise by setting values below threshold to 0.
-    aux_data: produce two images with positive and negative cases.
+    has_aux_bit: produce two images with positive and negative cases.
     count_min: use count min sketch.
 
   Returns:
@@ -220,7 +220,7 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold
   image_bit_level = int(np.log2(image_size))
   current_image = np.zeros([image_size, image_size])
   pos_image, neg_image = None, None
-  if aux_data:
+  if has_aux_bit:
     pos_image = np.zeros([image_size, image_size])
     neg_image = np.zeros([image_size, image_size])
   for path in sorted(tree):
@@ -260,7 +260,7 @@ def rebuild_from_vector(vector, tree, image_size, contour=False, split_threshold
           count *= scale
 
       current_image[x_bot:x_top + 1, y_bot:y_top + 1] = count
-      if aux_data:
+      if has_aux_bit:
         if pos == 1:
           pos_image[x_bot:x_top + 1, y_bot:y_top + 1] = count
         elif pos == 0:
@@ -332,7 +332,7 @@ def split_regions(tree_prefix_list,
     if len(prefix.split('/')) >= image_bit_level:
       continue
     if last_result:
-      cond = create_confidence_interval_condition(last_result, prefix, count,
+      cond = evaluate_confidence_interval_condition(last_result, prefix, count,
                                                   split_threshold)
     else:
       cond = count > split_threshold
@@ -397,16 +397,16 @@ def split_regions_aux(tree_prefix_list,
     if len(pos_prefix.split('/')) >= image_bit_level:
       continue
     if last_result:
-      p_cond = create_confidence_interval_condition(last_result, pos_prefix,
+      p_cond = evaluate_confidence_interval_condition(last_result, pos_prefix,
                                                     pos_count, split_threshold)
-      n_cond = create_confidence_interval_condition(last_result, neg_prefix,
+      n_cond = evaluate_confidence_interval_condition(last_result, neg_prefix,
                                                     neg_count, split_threshold)
       cond = p_cond and n_cond
     else:
       cond = (pos_count > split_threshold and neg_count > split_threshold)
     if cond:
-      neg_child = get_default_children(aux_data=True, split='neg')
-      pos_child = get_default_children(aux_data=True, split='pos')
+      neg_child = get_default_children(has_aux_bit=True, split='neg')
+      pos_child = get_default_children(has_aux_bit=True, split='pos')
       for j in range(len(pos_child)):
         new_prefix = f'{neg_prefix}/{neg_child[j]}'
         num_newly_expanded_nodes += append_to_tree(new_prefix, new_tree, new_tree_prefix_list)
@@ -564,7 +564,7 @@ def evaluate_confidence_interval_condition(last_result, prefix, count, split_thr
 
 def make_step(samples, eps, split_threshold, partial,
               prefix_len, dropout_rate, tree, tree_prefix_list,
-              noiser, quantize, total_size, aux_data, count_min):
+              noiser, quantize, total_size, has_aux_bit, count_min):
   """
 
   Args:
@@ -579,7 +579,7 @@ def make_step(samples, eps, split_threshold, partial,
     noiser: class for the noise
     quantize: use of quantization
     total_size: size of the location area (e.g. 1024).
-    aux_data: each entry in the dataset has also positivity status (x,y,positivity)
+    has_aux_bit: each entry in the dataset has also positivity status (x,y,positivity)
     count_min: use count-min sketch
 
   Returns: AlgResult and contour of the current split.
@@ -622,7 +622,7 @@ def make_step(samples, eps, split_threshold, partial,
       if j % (samples_len//10) == 0 or j == samples_len - 1:
         test_image, _, _ = rebuild_from_vector(
           np.copy(sum_vector), tree, image_size=total_size, split_threshold=split_threshold if eps else -1,
-          aux_data=aux_data, count_min=count_min)
+          has_aux_bit=has_aux_bit, count_min=count_min)
         level_animation_list.append(test_image)
   del round_vector
   rebuilder = np.copy(sum_vector)
@@ -633,7 +633,7 @@ def make_step(samples, eps, split_threshold, partial,
 
   test_image, pos_image, neg_image = rebuild_from_vector(
     rebuilder, tree, image_size=total_size, split_threshold=threshold_rebuild,
-    aux_data=aux_data, count_min=count_min)
+    has_aux_bit=has_aux_bit, count_min=count_min)
 
   grid_contour, _, _ = rebuild_from_vector(
     sum_vector,

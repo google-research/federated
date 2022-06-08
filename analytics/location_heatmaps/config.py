@@ -27,5 +27,5 @@ class Config:
     quantize: bool = None
     noise_class: Any = None
     save_gif: bool = False
-    aux_data: bool = False
+    has_aux_bit: bool = False
     start_with_level: int = 0

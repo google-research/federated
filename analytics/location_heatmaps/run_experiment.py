@@ -98,7 +98,7 @@ def run_experiment(true_image,
                    quantize=None,
                    noise_class=mechanisms.GeometricNoise,
                    save_gif=False,
-                   aux_data=False,
+                   has_aux_bit=False,
                    start_with_level=0,
                    ignore_start_eps=False,
                    last_result_ci=None,
@@ -128,9 +128,11 @@ def run_experiment(true_image,
       quantize: apply quantization to the vectors.
       noise_class: use specific noise, defaults to GeometricNoise.
       save_gif: saves all images as a gif.
-      aux_data: each entry in the dataset has also positivity status (x,y,positivity)
+      has_aux_bit: each entry in the dataset has also positivity status
+        (x,y,positivity)
       start_with_level: skip first levels and always expand them.
-      ignore_start_eps: ignore spending epsilon when using start_with_level.
+      ignore_start_eps: When starting with start_with_level of the tree don't
+          account for prior budget.
       last_result_ci: for two label save previous results.
       count_min: to use count-min sketch use dict: {'depth': 20, 'width': 4000}
 
@@ -157,16 +159,16 @@ def run_experiment(true_image,
                   quantize=quantize,
                   noise_class=noise_class,
                   save_gif=save_gif,
-                  aux_data=aux_data,
+                  has_aux_bit=has_aux_bit,
                   start_with_level=start_with_level)
 
-  tree, tree_prefix_list = geo_utils.init_tree(config.aux_data)
+  tree, tree_prefix_list = geo_utils.init_tree(config.has_aux_bit)
   per_level_results = list()
   per_level_grid = list()
   num_newly_expanded_nodes = None
   sum_vector = None
-  print_output(f'aux_data: {config.aux_data}', config.output_flag)
-  process_split = geo_utils.split_regions_aux if aux_data else geo_utils.split_regions
+  print_output(f'has_aux_bit: {config.has_aux_bit}', config.output_flag)
+  process_split = geo_utils.split_regions_aux if has_aux_bit else geo_utils.split_regions
   spent_budget = 0
   remaining_budget = total_epsilon_budget
   if config.level_sample_size % config.secagg_round_size != 0:
@@ -224,7 +226,9 @@ def run_experiment(true_image,
 
       noiser = noise_class(dp_round_size, sensitivity, eps)
       if ignore_start_eps and start_with_level <= i:
-        print_output('Ignoring eps spent', flag=output_flag)
+        print_output(f'Automatically expand top level of the tree without '+\
+                     f'any user contributions: {i}/{start_with_level}.',
+                     flag=output_flag)
         spent_budget = 0
       else:
         spent_budget += eps * samples_len
@@ -255,13 +259,13 @@ def run_experiment(true_image,
                                                prefix_len, dropout_rate,
                                                tree, tree_prefix_list,
                                                noiser, quantize, total_size,
-                                               aux_data, count_min=count_min_sketch)
+                                               has_aux_bit, count_min=count_min_sketch)
 
     per_level_results.append(result)
     per_level_grid.append(grid_contour)
 
     # compare to true image without sampling error
-    if aux_data:
+    if has_aux_bit:
       im = result.pos_image
     else:
       im = result.image
@@ -309,7 +313,7 @@ def run_experiment(true_image,
       result = per_level_results[i]
       plotting.plot_it(
         ax=axis,
-        test_image=result.pos_image if aux_data else result.image,
+        test_image=result.pos_image if has_aux_bit else result.image,
         eps=result.eps,
         total_regions=len(result.tree_prefix_list),
         metric=result.metric)
