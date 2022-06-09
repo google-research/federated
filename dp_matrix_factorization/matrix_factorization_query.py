@@ -57,6 +57,8 @@ import attr
 import tensorflow as tf
 import tensorflow_privacy as tfp
 
+from differential_privacy.python.accounting import dp_event
+
 NestedTensorStructure = Iterable[Union[tf.Tensor, 'NestedTensorStructure']]
 NestedTensorSpec = Iterable[Union[tf.TensorSpec, 'NestedTensorSpec']]
 
@@ -499,7 +501,7 @@ class FactorizedGaussianSumQuery(tfp.SumAggregationDPQuery):
   def get_noised_result(
       self, sample_state: NestedTensorStructure,
       global_state: FactorizedSumQueryState
-  ) -> Tuple[NestedTensorStructure, FactorizedSumQueryState, tfp.DpEvent]:
+  ) -> Tuple[NestedTensorStructure, FactorizedSumQueryState, dp_event.DpEvent]:
     clear_record, clear_query_state = self._clear_query.compute_query(
         global_state.clear_query_state, sample_state)
     noise, noise_mech_state = self._noise_mech.compute_noise(
@@ -514,5 +516,5 @@ class FactorizedGaussianSumQuery(tfp.SumAggregationDPQuery):
     # owned by the clients of this class.
     # TODO(b/230000870): Consider implementing a SingleEpochFactorized event,
     # and returning it once from this method.
-    event = tfp.UnsupportedDpEvent()
+    event = dp_event.UnsupportedDpEvent()
     return noised_result, new_global_state, event
