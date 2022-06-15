@@ -88,8 +88,7 @@ class GlobalTrainerTest(absltest.TestCase):
   @flagsaver.flagsaver(
       root_output_dir=tempfile.mkdtemp(),
       experiment_name='test_experiment',
-      dataset_name='landmark',
-      landmark_extra_test_over_original_test_ratio=0.5,
+      dataset_name='ted_multi',
       clients_per_train_round=1,
       total_rounds=2,
       rounds_per_evaluation=1,
@@ -103,9 +102,8 @@ class GlobalTrainerTest(absltest.TestCase):
       finetune_max_epochs=2,
       valid_clients_per_evaluation=1,
       test_clients_per_evaluation=1,
-      use_synthetic_data=True,
-      landmark_model_weights_eval_only=True)
-  def test_executes_landmark_model_weights_eval_only(self):
+      use_synthetic_data=True)
+  def test_executes_ted_multi(self):
     finetuning_trainer.main([])
 
 

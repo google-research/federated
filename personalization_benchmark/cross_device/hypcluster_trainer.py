@@ -30,6 +30,7 @@ from personalization_benchmark.cross_device.algorithms import optimizer_flag_uti
 from personalization_benchmark.cross_device.datasets import emnist
 from personalization_benchmark.cross_device.datasets import landmark
 from personalization_benchmark.cross_device.datasets import stackoverflow
+from personalization_benchmark.cross_device.datasets import ted_multi
 from utils import training_utils
 from utils import utils_impl
 
@@ -77,15 +78,6 @@ with utils_impl.record_hparam_flags() as training_flags:
       'each client\'s original test set. Used for controlling '
       'the distribution shift between selection set and '
       'the test set.')
-  flags.DEFINE_bool(
-      'landmark_model_weights_eval_only', False, 'If True, only perform '
-      'evaluation, and no training happens. The same model weights will be '
-      'evaluated across different rounds. This is useful for landmark '
-      'experiments, because both FedAvg training and evaluation is slow, it is '
-      'best to split training and evaluation, i.e., train FedAvg once and '
-      'evalute the final model over different settings, e.g., finetune full '
-      'model or only last layer, different '
-      '`landmark_extra_test_over_original_test_ratio`s.')
 
   # Random seeds for reproducibility
   flags.DEFINE_integer(
@@ -143,25 +135,6 @@ def _create_train_algorithm(
       initial_model_weights_list=initial_model_weights_list)
 
 
-def _create_no_train_process(
-    train_process: tff.learning.templates.LearningProcess
-) -> tff.learning.templates.LearningProcess:
-  """Creates a process that does no training and returns same state in `next`."""
-  state_type = train_process.next.type_signature.parameter[0]
-  data_type = train_process.next.type_signature.parameter[1]
-
-  @tff.federated_computation(state_type, data_type)
-  def next_with_no_training(state, data):
-    train_output = train_process.next(state, data)
-    return tff.learning.templates.LearningProcessOutput(
-        state=state, metrics=train_output.metrics)
-
-  return tff.learning.templates.LearningProcess(train_process.initialize,
-                                                next_with_no_training,
-                                                train_process.get_model_weights,
-                                                train_process.set_model_weights)
-
-
 def _create_model_and_data(
     dataset_name: str, use_synthetic_data: bool
 ) -> Tuple[constants.ModelFnType, constants.FederatedDatasetsType,
@@ -184,6 +157,11 @@ def _create_model_and_data(
         use_synthetic_data=use_synthetic_data,
         extra_test_over_original_test_ratio=FLAGS
         .landmark_extra_test_over_original_test_ratio)
+  elif dataset_name == 'ted_multi':
+    return ted_multi.create_model_and_data(
+        num_local_epochs=FLAGS.train_epochs,
+        train_batch_size=FLAGS.train_batch_size,
+        use_synthetic_data=use_synthetic_data)
   raise ValueError(f'Accepted dataset names: {constants.DATASET_NAMES}, but '
                    f'found {dataset_name}. Please provide a valid name.')
 
@@ -241,12 +219,6 @@ def main(argv):
     return train_preprocess_fn(raw_client_data)
 
   learning_process = _create_train_algorithm(model_fn)
-  if FLAGS.landmark_model_weights_eval_only:
-    if FLAGS.dataset_name != 'landmark':
-      raise ValueError(
-          'You can only set `landmark_model_weights_eval_only` as True for '
-          f'`landmark` experiments. Found dataset name: {FLAGS.dataset_name}.')
-    learning_process = _create_no_train_process(learning_process)
   training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
       build_train_dataset_from_client_id, learning_process)
   training_process.get_model_weights = learning_process.get_model_weights

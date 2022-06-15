@@ -17,7 +17,7 @@ from typing import Callable, OrderedDict
 import tensorflow as tf
 import tensorflow_federated as tff
 
-DATASET_NAMES = ['emnist', 'stackoverflow', 'landmark']
+DATASET_NAMES = ['emnist', 'stackoverflow', 'landmark', 'ted_multi']
 TRAIN_CLIENTS_KEY = 'train_clients'
 VALID_CLIENTS_KEY = 'valid_clients'
 TEST_CLIENTS_KEY = 'test_clients'

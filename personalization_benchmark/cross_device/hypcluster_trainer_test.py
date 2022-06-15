@@ -83,8 +83,7 @@ class GlobalTrainerTest(tf.test.TestCase, parameterized.TestCase):
   @flagsaver.flagsaver(
       root_output_dir=tempfile.mkdtemp(),
       experiment_name='test_experiment',
-      dataset_name='landmark',
-      landmark_extra_test_over_original_test_ratio=0.5,
+      dataset_name='ted_multi',
       clients_per_train_round=1,
       num_clusters=2,
       total_rounds=2,
@@ -92,13 +91,12 @@ class GlobalTrainerTest(tf.test.TestCase, parameterized.TestCase):
       rounds_per_checkpoint=1,
       client_optimizer='sgd',
       client_learning_rate=0.01,
-      server_optimizer='adam',
+      server_optimizer='sgd',
       server_learning_rate=1.0,
       valid_clients_per_evaluation=1,
       test_clients_per_evaluation=1,
-      use_synthetic_data=True,
-      landmark_model_weights_eval_only=True)
-  def test_executes_landmark_model_weights_eval_only(self):
+      use_synthetic_data=True)
+  def test_executes_ted_multi(self):
     hypcluster_trainer.main([])
 
 
