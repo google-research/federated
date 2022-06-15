@@ -96,7 +96,7 @@ On Federated-EMNIST, upwards of 50x compression can be attained with
 
 **Left:** Stack Overflow next-word prediction. **Right:** Federated-EMNIST.
 
-<img src="images/sownwp-dr.png" height="200px"><img src="images/emnist-dr.png" height="200px">
+<img src="images/sonwp-dr.png" height="200px"><img src="images/emnist-dr.png" height="200px">
 
 Optimizing both quantization and linear dimensionality reduction via sketching,
 we can obtain as low as 0.24 bits per parameter on Federated-EMNIST (below) and
