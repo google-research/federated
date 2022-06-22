@@ -2,6 +2,8 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 # Enables linear compression aggregators in Federated Learning as a means to achieve optimal privacy-accuracy-communication tradeoffs.
 
+package(default_visibility = ["//visibility:private"])
+
 licenses(["notice"])
 
 py_library(
