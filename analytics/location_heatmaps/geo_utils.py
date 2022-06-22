@@ -325,7 +325,7 @@ def split_regions(tree_prefix_list,
     if count_min:
       count = count_min.query(tree_prefix_list[i])
     else:
-      count = vector_counts[i] if vector_counts else np.inf
+      count = vector_counts[i] if vector_counts is not None else np.inf
     prefix = tree_prefix_list[i]
 
     # check whether the tree has reached the bottom
