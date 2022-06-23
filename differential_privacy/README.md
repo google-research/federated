@@ -12,12 +12,7 @@ For a more general look at using TensorFlow Federated for research, see
 Some pip packages are required by this library, and may need to be installed:
 
 ```
-pip install absl-py
-pip install attr
-pip install numpy
-pip install tensorflow
-pip install tensorflow-privacy
-pip install tensorflow-federated
+pip install --requirement differential_privacy/requirements.txt
 ```
 
 ## Example usage
@@ -27,7 +22,7 @@ bazel run run_federated -- \
   --client_optimizer=sgd \
   --server_optimizer=sgd \
   --server_sgd_momentum=0.9 \
-  --clients_per_round=100 \
+  --clients_per_round=10 \
   --uniform_weighting=True \
   --clip=0.1 \
   --target_unclipped_quantile=0.5 \
@@ -39,5 +34,6 @@ bazel run run_federated -- \
   --total_rounds=1500 \
   --client_batch_size=16 \
   --root_output_dir=/tmp/dp \
-  --experiment_name=so_nwp
+  --experiment_name=so_nwp \
+  --max_elements_per_client=1000
 ```
