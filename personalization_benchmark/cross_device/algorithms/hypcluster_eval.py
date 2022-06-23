@@ -46,8 +46,7 @@ def build_hypcluster_eval_with_dataset_split(
     num_clusters: int) -> tff.Computation:
   """Builds a computation for performing a special HypCluster evaluation.
 
-  This differs notably from `build_hypcluster_evel` in how the metrics are
-  computed. The client-side input is a `collections.OrderedDict` with two keys:
+  The client-side input is a `collections.OrderedDict` with two keys:
   `SELECTION_DATA_KEY` and `TEST_DATA_KEY`, each one of corresponds to a
   `tf.data.Dataset` value. The selection data is used to select the best model,
   while the test data is used to evaluate the selected model. Evaluation metrics

@@ -1,8 +1,41 @@
 # Cross-device experiments in Motley
 
 This directory contains code to reproduce the cross-device experiments in our
-paper "Motley: Benchmarking Heterogeneity and Personalization in Federated
-Learning".
+paper
+["Motley: Benchmarking Heterogeneity and Personalization in Federated Learning"](https://arxiv.org/abs/2206.09262).
+
+Some pip packages are required by this library, and may need to be installed.
+For more details, see `requirements.txt`. We recommend running `pip install
+--requirement "requirements.txt"`.
+
+We also require [Bazel](https://www.bazel.build/) in order to run the code.
+Please see the guide [here](https://bazel.build/install) for installation
+instructions.
+
+The main binaries are located at `finetuning_trainer.py` and
+`hypcluster_trainer.py`. Here is an example command:
+
+```
+bazel run :finetuning_trainer --
+--dataset_name={DATASET NAME}
+--experiment_name={EXPERIMENT NAME}
+--total_rounds={TOTAL ROUNDS}
+--clients_per_train_round={COHORT SIZE}
+--train_batch_size={CLIENT BATCH SIZE}
+--train_epochs=1
+--server_optimizer=adam
+--server_learning_rate={SERVER LEARNING RATE}
+--server_adam_beta_1=0.9
+--server_adam_beta_2=0.99
+--server_adam_epsilon={SERVER ADAM EPSILON}
+--client_optimizer=sgd
+--client_learning_rate={CLIENT LEARNING RATE}
+--finetune_optimizer=sgd
+--finetune_learning_rate={FINETUNE LEARNING RATE}
+--finetune_max_epochs={FINETUNE MAX EPOCHS}
+--finetune_last_layer={True/False}
+--base_random_seed={RANDOM SEED}
+```
 
 Below we describe the hyperparameter grids and the best hyperparameters found
 for the three algorithms (FedAvg+Fine-tuning, HypCluster, and local training)

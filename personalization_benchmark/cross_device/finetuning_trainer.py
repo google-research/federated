@@ -40,7 +40,7 @@ with utils_impl.record_hparam_flags() as training_flags:
       '--root_output_dir to separate experiment results.')
   flags.DEFINE_enum('dataset_name', None, constants.DATASET_NAMES,
                     'Which dataset to use for experiments.')
-  flags.DEFINE_string('root_output_dir', '/tmp/data_poor_fl/',
+  flags.DEFINE_string('root_output_dir', '/tmp/personalization_benchmark/',
                       'Root directory for writing experiment output.')
   flags.DEFINE_integer('total_rounds', 100, 'Number of total training rounds.')
   flags.DEFINE_integer('rounds_per_evaluation', 10,
