@@ -19,14 +19,14 @@ import tensorflow_federated as tff
 from personalization_benchmark.cross_device.algorithms import hypcluster_eval
 
 
-def create_dataset():
+def create_three_example_dataset():
   # Create data satisfying y = x + 1
   x = [[1.0], [2.0], [3.0]]
   y = [[2.0], [3.0], [4.0]]
   return tf.data.Dataset.from_tensor_slices((x, y)).batch(1)
 
 
-def create_dataset_with_zeros_y():
+def create_two_example_dataset_with_zeros_y():
   # Create data with y = 0
   x = [[1.0], [2.0]]
   y = [[0.0], [0.0]]
@@ -34,7 +34,7 @@ def create_dataset_with_zeros_y():
 
 
 def get_input_spec():
-  return create_dataset().element_spec
+  return create_three_example_dataset().element_spec
 
 
 def model_fn(initializer='zeros'):
@@ -81,17 +81,19 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
         weight_tensors_from_model(model_fn('ones')),
     ]
     client_data = collections.OrderedDict([
-        (hypcluster_eval.SELECTION_DATA_KEY, create_dataset()),
-        (hypcluster_eval.TEST_DATA_KEY, create_dataset_with_zeros_y())
+        (hypcluster_eval.SELECTION_DATA_KEY, create_three_example_dataset()),
+        (hypcluster_eval.TEST_DATA_KEY,
+         create_two_example_dataset_with_zeros_y())
     ])
     selection_metrics, test_metrics = (
         hypcluster_eval._get_metrics_for_select_and_test(
             model_list, weights_list, client_data))
     # The first model will predict y=0 for all examples. On the selection data
-    # (given by `create_dataset()`), the sum of squared error is 2*2+3*3+4*4=29.
+    # (given by `create_three_example_dataset()`), the sum of squared error is
+    # 2*2+3*3+4*4=29.
     self.assertEqual(selection_metrics[0]['loss'], [29.0, 3.0])
-    # On the test data (given by `create_dataset_with_zeros_y()`), the sum of
-    # squared error is 0.
+    # On the test data (given by `create_two_example_dataset_with_zeros_y()`),
+    # the sum of squared error is 0.
     self.assertEqual(test_metrics[0]['loss'], [0.0, 2.0])
     # The second model will predict y=x+1. On the selection data, the sum of
     # squared error is 0
@@ -99,10 +101,10 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
     # On the test data, the sum of squared error is 2*2+3*3=13.
     self.assertEqual(test_metrics[1]['loss'], [13.0, 2.0])
     for model_i in [0, 1]:
-      # The selection data is given by `create_dataset()`.
+      # The selection data is given by `create_three_example_dataset)`.
       self.assertEqual(selection_metrics[model_i]['num_examples'], [3])
       self.assertEqual(selection_metrics[model_i]['num_batches'], [3])
-      # The test data is given by `create_dataset_with_zeros_y()`.
+      # The test data is given by `create_two_example_dataset_with_zeros_y()`.
       self.assertEqual(test_metrics[model_i]['num_examples'], [2])
       self.assertEqual(test_metrics[model_i]['num_batches'], [2])
 
@@ -111,12 +113,14 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
         model_fn=model_fn, num_clusters=1)
     model_weights_list = [weight_tensors_from_model(model_fn('ones'))]
     first_client_data = collections.OrderedDict([
-        (hypcluster_eval.SELECTION_DATA_KEY, create_dataset()),
-        (hypcluster_eval.TEST_DATA_KEY, create_dataset_with_zeros_y())
+        (hypcluster_eval.SELECTION_DATA_KEY, create_three_example_dataset()),
+        (hypcluster_eval.TEST_DATA_KEY,
+         create_two_example_dataset_with_zeros_y())
     ])
     second_client_data = collections.OrderedDict([
-        (hypcluster_eval.SELECTION_DATA_KEY, create_dataset_with_zeros_y()),
-        (hypcluster_eval.TEST_DATA_KEY, create_dataset())
+        (hypcluster_eval.SELECTION_DATA_KEY,
+         create_two_example_dataset_with_zeros_y()),
+        (hypcluster_eval.TEST_DATA_KEY, create_three_example_dataset())
     ])
     eval_metrics = eval_comp(model_weights_list,
                              [first_client_data, second_client_data])
@@ -127,10 +131,11 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
         ['best', 'model_0', 'choose_0', 'metric_samples'])
     self.assertEqual(eval_metrics['choose_0'], 1.0)
     for key in ['best', 'model_0']:
-      # The sum of squared error is 2*2+3*3=13 on the first client's test data,
-      # and is 0 on the second client's test data.
-      self.assertAlmostEqual(eval_metrics[key]['loss'], 13.0 / 5.0, places=6)
-      self.assertEqual(eval_metrics[key]['num_examples'], 5)
+      # The mean squared error is (2*2+3*3)/2=13/2 on the first client's test
+      # data, and is 0 on the second client's test data.
+      self.assertAlmostEqual(
+          eval_metrics[key]['loss'], (13.0 / 2 + 0) / 2, places=6)
+      self.assertEqual(eval_metrics[key]['num_examples'], (2 + 3) / 2.0)
 
   @parameterized.named_parameters(
       ('clusters2', 2),
@@ -146,12 +151,14 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
         for i in range(num_clusters)
     ]  # The i-th model has weights equal to i.
     first_client_data = collections.OrderedDict([
-        (hypcluster_eval.SELECTION_DATA_KEY, create_dataset()),
-        (hypcluster_eval.TEST_DATA_KEY, create_dataset_with_zeros_y())
+        (hypcluster_eval.SELECTION_DATA_KEY, create_three_example_dataset()),
+        (hypcluster_eval.TEST_DATA_KEY,
+         create_two_example_dataset_with_zeros_y())
     ])
     second_client_data = collections.OrderedDict([
-        (hypcluster_eval.SELECTION_DATA_KEY, create_dataset_with_zeros_y()),
-        (hypcluster_eval.TEST_DATA_KEY, create_dataset())
+        (hypcluster_eval.SELECTION_DATA_KEY,
+         create_two_example_dataset_with_zeros_y()),
+        (hypcluster_eval.TEST_DATA_KEY, create_three_example_dataset())
     ])
     eval_metrics = eval_comp(model_weights_list,
                              [first_client_data, second_client_data])
@@ -166,20 +173,22 @@ class HypClusterEvalTest(tf.test.TestCase, parameterized.TestCase):
         self.assertEqual(eval_metrics[f'choose_{i}'], 0.5)
       else:
         self.assertEqual(eval_metrics[f'choose_{i}'], 0.0)
-    # The sum of squared error is 2*2+3*3=13 on the first client's test data,
-    # and is 2*2+3*3+4*4=29 on the second client's test data.
-    self.assertAlmostEqual(eval_metrics['best']['loss'], 42.0 / 5.0, places=5)
+    # The mean squared error is 2*2+3*3=13/2 on the first client's test data,
+    # and is 2*2+3*3+4*4/3=29/3 on the second client's test data.
+    self.assertAlmostEqual(
+        eval_metrics['best']['loss'], (13.0 / 2 + 29.0 / 3) / 2.0, places=5)
     for i in range(num_clusters):
       # The i-th model has weights equal to i, so for input x, it will predict
       # y = x*i + i. Both clients need to evaluate this model on its test data.
-      expected_sum_squared_error = ((i + i)**2 + (2 * i + i)**2 +
-                                    (i + i - 2)**2 + (2 * i + i - 3)**2 +
-                                    (3 * i + i - 4)**2)
+      expected_mse_client_1 = ((i + i)**2 + (2 * i + i)**2) / 2.0
+      expected_mse_client_2 = ((i + i - 2)**2 + (2 * i + i - 3)**2 +
+                               (3 * i + i - 4)**2) / 3.0
       self.assertAlmostEqual(
           eval_metrics[f'model_{i}']['loss'],
-          float(expected_sum_squared_error) / 5.0,
+          (expected_mse_client_1 + expected_mse_client_2) / 2.0,
           places=5)
-      self.assertAlmostEqual(eval_metrics[f'model_{i}']['num_examples'], 5)
+      self.assertAlmostEqual(eval_metrics[f'model_{i}']['num_examples'],
+                             (2 + 3) / 2.0)
 
 
 if __name__ == '__main__':

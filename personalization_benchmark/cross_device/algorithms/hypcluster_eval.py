@@ -69,8 +69,7 @@ def build_hypcluster_eval_with_dataset_split(
     model_weights_type = tff.learning.framework.weights_type_from_model(model)
     unfinalized_metrics_type = tff.types.type_from_tensors(
         model.report_local_unfinalized_metrics())
-    metrics_aggregation_fn = tff.learning.metrics.sum_then_finalize(
-        model.metric_finalizers(), unfinalized_metrics_type)
+    metric_finalizers = model.metric_finalizers()
     client_data_type = tff.to_type(
         collections.OrderedDict([
             (SELECTION_DATA_KEY, tff.types.SequenceType(model.input_spec)),
@@ -79,6 +78,19 @@ def build_hypcluster_eval_with_dataset_split(
 
   metrics_gather_fn = hypcluster_utils.build_gather_fn(unfinalized_metrics_type,
                                                        num_clusters)
+
+  @tff.tf_computation(metrics_gather_fn.type_signature.parameter[0],
+                      metrics_gather_fn.type_signature.parameter[1])
+  def metrics_gather_and_finalize_fn(list_of_unfinalized_metrics, index):
+    unfinalized_metrics = metrics_gather_fn(list_of_unfinalized_metrics, index)
+    finalized_metrics = collections.OrderedDict()
+    for metric_name, metric_finalizer in metric_finalizers.items():
+      # Casting the metric to be floating-point type, so that the result can be
+      # used with `tff.federated_mean` when server aggregates the metrics.
+      finalized_metrics[metric_name] = tf.cast(
+          metric_finalizer(unfinalized_metrics[metric_name]), tf.float32)
+    return finalized_metrics
+
   list_weights_type = tff.StructWithPythonType(
       [model_weights_type for _ in range(num_clusters)], container_type=list)
 
@@ -90,10 +102,10 @@ def build_hypcluster_eval_with_dataset_split(
     best_model_index = hypcluster_utils.select_best_model(
         eval_models_outputs_for_select)
     local_metrics = collections.OrderedDict(
-        best=metrics_gather_fn(eval_models_outputs_for_metrics,
-                               best_model_index))
+        best=metrics_gather_and_finalize_fn(eval_models_outputs_for_metrics,
+                                            best_model_index))
     for i in range(num_clusters):
-      local_metrics[f'model_{i}'] = metrics_gather_fn(
+      local_metrics[f'model_{i}'] = metrics_gather_and_finalize_fn(
           eval_models_outputs_for_metrics, i)
     for i in range(num_clusters):
       local_metrics[f'choose_{i}'] = tf.cast(
@@ -111,10 +123,7 @@ def build_hypcluster_eval_with_dataset_split(
     metric_names = tff.structure.name_list(
         local_hypcluster_eval.type_signature.result)
     for name in metric_names:
-      if 'choose' in name:
-        eval_metrics[name] = tff.federated_mean(client_metrics[name])
-      else:
-        eval_metrics[name] = metrics_aggregation_fn(client_metrics[name])
+      eval_metrics[name] = tff.federated_mean(client_metrics[name])
     # Sample metrics from at most 500 clients. For most experiments that we run,
     # the test clients per evaluation is smaller than 500. This means that we
     # will save metrics from all the test clients evaluated at that round.
