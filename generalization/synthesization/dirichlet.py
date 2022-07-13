@@ -217,4 +217,4 @@ def synthesize_by_dirichlet_over_labels(
 
   synthesizer = _DirichletOverLabelsSynthesizer(dataset, num_clients,
                                                 concentration_factor, seed)
-  return synthesizer.build_client_data(rotate_draw=use_rotate_draw)
+  return synthesizer.build_client_data(rotate_draw=use_rotate_draw)  # pytype: disable=bad-return-type  # dynamic-method-lookup
