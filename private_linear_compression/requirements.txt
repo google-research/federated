@@ -1,5 +1,9 @@
-absl-py
-numpy
-tensorflow
-tensorflow-federated
-tensorflow-privacy
+absl-py==1.0.0
+matplotlib==3.3.4
+numpy==1.21.6
+pandas==1.1.5
+scipy==1.5.4
+seaborn==0.11.2
+tensorflow==2.9.1
+tensorflow-federated==0.27.0
+tensorflow-privacy==0.8.0

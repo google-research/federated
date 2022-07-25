@@ -193,12 +193,10 @@ class GradientCountSketchFactoryTest(tf.test.TestCase, parameterized.TestCase):
     # Expect a different sign and index seed each round.
     self.assertLen(set(index_seeds + sign_seeds), len(index_seeds + sign_seeds))
 
-  @parameterized.named_parameters([('float16', tf.float16),
-                                   ('float32', tf.float32),
-                                   ('float64', tf.float64)])
-  def test_aggregator_different_dtypes(self, dtype):
+  def test_aggregator_correct_dtype(self):
     kwargs = self.default_sketching_kwargs
 
+    dtype = tf.float32
     value_type = (dtype, [45])
     client_data = [tf.random.normal([45]), tf.random.uniform([45])]
 

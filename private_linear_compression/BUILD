@@ -49,6 +49,11 @@ py_library(
     srcs_version = "PY3",
 )
 
+py_binary(
+    name = "dme_merge_and_plot",
+    srcs = ["dme_merge_and_plot.py"],
+)
+
 py_test(
     name = "count_sketching_utils_test",
     srcs = ["count_sketching_utils_test.py"],
