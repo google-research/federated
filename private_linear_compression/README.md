@@ -18,7 +18,7 @@ Aggregation in Differentially Private Federated Learning", found at:
 
 Run scripts:
 
--   `fl_run.py`: Runs the FL experiments on different tasks:
+-   `fl_compression_run.py`: Runs the FL experiments on different tasks:
     -   [Federated EMNIST](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data)
     -   [Stack Overflow](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/stackoverflow/load_data)
 
@@ -35,14 +35,28 @@ Shared modules:
 
 See:
 
--   Federated Learning (`fl_run.py`)
+-   Federated Learning (`fl_compression_run.py`)
+-   Distributed Mean Estimation (`dme_run.py`)
+
+### Distributed Mean Estimation
+
+Run the `dme_run.py` script to perform this experiment.
+
+```
+bazel run :dme_run -- <flags>
+```
+
+See the arguments in the file for their descriptions. The defaults correspond to
+the setup used in the paper.
+
+To visualize results, run `dme_merge_and_plot.py`.
 
 ### Federated Learning
 
-Run the `fl_run.py` script to start training:
+Run the `fl_compression_run.py` script to start training:
 
 ```
-bazel run :fl_run -- <flags>
+bazel run :fl_compression_run -- <flags>
 ```
 
 The task flags are defined in the format of:
@@ -65,7 +79,7 @@ The optimizer flags can be set as:
 Example command to train on Federated EMNIST:
 
 ```
-bazel run :fl_run -- \
+bazel run :fl_compression_run -- \
     --task=emnist_character \
     --server_optimizer=sgd \
     --server_learning_rate=1 \

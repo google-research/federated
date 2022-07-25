@@ -243,12 +243,11 @@ def main(argv):
       client_template=model_trainable_variables)
   write_hparams(params_dict)
 
-  iterative_process = tff.learning.build_federated_averaging_process(
+  iterative_process = tff.learning.algorithms.build_unweighted_fed_avg(
       model_fn=task.model_fn,
       server_optimizer_fn=server_optimizer_fn,
-      client_weighting=tff.learning.ClientWeighting.UNIFORM,
       client_optimizer_fn=client_optimizer_fn,
-      model_update_aggregation_factory=aggregation_factory,
+      model_aggregator=aggregation_factory,
       use_experimental_simulation_loop=True)
 
   train_data = task.datasets.train_data.preprocess(
@@ -285,15 +284,21 @@ def main(argv):
 
   loop = asyncio.get_event_loop()
 
-  async def write_final_metrics(metrics, round_num):
+  async def write_final_metrics(metrics, metrics_type, round_num):
     await asyncio.gather(*[
-        manager.release(value=metrics, key=round_num)
+        manager.release(
+            value=metrics, type_signature=metrics_type, key=round_num)
         for manager in metrics_managers
     ])
 
   test_metrics = federated_eval(state.model, [test_data])
+  post_evaluation_metrics_type = tff.StructType([
+      ('test', federated_eval.type_signature.result),
+  ])
   loop.run_until_complete(
-      write_final_metrics(test_metrics, FLAGS.total_rounds + 1))
+      write_final_metrics(test_metrics, post_evaluation_metrics_type,
+                          FLAGS.total_rounds + 1))
+
 
 if __name__ == '__main__':
   app.run(main)

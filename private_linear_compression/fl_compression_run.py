@@ -13,6 +13,7 @@
 # limitations under the License.
 """Runs federated training tasks."""
 
+import asyncio
 import enum
 import functools
 import os
@@ -240,6 +241,7 @@ def _get_aggregator(
       agg_factory = tff.aggregators.UnweightedMeanFactory()
       agg_factory = count_sketching.GradientCountSketchFactory(
           **params, inner_agg_factory=agg_factory)
+      agg_factory = tff.aggregators.concat_factory(agg_factory)
       logging.info(
           'Using vanilla aggregation with compression with parameters: ')
       logging.info(pprint.pformat(params))
@@ -283,6 +285,8 @@ def main(argv: Sequence[Any]) -> None:
   if len(argv) > 1:
     raise app.UsageError('Expected no command-line arguments, '
                          'got: {}'.format(argv))
+
+  tff.backends.test.set_test_python_execution_context(_CLIENTS_PER_ROUND.value)
 
   client_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('client')
   server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
@@ -335,12 +339,11 @@ def main(argv: Sequence[Any]) -> None:
       _DECODE_METHOD.value, _ROTATION_TYPE.value)
   _write_hyper_params(params, _EXPERIMENT_NAME.value, _ROOT_OUTPUT_DIR.value)
 
-  iterative_process = tff.learning.build_federated_averaging_process(
+  iterative_process = tff.learning.algorithms.build_unweighted_fed_avg(
       model_fn=task.model_fn,
       server_optimizer_fn=server_optimizer_fn,
-      client_weighting=tff.learning.ClientWeighting.UNIFORM,
       client_optimizer_fn=client_optimizer_fn,
-      model_update_aggregation_factory=aggregation_factory,
+      model_aggregator=aggregation_factory,
       use_experimental_simulation_loop=True)
 
   train_data = task.datasets.train_data.preprocess(
@@ -376,9 +379,22 @@ def main(argv: Sequence[Any]) -> None:
       rounds_per_saving_program_state=_ROUNDS_PER_CHECKPOINT.value,
       metrics_managers=metrics_managers)
 
+  loop = asyncio.get_event_loop()
+
+  async def write_final_metrics(metrics, metrics_type, round_num):
+    await asyncio.gather(*[
+        manager.release(
+            value=metrics, type_signature=metrics_type, key=round_num)
+        for manager in metrics_managers
+    ])
+
   test_metrics = federated_eval(state.model, [test_data])
-  for metrics_manager in metrics_managers:
-    metrics_manager.release(test_metrics, _TOTAL_ROUNDS.value + 1)
+  post_evaluation_metrics_type = tff.StructType([
+      ('test', federated_eval.type_signature.result),
+  ])
+  loop.run_until_complete(
+      write_final_metrics(test_metrics, post_evaluation_metrics_type,
+                          _TOTAL_ROUNDS.value + 1))
 
 
 if __name__ == '__main__':

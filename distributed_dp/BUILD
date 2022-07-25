@@ -1,6 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
-package(default_visibility = ["//visibility:private"])
+package(default_visibility = ["//private_linear_compression:__subpackages__"])
 
 licenses(["notice"])
 
@@ -8,6 +8,9 @@ py_library(
     name = "accounting_utils",
     srcs = ["accounting_utils.py"],
     srcs_version = "PY3",
+    visibility = [
+        "//private_linear_compression:__subpackages__",
+    ],
 )
 
 py_library(
@@ -29,7 +32,9 @@ py_test(
 py_library(
     name = "compression_utils",
     srcs = ["compression_utils.py"],
-    visibility = ["//private_linear_compression:__subpackages__"],
+    visibility = [
+        "//private_linear_compression:__subpackages__",
+    ],
 )
 
 py_test(

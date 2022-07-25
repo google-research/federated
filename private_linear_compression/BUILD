@@ -87,3 +87,16 @@ py_test(
     srcs_version = "PY3",
     deps = [":subsampled_random_hadamard"],
 )
+
+py_binary(
+    name = "dme_run",
+    srcs = ["dme_run.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":count_sketching_utils",
+        "//distributed_dp:accounting_utils",
+        "//distributed_dp:ddpquery_utils",
+        "//distributed_dp:dme_utils",
+    ],
+)
