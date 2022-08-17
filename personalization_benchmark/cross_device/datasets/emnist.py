@@ -112,7 +112,9 @@ def create_model_and_data(
     # `tff.learning.build_personalization_eval` expects *unbatched* client-side
     # datasets. Batching is part of user-supplied personalization function.
     processed_data = eval_preprocess_fn(raw_data).unbatch().shuffle(
-        _SHUFFLE_BUFFER_SIZE)
+        _SHUFFLE_BUFFER_SIZE,
+        seed=constants.SPLIT_CLIENTS_SEED,
+        reshuffle_each_iteration=False)
     personalization_data, test_data = split_half(processed_data)
     final_data = collections.OrderedDict()
     final_data[constants.PERSONALIZATION_DATA_KEY] = personalization_data

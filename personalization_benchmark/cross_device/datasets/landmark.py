@@ -218,7 +218,10 @@ def create_model_and_data(
     # expects *unbatched* client-side datasets. Batching is part of
     # user-supplied personalization function.
     personalization_data, test_data = emnist.split_half(
-        raw_data.shuffle(_SHUFFLE_BUFFER_SIZE))
+        raw_data.shuffle(
+            _SHUFFLE_BUFFER_SIZE,
+            seed=constants.SPLIT_CLIENTS_SEED,
+            reshuffle_each_iteration=False))
     personalization_data = personalization_data.map(
         train_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     test_data = test_data.map(

@@ -58,6 +58,12 @@ class LandmarkTest(parameterized.TestCase, tf.test.TestCase):
     self.assertEqual(image.dtype, tf.float32)
     self.assertEqual(label.dtype, tf.int64)
 
+  def _check_same_element_different_loop(self, data):
+    first_element_loop_1 = iter(data).next()
+    first_element_loop_2 = iter(data).next()
+    tf.nest.map_structure(self.assertAllEqual, first_element_loop_1,
+                          first_element_loop_2)
+
   @parameterized.named_parameters(
       ('no_extra_test_examples', 0.0), ('extra_test_ratio_0.1', 0.1),
       ('extra_test_ratio_0.5', 0.5), ('extra_test_ratio_1.0', 1.0),
@@ -103,6 +109,9 @@ class LandmarkTest(parameterized.TestCase, tf.test.TestCase):
       personalization_data = client_data_after_split[
           constants.PERSONALIZATION_DATA_KEY]
       test_data = client_data_after_split[constants.TEST_DATA_KEY]
+      # Verify that every time we loop over the data, it gives the same result.
+      self._check_same_element_different_loop(personalization_data)
+      self._check_same_element_different_loop(test_data)
       # Before splitting, the client's local dataset has 3 examples, after
       # splitting, the personalization dataset should have 1 example. Since
       # extra test examples are added to `test_data` duing the `split_data_fn`,

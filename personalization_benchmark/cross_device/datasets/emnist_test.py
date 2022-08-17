@@ -29,6 +29,21 @@ class EmnistTest(parameterized.TestCase, tf.test.TestCase):
     self.assertListEqual(list(first_data), expected_first)
     self.assertListEqual(list(second_data), expected_second)
 
+  def _check_same_element_different_loop(self, data):
+    first_element_loop_1 = iter(data).next()
+    first_element_loop_2 = iter(data).next()
+    tf.nest.map_structure(self.assertAllEqual, first_element_loop_1,
+                          first_element_loop_2)
+
+  def _get_label_list(self, data):
+    label_list = []
+    for element in data:
+      if isinstance(element, tuple):
+        label_list.append(element[1].numpy())
+      else:
+        label_list.append(element['label'].numpy())
+    return label_list
+
   def test_create_model_and_data(self):
     train_batch_size = 2
     model_fn, datasets, train_preprocess_fn, split_data_fn, accuracy_name = (
@@ -68,6 +83,15 @@ class EmnistTest(parameterized.TestCase, tf.test.TestCase):
       personalization_data = client_data_after_split[
           constants.PERSONALIZATION_DATA_KEY]
       test_data = client_data_after_split[constants.TEST_DATA_KEY]
+      # Verify that every time we loop over the data, it gives the same result.
+      self._check_same_element_different_loop(personalization_data)
+      self._check_same_element_different_loop(test_data)
+      # Verify that the label list after split is the same as before split.
+      personalization_label_list = self._get_label_list(personalization_data)
+      test_label_list = self._get_label_list(test_data)
+      label_list_before_split = self._get_label_list(client_data_before_split)
+      self.assertCountEqual(personalization_label_list + test_label_list,
+                            label_list_before_split)
       # Before splitting, the client's local dataset has 10 examples, after
       # splitting, each of the two datasets have 5 examples.
       expected_size_before_split = 10
