@@ -112,9 +112,8 @@ Fixed hyperparameters:
 
 Tuned hyperparameters (best values are highlighted in **bold**):
 
--   finetune_learning_rate=[ 10^(-1.0), **10^(-0.6)**, 10^(-0.2), 10^(0.2),
-    10^(0.6), 10^(1.0) ]
--   finetune_last_layer=[ **True**, False ]
+-   finetune_learning_rate=[ 0.001, 0.003, **0.005**, 0.01, 0.05 ]
+-   finetune_last_layer=[ True, **False** ]
 
 ### StackOverflow
 
@@ -158,8 +157,8 @@ Fixed hyperparameters:
 
 Tuned hyperparameters (best values are highlighted in **bold**):
 
--   finetune_learning_rate=[ 0.001, 0.005, 0.01, 0.05, **0.1**, 0.5, 1.0 ]
--   finetune_last_layer=[ **True**, False ]
+-   finetune_learning_rate=[ 0.0001, 0.001, 0.005, **0.007**, 0.01, 0.03, 0.05 ]
+-   finetune_last_layer=[ True, **False** ]
 
 ### TedMulti-EnEs
 
@@ -294,7 +293,7 @@ metrics where each client learns a local model without federation.
 -   valid_clients_per_round=[100]
 -   test_clients_per_round=[100]
 -   finetune_last_layer=[ True, **False** ]
--   finetune_learning_rate=[ **0.1**, 0.3, 0.5, 1.0, 1.5, 2.0 ]
+-   finetune_learning_rate=[ 0.001, 0.01, **0.1**, 0.5, 1.0 ]
 -   finetune_optimzier=[‘sgd’]
 -   finetune_max_epochs=[200]
 
@@ -314,7 +313,7 @@ metrics where each client learns a local model without federation.
 -   valid_clients_per_round=[32]
 -   test_clients_per_round=[96]
 -   finetune_last_layer=[ True, **False** ]
--   finetune_learning_rate=[ 0.1, 0.3, 0.5, 0.7, **1.0**, 1.5 ]
+-   finetune_learning_rate=[ 0.0001, 0.001, **0.01**, 0.1 ]
 -   finetune_optimzier=[‘sgd’]
 -   finetune_max_epochs=[50]
 
