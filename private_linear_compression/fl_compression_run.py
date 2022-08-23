@@ -246,6 +246,7 @@ def _get_aggregator(
           'Using vanilla aggregation with compression with parameters: ')
       logging.info(pprint.pformat(params))
     else:
+      params = {}
       agg_factory = tff.aggregators.UnweightedMeanFactory()
       logging.info('Using vanilla aggregation without compression')
 
