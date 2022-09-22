@@ -69,9 +69,9 @@ def build_federated_shrink_unshrink_process(
     client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.1),
     oja_hyperparameter=1.0,
     debugging=False,
-    metrics_aggregator: Callable[[
-        OrderedDict[str, Callable[[Any], Any]], tff.types.StructWithPythonType
-    ], tff.Computation] = tff.learning.metrics.sum_then_finalize):
+    metrics_aggregator: Callable[
+        [tff.learning.MetricFinalizersType, tff.types.StructWithPythonType],
+        tff.Computation] = tff.learning.metrics.sum_then_finalize):
   """Builds the TFF computations for optimization using federated averaging.
 
   Args:

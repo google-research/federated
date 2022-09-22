@@ -25,7 +25,7 @@ Communication-Efficient Learning of Deep Networks from Decentralized Data
 """
 
 import collections
-from typing import Any, Callable, Optional, OrderedDict, Union
+from typing import Callable, Optional, Union
 
 import attr
 import tensorflow as tf
@@ -237,9 +237,9 @@ def build_fed_avg_process(
     server_optimizer_fn: OptimizerBuilder = tf.keras.optimizers.SGD,
     server_lr: Union[float, LRScheduleFn] = 1.0,
     client_weight_fn: Optional[ClientWeightFn] = None,
-    metrics_aggregator: Callable[[
-        OrderedDict[str, Callable[[Any], Any]], tff.types.StructWithPythonType
-    ], tff.Computation] = tff.learning.metrics.sum_then_finalize
+    metrics_aggregator: Callable[
+        [tff.learning.MetricFinalizersType, tff.types.StructWithPythonType],
+        tff.Computation] = tff.learning.metrics.sum_then_finalize
 ) -> tff.templates.IterativeProcess:
   """Builds the TFF computations for optimization using federated averaging.
 

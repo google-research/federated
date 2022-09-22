@@ -32,7 +32,7 @@ How To Back door Federated Learning
 """
 
 import collections
-from typing import Any, Callable, OrderedDict
+from typing import Callable
 
 import attr
 import tensorflow as tf
@@ -433,9 +433,9 @@ def build_federated_averaging_process_attacked(
     server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0),
     model_update_aggregation_factory=None,
     client_update_tf=ClientExplicitBoosting(boost_factor=1.0),
-    metrics_aggregator: Callable[[
-        OrderedDict[str, Callable[[Any], Any]], tff.types.StructWithPythonType
-    ], tff.Computation] = tff.learning.metrics.sum_then_finalize):
+    metrics_aggregator: Callable[
+        [tff.learning.MetricFinalizersType, tff.types.StructWithPythonType],
+        tff.Computation] = tff.learning.metrics.sum_then_finalize):
   """Builds the TFF computations for optimization using federated averaging with potentially malicious clients.
 
   Args:
