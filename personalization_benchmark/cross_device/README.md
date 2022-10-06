@@ -38,8 +38,8 @@ bazel run :finetuning_trainer --
 ```
 
 Below we describe the hyperparameter grids and the best hyperparameters found
-for the three algorithms (FedAvg+Fine-tuning, HypCluster, and local training)
-compared in our paper.
+for the four algorithms (FedAvg+Fine-tuning, HypCluster, FedAvg+kNN-Per, and
+local training) compared in our paper.
 
 ## Common hyperparameters
 
@@ -68,9 +68,9 @@ actual usage may be smaller than the allocated resources.
 -   Landmarks: 16 GPUs
 -   TedMulti-EnEs: 2 GPUs
 
-## FedAvg + Fine-tuning hyperparaemeters
+## FedAvg + Fine-tuning hyperparameters
 
-Definitions of all the hyperparaemeters for running this algorithm can be found
+Definitions of all the hyperparameters for running this algorithm can be found
 in `finetuning_trainer.py`. Since FedAvg + Fine-tuning is a two step process,
 the hyperparameters contain FedAvg (more specifically, FedAdam as mentioned
 above) hyperparameters and fine-tuning hyperparameters.
@@ -278,9 +278,37 @@ Tuned hyperparameters (best values are highlighted in **bold**):
     ]
 -   server_adam_epsilon=[ **0.001**, 0.00001 ]
 
+## FedAvg + kNN-Per hyperparameters
+
+Implementation of this kNN-Per algorithm is in `algorithms/knn_per.py`. We use
+the model trained by FedAvg (same as "FedAvg + Fine-tuning") as the global model
+for personalization. Following the
+[kNN-Per paper](https://arxiv.org/abs/2111.09360), we set the number of nearest
+neighbors k to 10 for all experiments (the paper shows that the performance is
+pretty robust to this value). We tune the ensemble coefficient globally for all
+clients (i.e., every client use the same coefficient), because tuning per-client
+specific coefficient seems to give worse performance. The best coefficient is
+highlighted in **bold** below.
+
+### EMNIST
+
+-   coefficient=[0, 0.1, 0.2, 0.3, **0.4**, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+
+### StackOverflow
+
+-   coefficient=[0, 0.1, **0.2**, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+
+### Landmarks
+
+-   coefficient=[0, 0.1, 0.2, 0.3, 0.4, **0.5**, 0.6, 0.7, 0.8, 0.9, 1.0]
+
+### TedMulti-EnEs
+
+-   coefficient=[0, **0.1**, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+
 ## Local training hyperparameters
 
-Traning a local model at each client can be done by running
+Training a local model at each client can be done by running
 `finetuning_trainer.py` with `total_rounds=0`. Note that what happens is that
 every client fine-tunes a random model (sent by the server) locally. As long as
 we set a large enough `finetune_max_epochs` (note that the best number of epochs

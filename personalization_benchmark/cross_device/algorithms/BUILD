@@ -74,3 +74,23 @@ py_test(
     srcs = ["optimizer_flag_utils_test.py"],
     deps = [":optimizer_flag_utils"],
 )
+
+py_test(
+    name = "knn_per_test",
+    srcs = ["knn_per_test.py"],
+    deps = [":knn_per_lib"],
+)
+
+py_library(
+    name = "knn_per_lib",
+    srcs = ["knn_per.py"],
+    deps = [
+        "//personalization_benchmark/cross_device:constants",
+        "//personalization_benchmark/cross_device/datasets:emnist",
+        "//personalization_benchmark/cross_device/datasets:landmark",
+        "//personalization_benchmark/cross_device/datasets:stackoverflow",
+        "//personalization_benchmark/cross_device/datasets:ted_multi",
+        "//utils:keras_metrics",
+        "//utils/datasets:stackoverflow_word_prediction",
+    ],
+)

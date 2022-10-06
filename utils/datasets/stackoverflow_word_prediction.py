@@ -38,6 +38,9 @@ class SpecialTokens(object):
   bos = attr.ib()
   eos = attr.ib()
 
+  def get_number_of_special_tokens(self) -> int:
+    return 3 + len(self.oov)
+
 
 def create_vocab(vocab_size: int) -> List[str]:
   """Creates vocab from `vocab_size` most common words in Stackoverflow."""
