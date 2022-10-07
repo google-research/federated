@@ -31,7 +31,7 @@ import tensorflow as tf
 FloatTensorLike = Union[tf.Tensor, float, np.float16, np.float32, np.float64]
 
 
-class LARS(tf.keras.optimizers.Optimizer):
+class LARS(tf.keras.optimizers.legacy.Optimizer):
   """Optimizer that implements Layer-wise Adaptive Rate Scaling (LARS)."""
 
   def __init__(self,

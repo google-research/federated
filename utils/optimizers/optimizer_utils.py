@@ -15,7 +15,7 @@
 
 import collections
 import inspect
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 from absl import flags
 from absl import logging
@@ -125,16 +125,8 @@ def define_optimizer_flags(prefix: str) -> None:
         define_flag_fn = flags.DEFINE_integer
       elif is_param_of_type(param, str):
         define_flag_fn = flags.DEFINE_string
-      elif is_param_of_type(param, List[str]):
-        define_flag_fn = flags.DEFINE_multi_string
       else:
-        raise NotImplementedError('Cannot define flag [{!s}] '
-                                  'for parameter [{!s}] of type [{!s}] '
-                                  '(default value type [{!s}]) '
-                                  'on optimizer [{!s}]'.format(
-                                      prefixed(param.name),
-                                      param.name, param.annotation,
-                                      type(param.default), optimizer_name))
+        continue
       define_flag_fn(
           name=prefixed(param.name),
           default=param.default,
@@ -143,8 +135,9 @@ def define_optimizer_flags(prefix: str) -> None:
       logging.info('Defined new flag: [%s]', prefixed(param.name))
 
 
-def remove_unused_flags(prefix: str,
-                        hparam_dict: Dict[str, Any]) -> collections.OrderedDict:
+def remove_unused_flags(
+    prefix: str, hparam_dict: Dict[str,
+                                   Any]) -> collections.OrderedDict[str, Any]:
   """Removes unused optimizer flags with a given prefix.
 
   This method is intended to be used with `define_optimizer_flags`, and is used

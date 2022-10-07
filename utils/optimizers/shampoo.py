@@ -135,7 +135,7 @@ def reform_tensor(partitioned_tensors: Sequence[TfValue],
   return partitioned_tensors[0]
 
 
-class Shampoo(tf.keras.optimizers.Optimizer):
+class Shampoo(tf.keras.optimizers.legacy.Optimizer):
   """Approximates full-matrix AdaGrad per layer.
 
   Approximates full-matrix AdaGrad with kronecker-products of two statistics
