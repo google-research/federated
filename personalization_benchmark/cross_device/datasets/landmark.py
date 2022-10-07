@@ -100,10 +100,7 @@ def _map_fn(element: OrderedDict[str, tf.Tensor],
 
 
 def create_model_and_data(
-    num_local_epochs: int,
-    train_batch_size: int,
-    use_synthetic_data: bool,
-    extra_test_over_original_test_ratio: float = 0.0
+    num_local_epochs: int, train_batch_size: int, use_synthetic_data: bool
 ) -> Tuple[constants.ModelFnType, constants.FederatedDatasetsType,
            constants.ProcessFnType, constants.SplitDataFnType, str]:
   """Creates model, datasets, and processing functions for GLD.
@@ -117,13 +114,6 @@ def create_model_and_data(
       `train_dataset.batch(train_batch_size)`.
     use_synthetic_data: Whether to use synthetic data. This should only be set
       to True for debugging and testing purposes.
-    extra_test_over_original_test_ratio: The number of extra test examples added
-      to each client's original test set (after splitting the client's local
-      dataset into a personalization set and a test set) is defined by this
-      ratio times the original test set size. The extra test examples are
-      sampled from an (approximately) uniform label distribution (the second
-      value returned by `tff.simulation.datasets.gldv2.load_data`). Default is
-      0.0, meaning that no extra test examples are added.
 
   Returns:
     1. A no-argument function that returns a `tff.learning.Model`.
@@ -135,11 +125,8 @@ def create_model_and_data(
     4. A dataset split function for per-client dataset in evaluation (including
       both validation clients and test clients). Specifically, each client's
       examples are split into two equal-sized unbatched datasets (a
-      personalization dataset and a test dataset). The text dataset is then
-      augmented with extra test examples from a uniform label distribution. The
-      number of extra test examples is controlled by
-      `extra_test_over_original_test_ratio`. The personalization dataset is used
-      for finetuning the model in `finetuning_trainer` or choosing the best
+      personalization dataset and a test dataset).The personalization dataset is
+      used for finetuning the model in `finetuning_trainer` or choosing the best
       model in `hypcluster_trainer`.
     5. The accuracy name key stored in the evaluation metrics. It will be used
       in postprocessing the validation clients and test clients metrics in the
@@ -209,9 +196,7 @@ def create_model_and_data(
     Returns:
       An `OrderedDict` of two datasets with `constants.PERSONALIZATION_DATA_KEY`
       and `constants.TEST_DATA_KEY` as keys. The two datasets are formed by
-      first splitting the `raw_data` into two unbatched datasets, and then
-      concatenates the second dataset with extra examples sampled from a uniform
-      label distribution, obtained by `tff.simulation.datasets.gldv2.load_data`.
+      first splitting the `raw_data` into two unbatched datasets.
     """
     # Splits the `raw_data` into two datasets, and processes them. We do not
     # apply batching here, because `tff.learning.build_personalization_eval`
@@ -226,23 +211,6 @@ def create_model_and_data(
         train_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     test_data = test_data.map(
         test_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    if extra_test_over_original_test_ratio > 0.0:
-      # Adds extra test examples to the original test set.
-      num_original_test_elements = tf.cast(
-          test_data.reduce(0, lambda x, _: x + 1), dtype=tf.float32)
-      num_extra_test_examples = tf.cast(
-          extra_test_over_original_test_ratio * num_original_test_elements,
-          dtype=tf.int64)
-      if use_synthetic_data:
-        uniform_test_data = _get_synthetic_landmark_data()
-      else:
-        _, uniform_test_data = tff.simulation.datasets.gldv2.load_data(
-            gld23k=False)
-      uniform_test_data = uniform_test_data.map(
-          test_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-      extra_test = uniform_test_data.shuffle(_SHUFFLE_BUFFER_SIZE).take(
-          num_extra_test_examples)
-      test_data = test_data.concatenate(extra_test)
     # Creates the final data structure.
     final_data = collections.OrderedDict()
     final_data[constants.PERSONALIZATION_DATA_KEY] = personalization_data

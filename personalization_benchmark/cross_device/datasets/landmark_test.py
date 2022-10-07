@@ -64,19 +64,13 @@ class LandmarkTest(parameterized.TestCase, tf.test.TestCase):
     tf.nest.map_structure(self.assertAllEqual, first_element_loop_1,
                           first_element_loop_2)
 
-  @parameterized.named_parameters(
-      ('no_extra_test_examples', 0.0), ('extra_test_ratio_0.1', 0.1),
-      ('extra_test_ratio_0.5', 0.5), ('extra_test_ratio_1.0', 1.0),
-      ('extra_test_ratio_1.5', 1.5))
-  def test_create_model_and_data(self, extra_test_over_original_test_ratio):
+  def test_create_model_and_data(self):
     train_batch_size = 1
     model_fn, datasets, train_preprocess_fn, split_data_fn, accuracy_name = (
         landmark.create_model_and_data(
             num_local_epochs=1,
             train_batch_size=train_batch_size,
-            use_synthetic_data=True,
-            extra_test_over_original_test_ratio=extra_test_over_original_test_ratio
-        ))
+            use_synthetic_data=True))
     self.assertEqual(accuracy_name, landmark._ACCURACY_NAME)
     model = model_fn()
     self.assertIsInstance(model, tff.learning.Model)
@@ -113,13 +107,11 @@ class LandmarkTest(parameterized.TestCase, tf.test.TestCase):
       self._check_same_element_different_loop(personalization_data)
       self._check_same_element_different_loop(test_data)
       # Before splitting, the client's local dataset has 3 examples, after
-      # splitting, the personalization dataset should have 1 example. Since
-      # extra test examples are added to `test_data` duing the `split_data_fn`,
-      # expected size is 2 (the original test data) + number of extra examples.
+      # splitting, the personalization dataset should have 1 example and the
+      # eval set should have 2 examples.
       expected_size_before_split = 3
       expected_personalization_size = 1
-      expected_test_size = 2 + tf.cast(2 * extra_test_over_original_test_ratio,
-                                       tf.int64).numpy()
+      expected_test_size = 2
       self.assertLen(list(client_data_before_split), expected_size_before_split)
       self.assertLen(list(personalization_data), expected_personalization_size)
       self.assertLen(list(test_data), expected_test_size)

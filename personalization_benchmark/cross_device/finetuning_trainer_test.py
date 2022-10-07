@@ -67,7 +67,6 @@ class GlobalTrainerTest(absltest.TestCase):
       root_output_dir=tempfile.mkdtemp(),
       experiment_name='test_experiment',
       dataset_name='landmark',
-      landmark_extra_test_over_original_test_ratio=0.5,
       clients_per_train_round=1,
       total_rounds=2,
       rounds_per_evaluation=1,

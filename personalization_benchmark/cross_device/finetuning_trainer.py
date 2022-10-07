@@ -15,7 +15,6 @@
 
 import collections
 import functools
-import pickle
 from typing import Any, Callable, List, OrderedDict, Tuple
 
 from absl import app
@@ -35,60 +34,59 @@ from utils.optimizers import optimizer_utils
 
 with utils_impl.record_hparam_flags() as training_flags:
   # Training loop configuration
-  flags.DEFINE_string(
+  _EXPERIMENT_NAME = flags.DEFINE_string(
       'experiment_name', None, 'The name of this experiment. Will be append to '
       '--root_output_dir to separate experiment results.')
-  flags.DEFINE_enum('dataset_name', None, constants.DATASET_NAMES,
-                    'Which dataset to use for experiments.')
-  flags.DEFINE_string('root_output_dir', '/tmp/personalization_benchmark/',
-                      'Root directory for writing experiment output.')
-  flags.DEFINE_integer('total_rounds', 100, 'Number of total training rounds.')
-  flags.DEFINE_integer('rounds_per_evaluation', 10,
-                       'Frequency of performing evaluation.')
-  flags.DEFINE_integer('rounds_per_checkpoint', 50,
-                       'Frequency of saving a checkpoint.')
-  flags.DEFINE_string(
+  _DATASET_NAME = flags.DEFINE_enum('dataset_name', None,
+                                    constants.DATASET_NAMES,
+                                    'Which dataset to use for experiments.')
+  _ROOT_OUTPUT_DIR = flags.DEFINE_string(
+      'root_output_dir', '/tmp/personalization_benchmark/',
+      'Root directory for writing experiment output.')
+  _TOTAL_ROUNDS = flags.DEFINE_integer('total_rounds', 100,
+                                       'Number of total training rounds.')
+  _ROUNDS_PER_EVALUATION = flags.DEFINE_integer(
+      'rounds_per_evaluation', 10, 'Frequency of performing evaluation.')
+  _ROUNDS_PER_CHECKPOINT = flags.DEFINE_integer(
+      'rounds_per_checkpoint', 50, 'Frequency of saving a checkpoint.')
+  _PATH_TO_INITIAL_MODEL_WEIGHTS = flags.DEFINE_string(
       'path_to_initial_model_weights', None,
-      'Path to load the initial model weights used for warmstarting FedAvg. If '
-      'None, use random initialization.')
+      'Path to load the initial Keras model used for warmstarting FedAvg. If '
+      'None, use random initialization. See `algorithms/checkpoint_utils.py` '
+      'for extracting model weights from a checkpoint given by our trainer.')
 
   # Train client configuration
-  flags.DEFINE_integer('clients_per_train_round', 10,
-                       'How many clients to sample at each training round.')
-  flags.DEFINE_integer(
+  _CLIENTS_PER_TRAIN_ROUND = flags.DEFINE_integer(
+      'clients_per_train_round', 10,
+      'How many clients to sample at each training round.')
+  _TRAIN_EPOCHS = flags.DEFINE_integer(
       'train_epochs', 1,
       'Number of epochs performed by a client during a round of training.')
-  flags.DEFINE_integer('train_batch_size', 10, 'Batch size on train clients.')
+  _TRAIN_BATCH_SIZE = flags.DEFINE_integer('train_batch_size', 10,
+                                           'Batch size on train clients.')
 
   # Finetuning evaluation configuration
-  flags.DEFINE_integer(
+  _FINETUNE_MAX_EPOCHS = flags.DEFINE_integer(
       'finetune_max_epochs', 20, 'Maximum number of finetuning epochs. The '
       'best epoch will be in [0, finetune_max_epochs], which is identified '
       'by post-processing the evaluation metrics.')
-  flags.DEFINE_bool(
+  _FINETUNE_LAST_LAYER = flags.DEFINE_bool(
       'finetune_last_layer', False, 'If True, only finetune the last layer. '
       'Default is False, which means all layers will be finetuned.')
-  flags.DEFINE_integer(
+  _VALID_CLIENTS_PER_EVALUATION = flags.DEFINE_integer(
       'valid_clients_per_evaluation', 100, 'Number of validation clients '
       'sampled to perform finetuning evaluation.')
-  flags.DEFINE_integer(
+  _TEST_CLIENTS_PER_EVALUATION = flags.DEFINE_integer(
       'test_clients_per_evaluation', 100, 'Number of test clients sampled to '
       'perform finetuning evaluation.')
 
-  # Task-specific flag
-  flags.DEFINE_float(
-      'landmark_extra_test_over_original_test_ratio', 0.0,
-      'The ratio of the number of extra test examples added to each client\'s '
-      'original test set. Used for controlling the distribution shift between '
-      'fine-tuning set and the test set.')
-
   # Random seeds for reproducibility
-  flags.DEFINE_integer(
+  _BASE_RANDOM_SEED = flags.DEFINE_integer(
       'base_random_seed', 0, 'An integer random seed governing'
       ' the randomness in the simulation.')
 
   # Debugging flags
-  flags.DEFINE_bool(
+  _USE_SYNTHETIC_DATA = flags.DEFINE_bool(
       'use_synthetic_data', False, 'Whether to use synthetic data. This should '
       'only be set to True for debugging purposes.')
 
@@ -96,8 +94,6 @@ with utils_impl.record_hparam_flags() as optimizer_flags:
   optimizer_utils.define_optimizer_flags('client')
   optimizer_utils.define_optimizer_flags('server')
   optimizer_utils.define_optimizer_flags('finetune')
-
-FLAGS = flags.FLAGS
 
 
 def _write_hparams():
@@ -110,8 +106,8 @@ def _write_hparams():
   opt_flag_dict = optimizer_utils.remove_unused_flags('finetune', opt_flag_dict)
   hparam_dict.update(opt_flag_dict)
   # Write the updated hyperparameters to a file.
-  training_utils.write_hparams_to_csv(hparam_dict, FLAGS.root_output_dir,
-                                      FLAGS.experiment_name)
+  training_utils.write_hparams_to_csv(hparam_dict, _ROOT_OUTPUT_DIR.value,
+                                      _EXPERIMENT_NAME.value)
 
 
 def _create_train_algorithm(
@@ -125,9 +121,11 @@ def _create_train_algorithm(
       client_optimizer_fn=client_optimizer_fn,
       server_optimizer_fn=server_optimizer_fn,
       model_aggregator=tff.learning.robust_aggregator())
-  if FLAGS.path_to_initial_model_weights is not None:
-    with tf.io.gfile.GFile(FLAGS.path_to_initial_model_weights, 'rb') as f:
-      initial_model_weights = pickle.load(f)
+  if _PATH_TO_INITIAL_MODEL_WEIGHTS.value is not None:
+    saved_keras_model = tf.keras.models.load_model(
+        _PATH_TO_INITIAL_MODEL_WEIGHTS.value)
+    initial_model_weights = tff.learning.ModelWeights.from_model(
+        saved_keras_model)
     original_state = learning_process.initialize()
     initial_state = learning_process.set_model_weights(original_state,
                                                        initial_model_weights)
@@ -149,25 +147,23 @@ def _create_model_and_data(
   """Creates model, datasets, and processing functions for the given dataset."""
   if dataset_name == 'emnist':
     return emnist.create_model_and_data(
-        num_local_epochs=FLAGS.train_epochs,
-        train_batch_size=FLAGS.train_batch_size,
+        num_local_epochs=_TRAIN_EPOCHS.value,
+        train_batch_size=_TRAIN_BATCH_SIZE.value,
         use_synthetic_data=use_synthetic_data)
   elif dataset_name == 'stackoverflow':
     return stackoverflow.create_model_and_data(
-        num_local_epochs=FLAGS.train_epochs,
-        train_batch_size=FLAGS.train_batch_size,
+        num_local_epochs=_TRAIN_EPOCHS.value,
+        train_batch_size=_TRAIN_BATCH_SIZE.value,
         use_synthetic_data=use_synthetic_data)
   elif dataset_name == 'landmark':
     return landmark.create_model_and_data(
-        num_local_epochs=FLAGS.train_epochs,
-        train_batch_size=FLAGS.train_batch_size,
-        use_synthetic_data=use_synthetic_data,
-        extra_test_over_original_test_ratio=FLAGS
-        .landmark_extra_test_over_original_test_ratio)
+        num_local_epochs=_TRAIN_EPOCHS.value,
+        train_batch_size=_TRAIN_BATCH_SIZE.value,
+        use_synthetic_data=use_synthetic_data)
   elif dataset_name == 'ted_multi':
     return ted_multi.create_model_and_data(
-        num_local_epochs=FLAGS.train_epochs,
-        train_batch_size=FLAGS.train_batch_size,
+        num_local_epochs=_TRAIN_EPOCHS.value,
+        train_batch_size=_TRAIN_BATCH_SIZE.value,
         use_synthetic_data=use_synthetic_data)
   raise ValueError(f'Accepted dataset names: {constants.DATASET_NAMES}, but '
                    f'found {dataset_name}. Please provide a valid name.')
@@ -176,9 +172,9 @@ def _create_model_and_data(
 def _finetune_eval_fn_builder():
   return finetuning_utils.build_finetune_eval_fn(
       optimizer_fn=optimizer_utils.create_optimizer_fn_from_flags('finetune'),
-      batch_size=FLAGS.train_batch_size,
-      num_finetuning_epochs=FLAGS.finetune_max_epochs,
-      finetune_last_layer=FLAGS.finetune_last_layer)
+      batch_size=_TRAIN_BATCH_SIZE.value,
+      num_finetuning_epochs=_FINETUNE_MAX_EPOCHS.value,
+      finetune_last_layer=_FINETUNE_LAST_LAYER.value)
 
 
 def _split_data_and_run_finetuning_eval_computation(
@@ -196,8 +192,8 @@ def _split_data_and_run_finetuning_eval_computation(
           (constants.FINETUNING_FN_NAME, _finetune_eval_fn_builder)
       ]),
       baseline_evaluate_fn=finetuning_utils.evaluate_fn,
-      max_num_clients=max(FLAGS.valid_clients_per_evaluation,
-                          FLAGS.test_clients_per_evaluation))
+      max_num_clients=max(_VALID_CLIENTS_PER_EVALUATION.value,
+                          _TEST_CLIENTS_PER_EVALUATION.value))
 
   model_weights_type = finetuning_eval_computation.type_signature.parameter[0]
   # Note that `tff.simulation.compose_dataset_computation_with_computation` does
@@ -215,11 +211,11 @@ def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Expected no command-line arguments, '
                          'got: {}'.format(argv))
-  if not FLAGS.experiment_name:
+  if not _EXPERIMENT_NAME.value:
     raise ValueError('FLAGS.experiment_name must be set.')
 
   model_fn, federated_datasets, train_preprocess_fn, split_data_fn, accuracy_name = (
-      _create_model_and_data(FLAGS.dataset_name, FLAGS.use_synthetic_data))
+      _create_model_and_data(_DATASET_NAME.value, _USE_SYNTHETIC_DATA.value))
   train_client_data = federated_datasets[constants.TRAIN_CLIENTS_KEY]
   valid_client_data = federated_datasets[constants.VALID_CLIENTS_KEY]
   test_client_data = federated_datasets[constants.TEST_CLIENTS_KEY]
@@ -228,8 +224,8 @@ def main(argv):
   # round number, and outputs a list of client IDs for training in that round.
   training_selection_fn = functools.partial(
       tff.simulation.build_uniform_sampling_fn(
-          train_client_data.client_ids, random_seed=FLAGS.base_random_seed),
-      size=FLAGS.clients_per_train_round)
+          train_client_data.client_ids, random_seed=_BASE_RANDOM_SEED.value),
+      size=_CLIENTS_PER_TRAIN_ROUND.value)
 
   # Create the training process (and wiring in a dataset computation)
   @tff.tf_computation(tf.string)
@@ -247,12 +243,12 @@ def main(argv):
   # test clients. The output of `evaluation_selection_fn` will be used as the
   # second parameter of the `evaluation_fn` below.
   valid_clients_sampling_fn = tff.simulation.build_uniform_sampling_fn(
-      valid_client_data.client_ids, random_seed=FLAGS.base_random_seed)
+      valid_client_data.client_ids, random_seed=_BASE_RANDOM_SEED.value)
   test_clients_sampling_fn = tff.simulation.build_uniform_sampling_fn(
-      test_client_data.client_ids, random_seed=FLAGS.base_random_seed)
+      test_client_data.client_ids, random_seed=_BASE_RANDOM_SEED.value)
   evaluation_selection_fn = lambda round_num: (  # pylint: disable=g-long-lambda
-      valid_clients_sampling_fn(round_num, FLAGS.valid_clients_per_evaluation),
-      test_clients_sampling_fn(round_num, FLAGS.test_clients_per_evaluation))
+      valid_clients_sampling_fn(round_num, _VALID_CLIENTS_PER_EVALUATION.value),
+      test_clients_sampling_fn(round_num, _TEST_CLIENTS_PER_EVALUATION.value))
 
   valid_clients_eval_computation = _split_data_and_run_finetuning_eval_computation(
       valid_client_data, model_fn, split_data_fn)
@@ -287,17 +283,17 @@ def main(argv):
 
   # Configuring release managers and performing training/eval
   program_state_manager, metrics_managers = training_utils.create_managers(
-      FLAGS.root_output_dir, FLAGS.experiment_name)
+      _ROOT_OUTPUT_DIR.value, _EXPERIMENT_NAME.value)
   _write_hparams()
   tff.simulation.run_training_process(
       training_process=training_process,
       training_selection_fn=training_selection_fn,
-      total_rounds=FLAGS.total_rounds,
+      total_rounds=_TOTAL_ROUNDS.value,
       evaluation_fn=evaluation_fn,
       evaluation_selection_fn=evaluation_selection_fn,
-      rounds_per_evaluation=FLAGS.rounds_per_evaluation,
+      rounds_per_evaluation=_ROUNDS_PER_EVALUATION.value,
       program_state_manager=program_state_manager,
-      rounds_per_saving_program_state=FLAGS.rounds_per_checkpoint,
+      rounds_per_saving_program_state=_ROUNDS_PER_CHECKPOINT.value,
       metrics_managers=metrics_managers)
 
 

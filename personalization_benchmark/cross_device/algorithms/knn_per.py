@@ -19,7 +19,6 @@ through Local Memorization", ICML 2022. https://arxiv.org/abs/2111.09360
 
 from collections.abc import Sequence
 import functools
-import pickle
 from typing import Optional
 
 from absl import app
@@ -42,9 +41,10 @@ _DATASET_NAME = flags.DEFINE_enum('dataset_name', None, constants.DATASET_NAMES,
 _NUM_NEIGHBORS = flags.DEFINE_integer('num_neighbors', 10,
                                       'The value of k used in the kNN model.')
 _PATH_TO_INITIAL_MODEL_WEIGHTS = flags.DEFINE_string(
-    'path_to_initial_model_weights', None, 'Path to initial model weights '
-    'extracted from a FedAvg-trained model. See `checkpoint_util.py` for how '
-    'to extract the model weights from a checkpoint created by our trainer.')
+    'path_to_initial_model_weights', None, 'Path to saved Keras model used for '
+    'initialization. If None, use random initialization. See '
+    '`checkpoint_util.py` for how to extract the model weights from a '
+    'checkpoint created by our trainer.')
 _VALID_CLIENTS_PER_EVALUATION = flags.DEFINE_integer(
     'valid_clients_per_evaluation', 100, 'Number of validation clients '
     'sampled to perform evaluation.')
@@ -332,12 +332,12 @@ def main(argv: Sequence[str]) -> None:
   model_fn, datasets, _, split_data_fn, _ = create_model_and_data(
       _DATASET_NAME.value, _USE_SYNTHETIC_DATA.value)
 
-  # Create the global model, and initialize it with the provided checkpoint.
-  global_model = model_fn()._keras_model  # pylint:disable=protected-access
+  # Create the global model, and initialize it with the checkpoint (if given).
   if _PATH_TO_INITIAL_MODEL_WEIGHTS.value is not None:
-    with tf.io.gfile.GFile(_PATH_TO_INITIAL_MODEL_WEIGHTS.value, 'rb') as f:
-      initial_model_weights = pickle.load(f)
-    initial_model_weights.assign_weights_to(global_model)
+    global_model = tf.keras.models.load_model(
+        _PATH_TO_INITIAL_MODEL_WEIGHTS.value)
+  else:
+    global_model = model_fn()._keras_model  # pylint:disable=protected-access
   # Create the model to map input features to a embedding vector. The embeddings
   # will then be used by every client to train a local kNN model.
   layer_name = global_model.layers[embedding_layer_index(

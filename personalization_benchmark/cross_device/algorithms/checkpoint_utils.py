@@ -13,8 +13,15 @@
 # limitations under the License.
 """Utilities used to extract models from checkpoints saved by `finetuning_trainer.py`.
 
-One can save a list of `tff.learning.ModelWeights`s to file, and use it to
-warmstart HypCluster (via the flag `path_to_initial_model_weights_list`).
+To save the model weights to file, one can first assign the model weights to a
+Keras model and then save the Keras model to file:
+```
+keras_model = model_fn()._keras_model
+model_weights.assign_weights_to(keras_model)
+keras_model.save(path_to_saved_model)
+```
+The saved path can be used as the flag `path_to_initial_model_weights` in the
+`finetuning_trainer` and `hypcluster_trainer`.
 """
 
 import asyncio
