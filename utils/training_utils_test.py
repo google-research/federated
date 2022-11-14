@@ -49,7 +49,7 @@ class CreateManagersTest(parameterized.TestCase):
 
     self.assertIsInstance(file_program_state_manager,
                           tff.program.FileProgramStateManager)
-    self.assertLen(release_managers, 3)
+    self.assertLen(release_managers, 4)
     self.assertIsInstance(release_managers[0],
                           tff.program.LoggingReleaseManager)
     self.assertIsInstance(release_managers[1],
