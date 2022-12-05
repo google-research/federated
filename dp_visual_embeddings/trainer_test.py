@@ -102,9 +102,7 @@ class TrainerTest(tf.test.TestCase):
         server_optimizer=server_optimizer,
         client_optimizer=client_optimizer,
         client_learning_rate_fn=learning_rate_fn,
-        pretrained_model_path=self.save_infer_path,
-        pretrained_output_size=0,
-    )
+        pretrained_model_path=self.save_infer_path)
     eval_fn = trainer.build_eval_fn(
         process_type, train_process=process, task=task)
     export_fn = trainer.build_export_fn(
@@ -134,9 +132,7 @@ class TrainerTest(tf.test.TestCase):
         server_optimizer=server_optimizer,
         client_optimizer=client_optimizer,
         client_learning_rate_fn=learning_rate_fn,
-        pretrained_model_path=self.save_infer_path,
-        pretrained_output_size=0,
-    )
+        pretrained_model_path=self.save_infer_path)
     eval_fn = trainer.build_eval_fn(
         process_type, train_process=process, task=task)
     export_fn = trainer.build_export_fn(

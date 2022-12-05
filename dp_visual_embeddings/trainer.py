@@ -275,7 +275,6 @@ def build_train_process(
     client_optimizer: Union[_OptimizerType, _ScheduleOptimizerType],
     client_learning_rate_fn: Optional[Callable[[int], float]] = None,
     pretrained_model_path: Optional[str] = None,
-    pretrained_output_size: int = 0,
     head_lr_scale: float = 1.,
     reconst_iters: Optional[int] = None,
 ) -> tff.learning.templates.LearningProcess:
@@ -294,10 +293,6 @@ def build_train_process(
       a learning rate for that round.
     pretrained_model_path: Optional path to model saved by Keras `model.save`.
       If None, no saved model will be loaded.
-    pretrained_output_size: Optional integer indicates the number of
-      outputs/labels for the last layer of the pretrained model. For example,
-      1000 is used for training on ImageNet. If zero or negative, the pretrained
-      model is expected to only have the backbone model for inference.
     head_lr_scale: Use head_lr_scale to scale the learning rate for updating
       the local variables (head of the model).
     reconst_iters: If not `None`, first optimize the head of the model
@@ -328,11 +323,6 @@ def build_train_process(
         model_aggregator=aggregator,
         head_lr_scale=head_lr_scale,
         reconst_iters=reconst_iters)
-    if pretrained_output_size > 0:
-      raise ValueError(
-          'pretrained_output_size is expected to be zero for FedPartial, '
-          f'got {pretrained_output_size}. Consider removing head by using '
-          'pretrain/remove_head_and_export.py.')
 
     def pretrained_model_fn():
       model = task.inference_model

@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])
 
@@ -80,5 +80,26 @@ py_test(
         ":trainer",
         "//dp_visual_embeddings/models:build_model",
         "//dp_visual_embeddings/tasks:emnist_task",
+    ],
+)
+
+py_binary(
+    name = "run_centralized",
+    srcs = ["run_centralized.py"],
+    deps = [
+        ":centralized_training_loop",
+        "//dp_visual_embeddings/models:build_model",
+        "//dp_visual_embeddings/tasks:build_task",
+    ],
+)
+
+py_binary(
+    name = "run_federated",
+    srcs = ["run_federated.py"],
+    deps = [
+        ":trainer",
+        "//dp_visual_embeddings/models:build_model",
+        "//dp_visual_embeddings/tasks:build_task",
+        "//dp_visual_embeddings/utils:file_utils",
     ],
 )
