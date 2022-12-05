@@ -20,6 +20,16 @@ py_library(
     srcs = ["losses.py"],
 )
 
+py_library(
+    name = "centralized_training_loop",
+    srcs = ["centralized_training_loop.py"],
+    deps = [
+        "//dp_visual_embeddings/tasks:task_utils",
+        "//dp_visual_embeddings/utils:export",
+        "//dp_visual_embeddings/utils:file_utils",
+    ],
+)
+
 py_test(
     name = "tff_input_test",
     srcs = ["tff_input_test.py"],
@@ -36,4 +46,10 @@ py_test(
     name = "metrics_test",
     srcs = ["metrics_test.py"],
     deps = [":metrics"],
+)
+
+py_test(
+    name = "centralized_training_loop_test",
+    srcs = ["centralized_training_loop_test.py"],
+    deps = [":centralized_training_loop"],
 )
