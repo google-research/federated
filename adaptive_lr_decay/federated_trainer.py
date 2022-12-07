@@ -162,7 +162,7 @@ def main(argv):
 
   async def write_final_metrics(metrics, round_num):
     await asyncio.gather(*[
-        manager.release(value=metrics, key=round_num)
+        manager.release(value=metrics, key=round_num)  # pytype: disable=missing-parameter
         for manager in metrics_managers
     ])
 

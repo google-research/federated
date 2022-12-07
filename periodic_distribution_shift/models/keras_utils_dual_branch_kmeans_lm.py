@@ -115,13 +115,13 @@ def from_keras_model(
   """.format(tff.learning.model.MODEL_ARG_NAME,
              tff.learning.model.MODEL_LABEL_NAME)
   # Validate `keras_model`
-  tff.types.py_typecheck.check_type(keras_model, tf.keras.Model)
+  tff.types.py_typecheck.check_type(keras_model, tf.keras.Model)  # pytype: disable=module-attr
   if keras_model._is_compiled:  # pylint: disable=protected-access
     raise ValueError('`keras_model` must not be compiled')
 
   # Validate and normalize `loss` and `loss_weights`
   if not isinstance(loss, list):
-    tff.types.py_typecheck.check_type(loss, tf.keras.losses.Loss)
+    tff.types.py_typecheck.check_type(loss, tf.keras.losses.Loss)  # pytype: disable=module-attr
     if loss_weights is not None:
       raise ValueError('`loss_weights` cannot be used if `loss` is not a list.')
     loss = [loss]
@@ -134,7 +134,7 @@ def from_keras_model(
                            loss, len(loss), keras_model.outputs,
                            len(keras_model.outputs)))
     for loss_fn in loss:
-      tff.types.py_typecheck.check_type(loss_fn, tf.keras.losses.Loss)
+      tff.types.py_typecheck.check_type(loss_fn, tf.keras.losses.Loss)  # pytype: disable=module-attr
 
     if loss_weights is None:
       loss_weights = [1.0] * len(loss)
@@ -147,7 +147,7 @@ def from_keras_model(
                                                         loss_weights,
                                                         len(loss_weights)))
       for loss_weight in loss_weights:
-        tff.types.py_typecheck.check_type(loss_weight, float)
+        tff.types.py_typecheck.check_type(loss_weight, float)  # pytype: disable=module-attr
 
   if len(input_spec) != 2:
     raise ValueError('The top-level structure in `input_spec` must contain '
@@ -165,7 +165,7 @@ def from_keras_model(
   else:
     tensor_spec = (tf.TensorSpec, tf.RaggedTensorSpec)
     tf.nest.map_structure(
-        lambda s: tff.types.py_typecheck.check_type(  # pylint:disable=g-long-lambda,line-too-long
+        lambda s: tff.types.py_typecheck.check_type(  # pylint:disable=g-long-lambda,line-too-long  # pytype: disable=module-attr
             s, tensor_spec, 'input spec member'),
         input_spec)
   if isinstance(input_spec, collections.abc.Mapping):
@@ -184,7 +184,7 @@ def from_keras_model(
   if metrics is None:
     metrics = []
   else:
-    tff.types.py_typecheck.check_type(metrics, list)
+    tff.types.py_typecheck.check_type(metrics, list)  # pytype: disable=module-attr
 
   for layer in keras_model.layers:
     if isinstance(layer, tf.keras.layers.BatchNormalization):
@@ -344,7 +344,7 @@ class _KerasModel(tff.learning.Model):
         self._loss_fns = loss_fns
         self._loss_weights = loss_weights
 
-      def update_state(self, y_true, y_pred, sample_weight=None):
+      def update_state(self, y_true, y_pred, sample_weight=None):  # pytype: disable=signature-mismatch
         if isinstance(y_pred, list):
           batch_size = tf.shape(y_pred[0])[0]
         else:

@@ -66,7 +66,7 @@ def build_hypcluster_eval_with_dataset_split(
     # Wrap model construction in a graph to avoid polluting the global context
     # with variables created for this model.
     model = model_fn()
-    model_weights_type = tff.learning.framework.weights_type_from_model(model)
+    model_weights_type = tff.learning.framework.weights_type_from_model(model)  # pytype: disable=module-attr
     unfinalized_metrics_type = tff.types.type_from_tensors(
         model.report_local_unfinalized_metrics())
     metric_finalizers = model.metric_finalizers()

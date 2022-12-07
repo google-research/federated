@@ -376,7 +376,7 @@ class UserEmbedding(tf.keras.layers.Layer):
   def call(self, inputs):
     return self.embedding
 
-  def compute_output_shape(self):
+  def compute_output_shape(self):  # pytype: disable=signature-mismatch
     return (1, self.num_latent_factors)
 
 
@@ -482,7 +482,7 @@ class ReconstructionAccuracyMetric(tf.keras.metrics.Mean):
     super().__init__(name=name, **kwargs)
     self.threshold = threshold
 
-  def update_state(self,
+  def update_state(self,  # pytype: disable=signature-mismatch
                    y_true: tf.Tensor,
                    y_pred: tf.Tensor,
                    sample_weight: Optional[tf.Tensor] = None):

@@ -173,7 +173,7 @@ def main(argv):
           target_unclipped_quantile=FLAGS.target_unclipped_quantile,
           learning_rate=FLAGS.adaptive_clip_learning_rate)
 
-  iterative_process = tff.learning.build_federated_averaging_process(
+  iterative_process = tff.learning.build_federated_averaging_process(  # pytype: disable=module-attr
       model_fn=task.model_fn,
       server_optimizer_fn=server_optimizer_fn,
       client_weighting=client_weighting,
@@ -216,7 +216,7 @@ def main(argv):
 
   async def write_final_metrics(metrics, round_num):
     await asyncio.gather(*[
-        manager.release(value=metrics, key=round_num)
+        manager.release(value=metrics, key=round_num)  # pytype: disable=missing-parameter
         for manager in metrics_managers
     ])
 

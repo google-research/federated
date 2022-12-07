@@ -192,7 +192,7 @@ class MeanLossMetric(tf.keras.metrics.Mean):
     super().__init__(name, dtype)
     self._loss_fn = loss_fn
 
-  def update_state(self, y_true, y_pred, sample_weight=None):
+  def update_state(self, y_true, y_pred, sample_weight=None):  # pytype: disable=signature-mismatch
     batch_size = tf.cast(tf.shape(y_pred)[0], self._dtype)
     y_true = tf.cast(y_true, self._dtype)
     y_pred = tf.cast(y_pred, self._dtype)

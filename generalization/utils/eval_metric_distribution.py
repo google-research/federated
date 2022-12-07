@@ -107,7 +107,7 @@ def create_federated_eval_distribution_computation(
   # with variables created for this model.
   with tf.Graph().as_default():
     placeholder_model = model_fn()
-    model_weights_type = tff.learning.framework.weights_type_from_model(
+    model_weights_type = tff.learning.framework.weights_type_from_model(  # pytype: disable=module-attr
         placeholder_model)
     model_input_type = tff.SequenceType(placeholder_model.input_spec)
 
