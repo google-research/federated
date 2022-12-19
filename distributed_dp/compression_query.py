@@ -32,7 +32,7 @@ from distributed_dp import compression_utils
 
 def _attr_bool_check(instance, attribute, value):
   if not isinstance(value, tf.Tensor):
-    if not isinstance(value, (bool, np.bool, np.bool_)):
+    if not isinstance(value, (bool, bool, np.bool_)):
       raise ValueError(f'`{attribute.name}` should be a bool constant. Found '
                        f'`{value}` with type `{type(value)}`.')
 
