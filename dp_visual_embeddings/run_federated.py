@@ -98,8 +98,7 @@ _USE_CLIENT_SOFTMAX = flags.DEFINE_boolean(
     'client-sampled softmax.')
 _DYNAMIC_CLIENTS = flags.DEFINE_integer(
     'dynamic_clients', 1,
-    'Dynamically merge clients to super clients for user-level DP; each client'
-    'may contain `identities_per_client` before merging.')
+    'Dynamically merge clients to super clients for user-level DP.')
 
 _MODEL_BACKBONE = flags.DEFINE_enum(
     'model_backbone', 'mobilenet2', build_model.get_backbone_names(),
