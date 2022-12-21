@@ -95,7 +95,7 @@ def generate_non_iid_distributions_dirichlet(
                      f'Found dimension={ref_distribution.ndim}.')
   if (ref_distribution < 0).any() | (ref_distribution > 1).any():
     raise ValueError('Expecting elements in ref_distribution to be in [0, 1].')
-  if np.sum(ref_distribution) != 1:
+  if abs(np.sum(ref_distribution) - 1) > 1e-8:
     raise ValueError(f'ref_distribution should sum up to 1.'
                      f'Found the sum to be {np.sum(ref_distribution)}.')
   if distribution_delta > 0:
@@ -147,7 +147,7 @@ def generate_histograms(
                      f'Found dimension={ref_distribution.ndim}.')
   if (ref_distribution < 0).any() | (ref_distribution > 1).any():
     raise ValueError('Expecting elements in ref_distribution to be in [0, 1].')
-  if np.sum(ref_distribution) != 1:
+  if abs(np.sum(ref_distribution) - 1) > 1e-8:
     raise ValueError(f'ref_distribution should sum up to 1.'
                      f'Found the sum to be {np.sum(ref_distribution)}.')
   # Make sure that each user has at least 1 item
