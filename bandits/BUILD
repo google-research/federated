@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])
 
@@ -23,6 +23,21 @@ py_library(
     name = "bandits_process",
     srcs = ["bandits_process.py"],
     deps = [":bandits_utils"],
+)
+
+py_library(
+    name = "trainer",
+    srcs = ["trainer.py"],
+    deps = [
+        ":bandits_process",
+        ":bandits_utils",
+        "//bandits/algs:epsilon_greedy",
+        "//bandits/algs:falcon",
+        "//bandits/algs:softmax_sampling",
+        "//bandits/tasks:emnist",
+        "//bandits/tasks:stackoverflow",
+        "//bandits/tasks:task_utils",
+    ],
 )
 
 py_test(
@@ -52,5 +67,26 @@ py_test(
         "//bandits/algs:epsilon_greedy",
         "//bandits/tasks:emnist",
         "//bandits/tasks:task_utils",
+    ],
+)
+
+py_test(
+    name = "trainer_test",
+    srcs = ["trainer_test.py"],
+    deps = [
+        ":bandits_utils",
+        ":keras_optimizer_utils",
+        ":trainer",
+        "//bandits/tasks:task_utils",
+    ],
+)
+
+py_binary(
+    name = "run_federated",
+    srcs = ["run_federated.py"],
+    deps = [
+        ":file_utils",
+        ":keras_optimizer_utils",
+        ":trainer",
     ],
 )
