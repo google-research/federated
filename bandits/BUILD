@@ -19,6 +19,12 @@ py_library(
     srcs = ["file_utils.py"],
 )
 
+py_library(
+    name = "bandits_process",
+    srcs = ["bandits_process.py"],
+    deps = [":bandits_utils"],
+)
+
 py_test(
     name = "file_utils_test",
     srcs = ["file_utils_test.py"],
@@ -35,4 +41,16 @@ py_test(
     name = "keras_optimizer_utils_test",
     srcs = ["keras_optimizer_utils_test.py"],
     deps = [":keras_optimizer_utils"],
+)
+
+py_test(
+    name = "bandits_process_test",
+    srcs = ["bandits_process_test.py"],
+    deps = [
+        ":bandits_process",
+        ":bandits_utils",
+        "//bandits/algs:epsilon_greedy",
+        "//bandits/tasks:emnist",
+        "//bandits/tasks:task_utils",
+    ],
 )
