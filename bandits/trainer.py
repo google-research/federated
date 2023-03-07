@@ -648,9 +648,9 @@ def train_and_eval(
       validation. If `None`, all samples in the validation/test dataset will be
       used.
     bandits_epsilon: The exploration parameter for epsilon-greedy bandits.
-    bandits_mu: The exploration parameter mu for squareCB algorithm. If `None`,
+    bandits_mu: The exploration parameter mu for FALCON algorithm. If `None`,
       defaults to the number of possible actions.
-    bandits_gamma: The exploration parameter gamma for squareCB algorithm.
+    bandits_gamma: The exploration parameter gamma for FALCON algorithm.
     bandits_temperature: Parameter for softmax exploration.
     bandits_deployment_frequency: Deploys the online training model for bandits
       inference every `bandits_deployment_frequency` rounds.

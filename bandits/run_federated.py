@@ -190,12 +190,12 @@ _MU = flags.DEFINE_float(
     'bandits_mu',
     None,
     (
-        'Exploration mu of squareCB bandits. If `None`, '
+        'Exploration parameter mu of the FALCON bandit algorithm. If `None`, '
         'default to the number of possible actions.'
     ),
 )
 _GAMMA = flags.DEFINE_float(
-    'bandits_gamma', 100, 'Exploration gamma of squareCB bandits.'
+    'bandits_gamma', 100, 'Exploration gamma of the FALCON bandit algorithm.'
 )
 _TEMPERATURE = flags.DEFINE_float(
     'bandits_temperature', 1.0, 'Temperature for softmax exploration.'
