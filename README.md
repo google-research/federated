@@ -24,7 +24,7 @@ related papers. None of the projects (or subfolders) here is intended to be a
 resusable framework or package.
 
 *   The recommended usage for this repository is to `git clone` and follow the
-    instruction in each indedpendent project to run the code, usually with
+    instruction in each independent project to run the code, usually with
     `bazel`.
 
 There is a special module `utils/` that is widely used as a dependency for
@@ -38,8 +38,7 @@ is not promised to be a stable API and the code may change in any time.
 *   If you find `utils/` and maybe other projects helpful as a module that your
     projects want to depend on (and you accept the risk of depending on
     potentially unstable and unsupported code), you can use `git submodule` and
-    add the module to your python path. See
-    [this example](https://github.com/michaelreneer/experiment).
+    add the module to your python path.
 
 ## Contributing
 
@@ -70,6 +69,13 @@ tag.
 If you would like more information on federated learning, please see the
 following
 [introduction to federated learning](https://ai.googleblog.com/2017/04/federated-learning-collaborative.html).
-For a more in-depth discussion of recent progress in federated learning and open
-problems, see
-[Advances and Open Problems in Federated Learning](https://arxiv.org/abs/1912.04977).
+For a more in-depth discussion, see the following manuscripts
+
+*   [Advances and Open Problems in Federated Learning](https://arxiv.org/abs/1912.04977)
+    for progress in federated learning and open problems.
+*   [A Field Guide to Federated Optimization](https://arxiv.org/abs/2107.06917)
+    for practical considerations, and guidelines to simulation and experiments.
+*   [Motley: Benchmarking Heterogeneity and Personalization in Federated
+    Learning](https://arxiv.org/abs/2206.09262) for personalization.
+*   [How to DP-fy ML: A Practical Guide to Machine Learning with Differential
+    Privacy](https://arxiv.org/abs/2303.00654) for differential privacy.
