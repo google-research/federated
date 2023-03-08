@@ -1,7 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 package(
-    default_applicable_licenses = ["//third_party/federated_research:package_license"],
+    default_applicable_licenses = ["//:package_license"],
     default_visibility = ["//bandits:__subpackages__"],
 )
 
