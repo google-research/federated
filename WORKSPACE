@@ -10,3 +10,9 @@ git_repository(
 
 load("@rules_python//python:repositories.bzl", "py_repositories")
 py_repositories()
+
+git_repository(
+    name = "rules_license",
+    remote = "https://github.com/bazelbuild/rules_license.git",
+    tag = "0.0.4",
+)
