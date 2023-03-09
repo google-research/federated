@@ -2,9 +2,12 @@ load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 licenses(["notice"])
 
-package(default_visibility = [
-    "//generalization:__subpackages__",
-])
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = [
+        "//generalization:__subpackages__",
+    ],
+)
 
 py_library(
     name = "centralized_training_loop",

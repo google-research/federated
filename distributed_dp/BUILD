@@ -1,6 +1,9 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
-package(default_visibility = ["//private_linear_compression:__subpackages__"])
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = ["//private_linear_compression:__subpackages__"],
+)
 
 licenses(["notice"])
 

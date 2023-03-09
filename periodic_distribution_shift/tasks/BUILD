@@ -1,6 +1,9 @@
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
-package(default_visibility = ["//periodic_distribution_shift:__subpackages__"])
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = ["//periodic_distribution_shift:__subpackages__"],
+)
 
 licenses(["notice"])
 

@@ -1,6 +1,9 @@
 load("@rules_python//python:defs.bzl", "py_library")
 
-package(default_visibility = ["//gans/experiments/emnist:__subpackages__"])
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = ["//gans/experiments/emnist:__subpackages__"],
+)
 
 licenses(["notice"])
 

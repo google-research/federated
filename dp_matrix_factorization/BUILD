@@ -2,9 +2,12 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])
 
-package(default_visibility = [
-    ":dp_matrix_factorization_packages",
-])
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = [
+        ":dp_matrix_factorization_packages",
+    ],
+)
 
 package_group(
     name = "dp_matrix_factorization_packages",
