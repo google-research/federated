@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains the code for the paper "The Funamdental Price of Secure
+This directory contains the code for the paper "The Fundamental Price of Secure
 Aggregation in Differentially Private Federated Learning", found at:
 [[PDF](https://arxiv.org/pdf/2203.03761.pdf)][[arXiv](https://arxiv.org/abs/2203.03761)].
 
