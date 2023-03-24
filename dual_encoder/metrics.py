@@ -78,10 +78,12 @@ class BatchRecall(tf.keras.metrics.Mean):
     self.normalization_fn = normalization_fn
     self.expect_embeddings = expect_embeddings
 
-  def update_state(self,
-                   y_true: tf.Tensor,
-                   y_pred: tf.Tensor,
-                   sample_weight: Optional[tf.Tensor] = None):
+  def update_state(
+      self,
+      y_true: tf.Tensor,
+      y_pred: tf.Tensor,
+      sample_weight: Optional[tf.Tensor] = None,
+  ):  # pytype: disable=signature-mismatch
     """Compute the batch recall and update state of the metric.
 
     Args:
@@ -151,10 +153,12 @@ class BatchRecallWithGlobalSimilarity(tf.keras.metrics.Mean):
     self.normalization_fn = normalization_fn
     self.expect_embeddings = expect_embeddings
 
-  def update_state(self,
-                   y_true: tf.Tensor,
-                   y_pred: tf.Tensor,
-                   sample_weight: Optional[tf.Tensor] = None):
+  def update_state(
+      self,
+      y_true: tf.Tensor,
+      y_pred: tf.Tensor,
+      sample_weight: Optional[tf.Tensor] = None,
+  ):  # pytype: disable=signature-mismatch
     """Compute the batch recall and update state of the metric.
 
     Args:
@@ -231,10 +235,12 @@ class GlobalRecall(tf.keras.metrics.Mean):
     self.normalization_fn = normalization_fn
     self.expect_embeddings = expect_embeddings
 
-  def update_state(self,
-                   y_true: tf.Tensor,
-                   y_pred: tf.Tensor,
-                   sample_weight: Optional[tf.Tensor] = None):
+  def update_state(
+      self,
+      y_true: tf.Tensor,
+      y_pred: tf.Tensor,
+      sample_weight: Optional[tf.Tensor] = None,
+  ):  # pytype: disable=signature-mismatch
     """Compute the global recall and update state of the metric.
 
     Args:
@@ -294,11 +300,12 @@ class BatchMeanRank(tf.keras.metrics.Mean):
     self.normalization_fn = normalization_fn
     self.expect_embeddings = expect_embeddings
 
-  def update_state(self,
-                   y_true: tf.Tensor,
-                   y_pred: tf.Tensor,
-                   sample_weight: Optional[tf.Tensor] = None):
-
+  def update_state(
+      self,
+      y_true: tf.Tensor,
+      y_pred: tf.Tensor,
+      sample_weight: Optional[tf.Tensor] = None,
+  ):  # pytype: disable=signature-mismatch
     _, _, similarities = (
         utils.get_embeddings_and_similarities(
             y_pred, y_true, self.expect_embeddings, self.normalization_fn))
@@ -352,11 +359,12 @@ class GlobalMeanRank(tf.keras.metrics.Mean):
     self.normalization_fn = normalization_fn
     self.expect_embeddings = expect_embeddings
 
-  def update_state(self,
-                   y_true: tf.Tensor,
-                   y_pred: tf.Tensor,
-                   sample_weight: Optional[tf.Tensor] = None):
-
+  def update_state(
+      self,
+      y_true: tf.Tensor,
+      y_pred: tf.Tensor,
+      sample_weight: Optional[tf.Tensor] = None,
+  ):  # pytype: disable=signature-mismatch
     _, _, similarities = (
         utils.get_embeddings_and_similarities(
             y_pred, y_true, self.expect_embeddings, self.normalization_fn))
@@ -413,11 +421,12 @@ class BatchSimilaritiesNorm(tf.keras.metrics.Mean):
     self.normalization_fn = normalization_fn
     self.expect_embeddings = expect_embeddings
 
-  def update_state(self,
-                   y_true: tf.Tensor,
-                   y_pred: tf.Tensor,
-                   sample_weight: Optional[tf.Tensor] = None):
-
+  def update_state(
+      self,
+      y_true: tf.Tensor,
+      y_pred: tf.Tensor,
+      sample_weight: Optional[tf.Tensor] = None,
+  ):  # pytype: disable=signature-mismatch
     _, _, similarities = (
         utils.get_embeddings_and_similarities(
             y_pred, y_true, self.expect_embeddings, self.normalization_fn))
@@ -449,7 +458,7 @@ class NumExamplesCounter(tf.keras.metrics.Sum):
                **kwargs):
     super().__init__(name=name, **kwargs)
 
-  def update_state(self, y_true, y_pred, sample_weight=None):
+  def update_state(self, y_true, y_pred, sample_weight=None):  # pytype: disable=signature-mismatch
     return super().update_state(tf.shape(y_true)[0])
 
 
@@ -464,5 +473,5 @@ class NumBatchesCounter(tf.keras.metrics.Sum):
                **kwargs):
     super().__init__(name=name, **kwargs)
 
-  def update_state(self, y_true, y_pred, sample_weight=None):
+  def update_state(self, y_true, y_pred, sample_weight=None):  # pytype: disable=signature-mismatch
     return super().update_state(1)

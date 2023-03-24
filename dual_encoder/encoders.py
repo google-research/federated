@@ -149,7 +149,7 @@ class EmbeddingBOWEncoder(Encoder):
 
     self.layer_name_prefix = layer_name_prefix
 
-  def call(self, inputs: tf.keras.layers.Layer) -> tf.keras.layers.Layer:
+  def call(self, inputs: tf.keras.layers.Layer) -> tf.keras.layers.Layer:  # pytype: disable=signature-mismatch
     """Call the encoder to produce output.
 
     Args:
@@ -243,7 +243,7 @@ class EmbeddingEncoder(Encoder):
 
     self.layer_name_prefix = layer_name_prefix
 
-  def call(self, inputs: tf.keras.layers.Layer) -> tf.keras.layers.Layer:
+  def call(self, inputs: tf.keras.layers.Layer) -> tf.keras.layers.Layer:  # pytype: disable=signature-mismatch
     """Call the encoder to produce output.
 
     Args:
