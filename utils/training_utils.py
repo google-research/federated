@@ -98,8 +98,8 @@ def write_hparams_to_csv(hparam_dict: Dict[str, Any], root_output_dir: str,
 def create_validation_fn(
     task: tff.simulation.baselines.BaselineTask,
     validation_frequency: int,
-    num_validation_examples: Optional[int] = None
-) -> Callable[[tff.learning.ModelWeights, int], Any]:
+    num_validation_examples: Optional[int] = None,
+) -> Callable[[tff.learning.models.ModelWeights, int], Any]:
   """Creates a function for validating performance of a `tff.learning.Model`."""
   if task.datasets.validation_data is not None:
     validation_set = task.datasets.validation_data
@@ -122,8 +122,8 @@ def create_validation_fn(
 
 
 def create_test_fn(
-    task: tff.simulation.baselines.BaselineTask
-) -> Callable[[tff.learning.ModelWeights], Any]:
+    task: tff.simulation.baselines.BaselineTask,
+) -> Callable[[tff.learning.models.ModelWeights], Any]:
   """Creates a function for testing performance of a `tff.learning.Model`."""
   test_set = task.datasets.get_centralized_test_data()
   evaluate_fn = tff.learning.build_federated_evaluation(task.model_fn)

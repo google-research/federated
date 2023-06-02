@@ -151,16 +151,17 @@ def create_model_and_data(
       raw_client_data.create_tf_dataset_for_client(
           raw_client_data.client_ids[0])).element_spec
 
-  def model_fn() -> tff.learning.Model:
+  def model_fn() -> tff.learning.models.VariableModel:
     keras_model = mobilenet_v2.create_mobilenet_v2(
         input_shape=(_IMAGE_SIZE, _IMAGE_SIZE, 3),
         num_groups=_NUM_GROUPS,
         num_classes=_NUM_CLASSES)
-    return tff.learning.from_keras_model(
+    return tff.learning.models.from_keras_model(
         keras_model=keras_model,
         input_spec=input_spec,
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
-        metrics=[tf.keras.metrics.SparseCategoricalAccuracy(_ACCURACY_NAME)])
+        metrics=[tf.keras.metrics.SparseCategoricalAccuracy(_ACCURACY_NAME)],
+    )
 
   if use_synthetic_data:
     train_client_ids = raw_client_data.client_ids
@@ -199,22 +200,33 @@ def create_model_and_data(
       first splitting the `raw_data` into two unbatched datasets.
     """
     # Splits the `raw_data` into two datasets, and processes them. We do not
-    # apply batching here, because `tff.learning.build_personalization_eval`
-    # expects *unbatched* client-side datasets. Batching is part of
-    # user-supplied personalization function.
+    # apply batching here, because
+    # `tff.learning.build_personalization_eval_computation` expects *unbatched*
+    # client-side datasets. Batching is part of user-supplied personalization
+    # function.
     personalization_data, test_data = emnist.split_half(
         raw_data.shuffle(
             _SHUFFLE_BUFFER_SIZE,
             seed=constants.SPLIT_CLIENTS_SEED,
-            reshuffle_each_iteration=False))
+            reshuffle_each_iteration=False,
+        )
+    )
     personalization_data = personalization_data.map(
-        train_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        train_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE
+    )
     test_data = test_data.map(
-        test_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        test_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE
+    )
     # Creates the final data structure.
     final_data = collections.OrderedDict()
     final_data[constants.PERSONALIZATION_DATA_KEY] = personalization_data
     final_data[constants.TEST_DATA_KEY] = test_data
     return final_data
 
-  return model_fn, datasets, train_preprocess_fn, split_and_add_data_fn, _ACCURACY_NAME
+  return (
+      model_fn,
+      datasets,
+      train_preprocess_fn,
+      split_and_add_data_fn,
+      _ACCURACY_NAME,
+  )

@@ -111,7 +111,7 @@ def _write_hparams():
 
 
 def _create_train_algorithm(
-    model_fn: Callable[[], tff.learning.Model]
+    model_fn: Callable[[], tff.learning.models.VariableModel]
 ) -> tff.learning.templates.LearningProcess:
   """Creates a learning process for client training."""
   server_optimizer_fn = optimizer_utils.create_optimizer_fn_from_flags('server')
@@ -124,8 +124,9 @@ def _create_train_algorithm(
   if _PATH_TO_INITIAL_MODEL_WEIGHTS.value is not None:
     saved_keras_model = tf.keras.models.load_model(
         _PATH_TO_INITIAL_MODEL_WEIGHTS.value)
-    initial_model_weights = tff.learning.ModelWeights.from_model(
-        saved_keras_model)
+    initial_model_weights = tff.learning.models.ModelWeights.from_model(
+        saved_keras_model
+    )
     original_state = learning_process.initialize()
     initial_state = learning_process.set_model_weights(original_state,
                                                        initial_model_weights)
@@ -186,20 +187,27 @@ def _split_data_and_run_finetuning_eval_computation(
     return split_data_fn(client_data.dataset_computation(client_id))
 
   # Create the evaluation computation (and wiring in a dataset computation).
-  finetuning_eval_computation = tff.learning.build_personalization_eval(
-      model_fn=model_fn,
-      personalize_fn_dict=collections.OrderedDict([
-          (constants.FINETUNING_FN_NAME, _finetune_eval_fn_builder)
-      ]),
-      baseline_evaluate_fn=finetuning_utils.evaluate_fn,
-      max_num_clients=max(_VALID_CLIENTS_PER_EVALUATION.value,
-                          _TEST_CLIENTS_PER_EVALUATION.value))
+  finetuning_eval_computation = (
+      tff.learning.algorithms.build_personalization_eval_computation(
+          model_fn=model_fn,
+          personalize_fn_dict=collections.OrderedDict(
+              [(constants.FINETUNING_FN_NAME, _finetune_eval_fn_builder)]
+          ),
+          baseline_evaluate_fn=finetuning_utils.evaluate_fn,
+          max_num_clients=max(
+              _VALID_CLIENTS_PER_EVALUATION.value,
+              _TEST_CLIENTS_PER_EVALUATION.value,
+          ),
+      )
+  )
 
   model_weights_type = finetuning_eval_computation.type_signature.parameter[0]
+
   # Note that `tff.simulation.compose_dataset_computation_with_computation` does
   # not work here, because the dataset computation returns a dict of datasets.
-  @tff.federated_computation(model_weights_type,
-                             tff.types.at_clients(tf.string))
+  @tff.federated_computation(
+      model_weights_type, tff.types.at_clients(tf.string)
+  )
   def split_data_and_run_finetuning_eval(model_weights, client_ids):
     processed_datasets = tff.federated_map(split_data_for_client, client_ids)
     return finetuning_eval_computation(model_weights, processed_datasets)
@@ -209,13 +217,19 @@ def _split_data_and_run_finetuning_eval_computation(
 
 def main(argv):
   if len(argv) > 1:
-    raise app.UsageError('Expected no command-line arguments, '
-                         'got: {}'.format(argv))
+    raise app.UsageError(
+        'Expected no command-line arguments, got: {}'.format(argv)
+    )
   if not _EXPERIMENT_NAME.value:
     raise ValueError('FLAGS.experiment_name must be set.')
 
-  model_fn, federated_datasets, train_preprocess_fn, split_data_fn, accuracy_name = (
-      _create_model_and_data(_DATASET_NAME.value, _USE_SYNTHETIC_DATA.value))
+  (
+      model_fn,
+      federated_datasets,
+      train_preprocess_fn,
+      split_data_fn,
+      accuracy_name,
+  ) = _create_model_and_data(_DATASET_NAME.value, _USE_SYNTHETIC_DATA.value)
   train_client_data = federated_datasets[constants.TRAIN_CLIENTS_KEY]
   valid_client_data = federated_datasets[constants.VALID_CLIENTS_KEY]
   test_client_data = federated_datasets[constants.TEST_CLIENTS_KEY]
@@ -234,8 +248,11 @@ def main(argv):
     return train_preprocess_fn(raw_client_data)
 
   learning_process = _create_train_algorithm(model_fn)
-  training_process = tff.simulation.compose_dataset_computation_with_iterative_process(
-      build_train_dataset_from_client_id, learning_process)
+  training_process = (
+      tff.simulation.compose_dataset_computation_with_iterative_process(
+          build_train_dataset_from_client_id, learning_process
+      )
+  )
   training_process.get_model_weights = learning_process.get_model_weights
 
   # Create the evaluation client selection function, which takes in an integer
@@ -243,21 +260,31 @@ def main(argv):
   # test clients. The output of `evaluation_selection_fn` will be used as the
   # second parameter of the `evaluation_fn` below.
   valid_clients_sampling_fn = tff.simulation.build_uniform_sampling_fn(
-      valid_client_data.client_ids, random_seed=_BASE_RANDOM_SEED.value)
+      valid_client_data.client_ids, random_seed=_BASE_RANDOM_SEED.value
+  )
   test_clients_sampling_fn = tff.simulation.build_uniform_sampling_fn(
-      test_client_data.client_ids, random_seed=_BASE_RANDOM_SEED.value)
+      test_client_data.client_ids, random_seed=_BASE_RANDOM_SEED.value
+  )
   evaluation_selection_fn = lambda round_num: (  # pylint: disable=g-long-lambda
       valid_clients_sampling_fn(round_num, _VALID_CLIENTS_PER_EVALUATION.value),
-      test_clients_sampling_fn(round_num, _TEST_CLIENTS_PER_EVALUATION.value))
+      test_clients_sampling_fn(round_num, _TEST_CLIENTS_PER_EVALUATION.value),
+  )
 
-  valid_clients_eval_computation = _split_data_and_run_finetuning_eval_computation(
-      valid_client_data, model_fn, split_data_fn)
-  test_clients_eval_computation = _split_data_and_run_finetuning_eval_computation(
-      test_client_data, model_fn, split_data_fn)
+  valid_clients_eval_computation = (
+      _split_data_and_run_finetuning_eval_computation(
+          valid_client_data, model_fn, split_data_fn
+      )
+  )
+  test_clients_eval_computation = (
+      _split_data_and_run_finetuning_eval_computation(
+          test_client_data, model_fn, split_data_fn
+      )
+  )
 
   def evaluation_fn(
       state: tff.learning.templates.LearningAlgorithmState,
-      sampled_client_ids: Tuple[List[str], List[str]]) -> OrderedDict[str, Any]:
+      sampled_client_ids: Tuple[List[str], List[str]],
+  ) -> OrderedDict[str, Any]:
     """Evaluates the current model on the sampled validation and test clients.
 
     Args:

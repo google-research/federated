@@ -109,8 +109,9 @@ def create_model_and_data(
   def split_data_fn(
       raw_data: tf.data.Dataset) -> OrderedDict[str, tf.data.Dataset]:
     """Process the raw data and split it equally into two unbatched datasets."""
-    # `tff.learning.build_personalization_eval` expects *unbatched* client-side
-    # datasets. Batching is part of user-supplied personalization function.
+    # `tff.learning.build_personalization_eval_computation` expects *unbatched*
+    # client-side datasets. Batching is part of user-supplied personalization
+    # function.
     processed_data = eval_preprocess_fn(raw_data).unbatch().shuffle(
         _SHUFFLE_BUFFER_SIZE,
         seed=constants.SPLIT_CLIENTS_SEED,
@@ -123,4 +124,6 @@ def create_model_and_data(
 
   model_fn = task.model_fn
   train_preprocess_fn = task.datasets.train_preprocess_fn
+  if train_preprocess_fn is None:
+    train_preprocess_fn = lambda x: x
   return model_fn, datasets, train_preprocess_fn, split_data_fn, _ACCURACY_NAME

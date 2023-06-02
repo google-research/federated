@@ -405,8 +405,9 @@ def create_model_and_data(
   def split_data_fn(
       raw_data: tf.data.Dataset) -> OrderedDict[str, tf.data.Dataset]:
     """Process the raw data and split it equally into two unbatched datasets."""
-    # `tff.learning.build_personalization_eval` expects *unbatched* client-side
-    # datasets. Batching is part of user-supplied personalization function.
+    # `tff.learning.build_personalization_eval_computation` expects *unbatched*
+    # client-side datasets. Batching is part of user-supplied personalization
+    # function.
     processed_data = eval_preprocess_fn(raw_data).unbatch()
     personalization_data, test_data = emnist.split_half(processed_data)
     return collections.OrderedDict([(constants.PERSONALIZATION_DATA_KEY,
@@ -420,12 +421,13 @@ def create_model_and_data(
   assert en_example_dataset.element_spec == es_example_dataset.element_spec
   input_spec = en_example_dataset.element_spec
 
-  def model_fn() -> tff.learning.Model:
-    return tff.learning.from_keras_model(
+  def model_fn() -> tff.learning.models.VariableModel:
+    return tff.learning.models.from_keras_model(
         keras_model=_get_keras_model(vocab_size, num_oov_buckets),
         input_spec=input_spec,
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics=_get_metrics(vocab_size, num_oov_buckets=num_oov_buckets))
+        metrics=_get_metrics(vocab_size, num_oov_buckets=num_oov_buckets),
+    )
 
   return model_fn, datasets, train_preprocess_fn, split_data_fn, _ACCURACY_NAME
 
@@ -454,26 +456,26 @@ def _create_sample_data_dictionary():
   }
 
 
-def _synethetic_vocab():
+def _synethetic_vocab() -> List[str]:
   return [
-      b'the',
-      b'and',
-      b'to',
-      b'of',
-      b'a',
-      b'that',
-      b'i',
-      b'in',
-      b'it',
-      b'you',
-      b'de',
-      b'que',
-      b'y',
-      b'la',
-      b'en',
-      b'el',
-      b'lo',
-      b'ella',
-      b'es',
-      b'quot',
+      'the',
+      'and',
+      'to',
+      'of',
+      'a',
+      'that',
+      'i',
+      'in',
+      'it',
+      'you',
+      'de',
+      'que',
+      'y',
+      'la',
+      'en',
+      'el',
+      'lo',
+      'ella',
+      'es',
+      'quot',
   ]

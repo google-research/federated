@@ -77,8 +77,13 @@ def _sort_examples_by_date(
 
 def create_model_and_data(
     num_local_epochs: int, train_batch_size: int, use_synthetic_data: bool
-) -> Tuple[constants.ModelFnType, constants.FederatedDatasetsType,
-           constants.ProcessFnType, constants.SplitDataFnType, str]:
+) -> Tuple[
+    constants.ModelFnType,
+    constants.FederatedDatasetsType,
+    constants.ProcessFnType,
+    constants.SplitDataFnType,
+    str,
+]:
   """Creates model, datasets, and processing functions for StackOverflow.
 
   Args:
@@ -117,6 +122,8 @@ def create_model_and_data(
       use_synthetic_data=use_synthetic_data)
   train_data = task.datasets.train_data
   heldout_data = task.datasets.validation_data
+  if heldout_data is None:
+    raise ValueError('Expected stackoverflow validation data to not be None.')
   if use_synthetic_data:
     valid_client_ids = train_data.client_ids
     test_client_ids = train_data.client_ids
@@ -142,8 +149,9 @@ def create_model_and_data(
     """Sort examples by `date` and split it into two unbatched datasets."""
     sorted_data = raw_data.take(_MAX_ELEMENTS_PER_CLIENT).batch(
         _MAX_ELEMENTS_PER_CLIENT).map(_sort_examples_by_date).unbatch()
-    # `tff.learning.build_personalization_eval` expects *unbatched* client-side
-    # datasets. Batching is part of user-supplied personalization function.
+    # `tff.learning.build_personalization_eval_computation` expects *unbatched*
+    # client-side datasets. Batching is part of user-supplied personalization
+    # function.
     processed_data = eval_preprocess_fn(sorted_data).unbatch()
     personalization_data, test_data = emnist.split_half(processed_data)
     final_data = collections.OrderedDict()
@@ -153,4 +161,12 @@ def create_model_and_data(
 
   model_fn = task.model_fn
   train_preprocess_fn = task.datasets.train_preprocess_fn
-  return model_fn, datasets, train_preprocess_fn, sort_and_split_data_fn, _ACCURACY_NAME
+  if train_preprocess_fn is None:
+    train_preprocess_fn = lambda x: x
+  return (
+      model_fn,
+      datasets,
+      train_preprocess_fn,
+      sort_and_split_data_fn,
+      _ACCURACY_NAME,
+  )

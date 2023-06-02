@@ -30,7 +30,7 @@ FINETUNING_FN_NAME = 'finetuning'
 PERSONALIZATION_DATA_KEY = 'train_data'
 TEST_DATA_KEY = 'test_data'
 
-ModelFnType = Callable[[], tff.learning.Model]
+ModelFnType = Callable[[], tff.learning.models.VariableModel]
 FederatedDatasetsType = OrderedDict[str, tff.simulation.datasets.ClientData]
 ProcessFnType = Callable[[tf.data.Dataset], tf.data.Dataset]
 SplitDataFnType = Callable[[tf.data.Dataset], OrderedDict[str, tf.data.Dataset]]

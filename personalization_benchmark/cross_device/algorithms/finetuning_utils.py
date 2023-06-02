@@ -26,12 +26,17 @@ _RAW_METRICS_BEFORE_PROCESS = 'raw_metrics'
 _OptimizerFnType = Callable[[], tf.keras.optimizers.Optimizer]
 _MetricsType = OrderedDict[str, Any]
 _FinetuneEvalFnType = Callable[
-    [tff.learning.Model, tf.data.Dataset, tf.data.Dataset, Any], _MetricsType]
+    [tff.learning.models.VariableModel, tf.data.Dataset, tf.data.Dataset, Any],
+    _MetricsType,
+]
 
 
-def build_finetune_eval_fn(optimizer_fn: _OptimizerFnType, batch_size: int,
-                           num_finetuning_epochs: int,
-                           finetune_last_layer: bool) -> _FinetuneEvalFnType:
+def build_finetune_eval_fn(
+    optimizer_fn: _OptimizerFnType,
+    batch_size: int,
+    num_finetuning_epochs: int,
+    finetune_last_layer: bool,
+) -> _FinetuneEvalFnType:
   """Builds a `tf.function` that finetunes the model and evaluates on test data.
 
   The returned `tf.function` represents the logic to run on each client. It
@@ -59,10 +64,15 @@ def build_finetune_eval_fn(optimizer_fn: _OptimizerFnType, batch_size: int,
   optimizer = optimizer_fn()
 
   @tf.function
-  def finetune_eval_fn(model: tff.learning.Model,
-                       train_data: tf.data.Dataset,
-                       test_data: tf.data.Dataset,
-                       context: Optional[Any] = None) -> _MetricsType:
+  def finetune_eval_fn(
+      # The pytype below must be Any, because the code below uses internal
+      # methods only present on tff.learning.from_keras_model-derived TFF
+      # models.
+      model: Any,
+      train_data: tf.data.Dataset,
+      test_data: tf.data.Dataset,
+      context: Optional[Any] = None,
+  ) -> _MetricsType:
     """Finetunes the model and returns the evaluation metrics."""
     del context  # Unused
 
@@ -84,6 +94,7 @@ def build_finetune_eval_fn(optimizer_fn: _OptimizerFnType, batch_size: int,
     # Starts training.
     metrics_dict = collections.OrderedDict()
     train_data = train_data.batch(batch_size)
+    num_examples_sum = 0
     for idx in range(1, num_finetuning_epochs + 1):
       num_examples_sum = train_data.reduce(0, train_one_batch)
       # Evaluate the finetuned model every epoch.
@@ -95,9 +106,13 @@ def build_finetune_eval_fn(optimizer_fn: _OptimizerFnType, batch_size: int,
 
 
 @tf.function
-def evaluate_fn(model: tff.learning.Model,
-                dataset: tf.data.Dataset,
-                batch_size: int = 1) -> OrderedDict[str, tf.Tensor]:
+def evaluate_fn(
+    # The pytype below must be Any, because the code below uses internal methods
+    # only present on tff.learning.from_keras_model-derived TFF models.
+    model: Any,
+    dataset: tf.data.Dataset,
+    batch_size: int = 1,
+) -> OrderedDict[str, tf.Tensor]:
   """Evaluates a model on the given dataset."""
   # Resets the model's local variables. This is necessary because
   # `model.report_local_unfinalized_metrics()` aggregates the metrics from *all*
@@ -166,46 +181,55 @@ def postprocess_finetuning_metrics(
   test_baseline_metrics = test_metrics_dict[_BASELINE_METRICS]
   test_finetuning_metrics = test_metrics_dict[finetuning_fn_name]
   test_accuracies_at_best_epoch_mean = np.mean(
-      test_baseline_metrics[accuracy_name])
+      test_baseline_metrics[accuracy_name]
+  )
   if best_epoch > 0:
     test_accuracies_at_best_epoch_mean = np.mean(
-        test_finetuning_metrics[f'epoch_{best_epoch}'][accuracy_name])
+        test_finetuning_metrics[f'epoch_{best_epoch}'][accuracy_name]
+    )
   # Compute the number of clients whose test accuracy hurts after finetuning.
   num_total_test_clients = len(test_baseline_metrics[accuracy_name])
   num_test_clients_hurt_after_finetuning = 0
   if best_epoch > 0:
     for client_i in range(num_total_test_clients):
       finetuning_accuracy = test_finetuning_metrics[f'epoch_{best_epoch}'][
-          accuracy_name][client_i]
+          accuracy_name
+      ][client_i]
       baseline_accuracy = test_baseline_metrics[accuracy_name][client_i]
       if baseline_accuracy > finetuning_accuracy:
         num_test_clients_hurt_after_finetuning += 1
-  fraction_clients_hurt = (
-      num_test_clients_hurt_after_finetuning / float(num_total_test_clients))
+  fraction_clients_hurt = num_test_clients_hurt_after_finetuning / float(
+      num_total_test_clients
+  )
   # Create the postprocessed metrics dictionary.
   postprocessed_metrics = collections.OrderedDict()
   postprocessed_metrics[_BASELINE_METRICS] = collections.OrderedDict()
+  postprocessed_metrics[_BASELINE_METRICS][f'valid_{accuracy_name}_mean'] = (
+      np.mean(valid_baseline_metrics[accuracy_name])
+  )
+  postprocessed_metrics[_BASELINE_METRICS][f'test_{accuracy_name}_mean'] = (
+      np.mean(test_baseline_metrics[accuracy_name])
+  )
+  postprocessed_metrics[_BASELINE_METRICS]['test_num_eval_examples_mean'] = (
+      np.mean(test_baseline_metrics[_NUM_TEST_EXAMPLES])
+  )
   postprocessed_metrics[_BASELINE_METRICS][
-      f'valid_{accuracy_name}_mean'] = np.mean(
-          valid_baseline_metrics[accuracy_name])
-  postprocessed_metrics[_BASELINE_METRICS][
-      f'test_{accuracy_name}_mean'] = np.mean(
-          test_baseline_metrics[accuracy_name])
-  postprocessed_metrics[_BASELINE_METRICS][
-      'test_num_eval_examples_mean'] = np.mean(
-          test_baseline_metrics[_NUM_TEST_EXAMPLES])
-  postprocessed_metrics[_BASELINE_METRICS][
-      'test_num_finetune_examples_mean'] = np.mean(
-          test_finetuning_metrics[_NUM_FINETUNE_EXAMPLES])
+      'test_num_finetune_examples_mean'
+  ] = np.mean(test_finetuning_metrics[_NUM_FINETUNE_EXAMPLES])
   postprocessed_metrics[finetuning_fn_name] = collections.OrderedDict()
   postprocessed_metrics[finetuning_fn_name][
-      'best_finetuning_epoch'] = best_epoch
+      'best_finetuning_epoch'
+  ] = best_epoch
   postprocessed_metrics[finetuning_fn_name][
-      f'valid_{accuracy_name}_at_best_epoch_mean'] = best_valid_accuracies_mean
+      f'valid_{accuracy_name}_at_best_epoch_mean'
+  ] = best_valid_accuracies_mean
   postprocessed_metrics[finetuning_fn_name][
-      f'test_{accuracy_name}_at_best_epoch_mean'] = test_accuracies_at_best_epoch_mean
+      f'test_{accuracy_name}_at_best_epoch_mean'
+  ] = test_accuracies_at_best_epoch_mean
   postprocessed_metrics[finetuning_fn_name][
-      'fraction_clients_hurt_at_best_epoch'] = fraction_clients_hurt
+      'fraction_clients_hurt_at_best_epoch'
+  ] = fraction_clients_hurt
   postprocessed_metrics[_RAW_METRICS_BEFORE_PROCESS] = collections.OrderedDict(
-      valid=valid_metrics_dict, test=test_metrics_dict)
+      valid=valid_metrics_dict, test=test_metrics_dict
+  )
   return postprocessed_metrics
