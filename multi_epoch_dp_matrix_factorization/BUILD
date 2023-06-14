@@ -150,6 +150,12 @@ py_library(
     deps = ["//third_party/py/dp_accounting"],
 )
 
+py_library(
+    name = "accounting",
+    srcs = ["accounting.py"],
+    deps = ["//third_party/py/dp_accounting"],
+)
+
 py_test(
     name = "matrix_io_test",
     srcs = ["matrix_io_test.py"],
