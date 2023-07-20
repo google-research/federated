@@ -1,7 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 package(
-    default_applicable_licenses = ["//multi_epoch_dp_matrix_factorization:license"],
+    default_applicable_licenses = ["//:package_license"],
     default_visibility = [
         "//multi_epoch_dp_matrix_factorization:dp_matrix_factorization_packages",
         "//multi_epoch_dp_matrix_factorization:dp_matrix_factorization_users",

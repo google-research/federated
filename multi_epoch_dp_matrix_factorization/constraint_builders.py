@@ -164,7 +164,7 @@ def filter_constraints(
     full_constraint_matrix: tf.Tensor,
     target_vector: tf.Tensor,
     variable_mask: list[bool],
-) -> tuple[tf.Tensor, tf.tensor]:
+) -> tuple[tf.Tensor, tf.Tensor]:
   """Filters constraint matrix and target to reflect dropping of variables.
 
   That is, for some instantiations of our matrix-factorization problem, we wish

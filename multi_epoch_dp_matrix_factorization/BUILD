@@ -1,9 +1,9 @@
-load("@rules_license//rules:license.bzl", "license")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
-load("//tools/build_defs/license:license.bzl", "license")
+
+licenses(["notice"])
 
 package(
-    default_applicable_licenses = ["//multi_epoch_dp_matrix_factorization:license"],
+    default_applicable_licenses = ["//:package_license"],
     default_visibility = [
         ":dp_matrix_factorization_packages",
         ":dp_matrix_factorization_users",
@@ -21,13 +21,6 @@ package_group(
         "//multi_epoch_dp_matrix_factorization/...",  # Placeholder
     ],
 )
-
-license(
-    name = "license",
-    package_name = "multi_epoch_dp_matrix_factorization",
-)
-
-licenses(["notice"])
 
 py_library(
     name = "fixed_point_library",
@@ -147,13 +140,11 @@ py_library(
 py_library(
     name = "matrix_factorization_query",
     srcs = ["matrix_factorization_query.py"],
-    deps = ["//third_party/py/dp_accounting"],
 )
 
 py_library(
     name = "accounting",
     srcs = ["accounting.py"],
-    deps = ["//third_party/py/dp_accounting"],
 )
 
 py_test(
@@ -167,9 +158,5 @@ py_test(
 py_test(
     name = "matrix_factorization_query_test",
     srcs = ["matrix_factorization_query_test.py"],
-    deps = [
-        ":matrix_factorization_query",
-        "//third_party/py/tensorflow_privacy/privacy/dp_query:gaussian_query",
-        "//third_party/py/tensorflow_privacy/privacy/dp_query:tree_aggregation_query",
-    ],
+    deps = [":matrix_factorization_query"],
 )
