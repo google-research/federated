@@ -14,7 +14,8 @@
 """Utilities for finetuning-based personalization."""
 
 import collections
-from typing import Any, Callable, Optional, OrderedDict
+from collections.abc import Callable
+from typing import Any
 import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -24,9 +25,9 @@ _NUM_FINETUNE_EXAMPLES = 'num_train_examples'
 _BASELINE_METRICS = 'baseline_metrics'
 _RAW_METRICS_BEFORE_PROCESS = 'raw_metrics'
 _OptimizerFnType = Callable[[], tf.keras.optimizers.Optimizer]
-_MetricsType = OrderedDict[str, Any]
+_MetricsType = collections.OrderedDict[str, Any]
 _FinetuneEvalFnType = Callable[
-    [tff.learning.models.VariableModel, tf.data.Dataset, tf.data.Dataset, Any],
+    [tff.learning.models.VariableModel, tf.data.Dataset, tf.data.Dataset],
     _MetricsType,
 ]
 
@@ -41,10 +42,10 @@ def build_finetune_eval_fn(
 
   The returned `tf.function` represents the logic to run on each client. It
   takes a `tff.learning.Model` (with weights already initialized to the desired
-  initial model weights), an unbatched finetuning dataset, an unbatched test
-  dataset, and an optional `context` (e.g., extra dataset) as input, finetunes
-  the model on the training dataset, and returns the metrics evaluated on the
-  test dataset (the evaluation is done after *every* finetuning epoch).
+  initial model weights), an unbatched finetuning dataset, and an unbatched test
+  dataset, finetunes the model on the training dataset, and returns the metrics
+  evaluated on the test dataset (the evaluation is done after *every* finetuning
+  epoch).
 
   Args:
     optimizer_fn: A no-argument function that returns a
@@ -71,10 +72,8 @@ def build_finetune_eval_fn(
       model: Any,
       train_data: tf.data.Dataset,
       test_data: tf.data.Dataset,
-      context: Optional[Any] = None,
   ) -> _MetricsType:
     """Finetunes the model and returns the evaluation metrics."""
-    del context  # Unused
 
     @tf.function
     def train_one_batch(num_examples_sum, batch):
@@ -112,7 +111,7 @@ def evaluate_fn(
     model: Any,
     dataset: tf.data.Dataset,
     batch_size: int = 1,
-) -> OrderedDict[str, tf.Tensor]:
+) -> collections.OrderedDict[str, tf.Tensor]:
   """Evaluates a model on the given dataset."""
   # Resets the model's local variables. This is necessary because
   # `model.report_local_unfinalized_metrics()` aggregates the metrics from *all*
@@ -137,8 +136,11 @@ def evaluate_fn(
 
 
 def postprocess_finetuning_metrics(
-    valid_metrics_dict: _MetricsType, test_metrics_dict: _MetricsType,
-    accuracy_name: str, finetuning_fn_name: str) -> OrderedDict[str, Any]:
+    valid_metrics_dict: _MetricsType,
+    test_metrics_dict: _MetricsType,
+    accuracy_name: str,
+    finetuning_fn_name: str,
+) -> collections.OrderedDict[str, Any]:
   """Postprocesses the finetuning evaluation metrics collected at the server.
 
   By postprocessing, we will use `valid_metrics_dict` to find the best
