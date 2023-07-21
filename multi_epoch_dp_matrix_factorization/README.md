@@ -38,12 +38,6 @@ whose sensitivity we bound.
 
 <img src="images/matrices.png" height="200px">
 
-# Background
-
-Throughout this document, we will refer to the DP stochastic gradient descent
-(SGD) algorithm of [2] as DP-SGD and our multi-epoch matrix factorization work
-as MEMF-DP-FTRL.
-
 # Directory Structure
 
 -   The `dp_ftrl` package contains much of the run code for training models with
@@ -65,6 +59,12 @@ as MEMF-DP-FTRL.
 -   The main top-level modules contain common utilities for all of the above
     tasks.
 
+# Background
+
+Throughout this document, we will refer to the DP stochastic gradient descent
+(SGD) algorithm of [2] as DP-SGD and our multi-epoch matrix factorization work
+as MEMF-DP-FTRL.
+
 ## Differentially Private (DP) Machine Learning (ML)
 
 DP-SGD, the current go-to algorithm for DP-ML is based on the following 4 steps.
@@ -80,23 +80,67 @@ DP-SGD, the current go-to algorithm for DP-ML is based on the following 4 steps.
 4.  Add Gaussian noise *z* of standard deviation σ where σ is calibrated to
     achieve some chosen (ε, δ)-DP guarantee.
 
-To leverage our MEMF-DP-FTRL, we only need to change what noise we add to each
-step of DP-SGD. This can be translated to adding the following step 5.
+To leverage a factorized matrix for MEMF-DP-FTRL, we only need to change what
+noise we add to each step of DP-SGD. This can be translated to adding the
+following step 5.
 
-*   Given *z* generated from 4. above, correlate it by using the mechanism
-    **Bz**, where **B** is generated according to the training dynamics, as we
-    will discuss below. Equivalently, given **A** and **C**, where the former
-    will be pre-specified and the second optimized for (as discussed more below)
-    we generate noise as **AC^{-1}z**. Thus, the pair **A**,**C** specifies the
-    given matrix mechanism. TODO(b/285952627) to expand on this.
+*   Instead of adding a sample from a Gaussian which is isotropic across time to
+    the clipped gradients, add a *slice* of a Gaussian with some specified
+    covariance in the time dimension. We may add this slice in either *model
+    space*, corresponding to computing the ME-MF mechanism as **Ag + Bz**, or in
+    gradient space, corresponding to computing the mechanism as **A(g +
+    C^{-1}z)**, where **A = BC** is a factorization of the matrix **A** formed
+    by viewing the process of model training as a linear operator from streams
+    of gradients to streams of models. Such **A** can express gradient descent
+    with momentum and arbitrary (data-independent) learning rate schedules, but
+    leaves out important practical nonlinear optimizers like Adam and Adagrad.
 
 ## DP-FTRL
 
-TODO(b/285952627)
+The idea of leveraging noise which is *correlated through time* for
+differentially private ML training is not novel; to the best of our knowledge it
+first appeared in
+["Practical and Private (Deep) Learning without Sampling or Shuffling"](https://arxiv.org/abs/2103.00039),
+which presented DP-FTRL, an algorithm grounded in online convex optimization and
+leveraging the so-called 'tree aggregation mechanism' to compute private
+estimates of sums of gradients, a key quantity in FTRL algorithms (see, e.g.,
+Algorithm 2 in
+[this paper](https://jmlr.org/papers/volume18/14-428/14-428.pdf)).
+
+This algorithm was able to achieve similar utility to DP-SGD in certain regimes,
+*without the need to rely on amplification by sampling or shuffling*, a critical
+property for training settings in which the organization training the model does
+not precisely control when users participate. DP-FTRL with federated learning
+was therefore able to power the training and deployment of what appears to be
+the first ML model trained directly on user data with
+[formal differential privacy guarantees](https://ai.googleblog.com/2022/02/federated-learning-with-formal.html).
 
 ## Matrix Factorization
 
-TODO(b/285952627)
+DP-FTRL was extended and connected with the literature on the matrix mechanism
+in ["Improved Differential Privacy for SGD via Optimal Private Linear Operators
+on Adaptive
+Streams"](https://proceedings.neurips.cc/paper_files/paper/2022/file/271ec4d1a9ff5e6b81a6e21d38b1ba96-Paper-Conference.pdf),
+which instantiated DP-FTRL as an instance of a continuous class of private
+optimization methods, showing that *any* 'embedding matrix' **C** could be used
+to yield a private algorithm (assuming the noise is distributed as a Gaussian).
+
+The mechanisms proposed here are constructed by viewing the process of training
+as a linear mapping from streams of gradients **g** to streams of models **Ag**.
+Taking this view, we may ask about a *factorization* of the matrix **A** which
+yields minimal expected squared error as a stream function when the arguments
+are noised; IE, for what pair **(B, C)** is **B(Cg+z)** closest to **Ag**, where
+**C** is chosen to ensure differential privacy of the output?
+
+Any notion of differential privacy assumes a notion of neighboring dataset,
+roughly corresponding to the manner in which a single user's data may be
+accessed. The analysis in preceding work has leveraged a restriction here for
+tractability: restricting to training that only runs for a *single epoch*; this
+assumption significantly limits application of the resulting mechanisms, as many
+applications require more than one epoch. This assumption also suppresses
+certain subtle technical challenges which only appear in the presence of
+multiple epochs, like NP-hardness of computing sensitivity of a general matrix
+and the non-equivalence between vector-valued and matrix-valued sensitivities.
 
 # Try it out!
 
@@ -140,11 +184,22 @@ error). The following are what must be decided on a priori.
 To generate matrices for CIFAR-10, the
 `dp_ftrl`.`centralized`.`generate_and_write_matrices`.py run script will do
 this. As mentioned above, our CIFAR-10 results assume the prefix sum workload.
-Thus, this is assumed in this script. To generate matrices for other workloads,
-in particular for the Stackoverflow results, it is necessary to use the code in
-`multiple_participations`.
+Thus, this is assumed in this script.
 
-To do this, ... TODO(b/285952627)
+To generate matrices for other workloads, in particular for the Stackoverflow
+results, one may use the binary
+`multiple_partitipations.factorize_multi_epoch_prefix_sum.py`. Simply set the
+flags to express the matrix you are interested in factorizing, and the library
+will log progress in its optimization procedure as well as write the results to
+a provided directory. There may be some required tuning of optimization
+parameters to ensure convergence.
+
+Take note: for both paths abovs, the optimization code here will become
+computationally quite intensive as matrix size grows. The results in the present
+paper were generated for approximately 2000 steps, which ; in some situations
+matrices can be generated up to around 10000 steps, but this should likely be
+understood as a more or less strict upper bound on feasible matrix factorization
+(using a single machine, at least), with the code here.
 
 ## Train!
 
