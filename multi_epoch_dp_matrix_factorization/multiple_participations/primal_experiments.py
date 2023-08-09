@@ -55,11 +55,11 @@ def momentum_cooldown(n: int) -> jnp.ndarray:
   lr = lr.at[-cooldown_period:].set(
       jnp.linspace(1.0, cooldown_workload, num=cooldown_period)
   )
-  return matrix_constructors.momentum_sgd_matrix(n, 0.95, lr)
+  return matrix_constructors.momentum_sgd_matrix(n, 0.95, lr)  # pytype: disable=bad-return-type  # jnp-array
 
 
 def dual_optimization(
-    workload: jnp.array,
+    workload: jnp.ndarray,
     n: int,
     num_epochs: int,
     metric_callback: Callable[[int, dict[str, float]], None] = print,
@@ -130,7 +130,7 @@ def main(_) -> None:
   path = matrix_io.get_matrix_path(n, key)
 
   decoder, encoder = loops.w_and_h_from_x_and_s(gram_encoder, workload)
-  matrix_io.verify_and_write(
+  matrix_io.verify_and_write(  # pytype: disable=wrong-arg-types  # jnp-array
       w_matrix=decoder, h_matrix=encoder, s_matrix=workload, output_dir=path
   )
 

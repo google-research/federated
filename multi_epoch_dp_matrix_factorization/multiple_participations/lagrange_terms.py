@@ -36,7 +36,9 @@ class LagrangeTerms:
   u_matrices: Optional[jnp.ndarray] = None
 
   # Non-negativity  -tr(nonneg_multiplier @ X)
-  nonneg_multiplier: jnp.ndarray = None  # nxn matrix, non-negative
+  nonneg_multiplier: jnp.ndarray = (
+      None  # nxn matrix, non-negative  # pytype: disable=annotation-type-mismatch  # jnp-array
+  )
 
   @property
   def num_iters(self):
@@ -121,7 +123,7 @@ def summarize(lt: LagrangeTerms) -> LagrangeTerms:
   u_matrix = (
       lt.contrib_matrix
       @ jnp.diag(lt.lagrange_multiplier)
-      @ lt.contrib_matrix.T
+      @ lt.contrib_matrix.T  # pytype: disable=attribute-error  # jnp-array
       / multiplier_sum
   )
   u_matrices = u_matrix.reshape((1, n, n))

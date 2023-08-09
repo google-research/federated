@@ -111,7 +111,7 @@ def compute_observations_available(
     new_elem = max(last_val, elem)
     monotonic_availability.append(new_elem)
     last_val = new_elem
-  return monotonic_availability
+  return monotonic_availability  # pytype: disable=bad-return-type  # jnp-array
 
 
 def compute_flat_vars_for_streaming(

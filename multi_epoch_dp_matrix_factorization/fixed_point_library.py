@@ -81,4 +81,4 @@ def compute_phi_fixed_point(
     )
     jnp.all(v > 0)
 
-  return v
+  return v  # pytype: disable=bad-return-type  # jnp-array

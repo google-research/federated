@@ -45,7 +45,7 @@ def init_nonnegative_lagrange_terms_from_path(
       tf.io.read_file(os.path.join(init_matrix_dir, NN_LM_MATRIX_STRING)),
       tf.float64,
   ).numpy()
-  return lagrange_terms.LagrangeTerms(
+  return lagrange_terms.LagrangeTerms(  # pytype: disable=wrong-arg-types  # jnp-array
       lagrange_multiplier=jnp.array(lagrange_multiplier),
       contrib_matrix=epoch_contrib_matrix,
       nonneg_multiplier=nn_mult,
@@ -74,7 +74,7 @@ def init_nonnegative_lagrange_terms(
   # with the non-negativity constraint being tight.
   #
   # This results in the initial u_total() being the identity matrix.
-  return lagrange_terms.LagrangeTerms(
+  return lagrange_terms.LagrangeTerms(  # pytype: disable=wrong-arg-types  # jnp-array
       lagrange_multiplier=jnp.ones(epoch_contrib_matrix.shape[1]),
       contrib_matrix=epoch_contrib_matrix,
       nonneg_multiplier=(

@@ -367,12 +367,12 @@ def compute_h_fixed_point_iteration(
         target, lagrange_multiplier, iterations=iters_per_eval
     )
     num_iters += iters_per_eval
-    x_matrix = x_matrix_from_dual(lagrange_multiplier, target)
+    x_matrix = x_matrix_from_dual(lagrange_multiplier, target)  # pytype: disable=wrong-arg-types  # jnp-array
     x_inv = jnp.linalg.inv(x_matrix)
     loss = compute_loss_for_x(x_matrix, target, x_inv=x_inv)
     # Evaluating dual at the optimal X for the given lagrange_multiplier
     # gives a lower bound on the primal objevtive (loss).
-    dual_obj = lagrangian_fn(
+    dual_obj = lagrangian_fn(  # pytype: disable=wrong-arg-types  # jnp-array
         x_matrix, lagrange_multiplier, target=target, x_inv=x_inv
     )
     assert dual_obj > 0
@@ -394,7 +394,7 @@ def compute_h_fixed_point_iteration(
       logging.info('Reached target duality gap.')
       break
 
-  w, h = w_and_h_from_x_and_s(x_matrix, s_matrix)
+  w, h = w_and_h_from_x_and_s(x_matrix, s_matrix)  # pytype: disable=wrong-arg-types  # jnp-array
 
   assert jnp.all(jnp.isfinite(w))
   assert jnp.all(jnp.isfinite(h))

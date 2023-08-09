@@ -68,7 +68,7 @@ def sqrt_and_sqrt_inv(
     sqrt_inv = evecs @ jnp.diag(1 / eval_sqrt) @ evecs.T
   else:
     sqrt_inv = None
-  return sqrt, sqrt_inv
+  return sqrt, sqrt_inv  # pytype: disable=bad-return-type  # jnp-array
 
 
 def x_and_x_inv_from_dual(
@@ -138,7 +138,7 @@ class OptaxUpdate:
     lt_updates = {}
 
     if lt.lagrange_multiplier is not None:
-      mult_update = jnp.diag(lt.contrib_matrix.T @ x_matrix @ lt.contrib_matrix)
+      mult_update = jnp.diag(lt.contrib_matrix.T @ x_matrix @ lt.contrib_matrix)  # pytype: disable=attribute-error  # jnp-array
       assert jnp.all(
           mult_update >= 0
       ), f'x_matrix may not be PD, mult_update:\n {mult_update}'
@@ -159,7 +159,7 @@ class OptaxUpdate:
     if lt.u_matrices is not None:
       assert len(lt.u_multipliers) == len(lt.u_matrices)
       for i, u_matrix in enumerate(lt.u_matrices):
-        lt.u_multipliers[i] = lt.u_multipliers[i] * jnp.trace(
+        lt.u_multipliers[i] = lt.u_multipliers[i] * jnp.trace(  # pytype: disable=unsupported-operands  # jnp-array
             u_matrix @ x_matrix
         )
 
@@ -174,7 +174,7 @@ class OptaxUpdate:
       grads = x_matrix
       if self.multiplicative_update:
         grads *= nonneg_multiplier
-      updates, new_nonneg_opt_state = self.nonneg_optimizer.update(
+      updates, new_nonneg_opt_state = self.nonneg_optimizer.update(  # pytype: disable=attribute-error  # jnp-array
           grads, self.nonneg_opt_state
       )
       nonneg_multiplier += updates

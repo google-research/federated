@@ -33,7 +33,7 @@ config.update('jax_enable_x64', True)
 # pylint:disable=invalid-name
 
 
-def get_toeplitz_idx(n: int) -> jnp.array:
+def get_toeplitz_idx(n: int) -> jnp.ndarray:
   """Computes a Toeplitz matrix where entries are integer indices [0, ..., n-1].
 
   In particular, T_{ij} = | i - j |.  For example, get_toeplitz_idx(4) returns:
@@ -53,7 +53,7 @@ def get_toeplitz_idx(n: int) -> jnp.array:
   return jnp.array(sp.linalg.toeplitz(np.arange(n)))
 
 
-def get_orthogonal_mask(n: int, epochs: int = 1) -> jnp.array:
+def get_orthogonal_mask(n: int, epochs: int = 1) -> jnp.ndarray:
   """Computes a mask that imposes orthognality constraints on the optimization.
 
   This is specific to the fixed-epoch-order (k, b)-participation schema of
@@ -121,7 +121,7 @@ class MatrixFactorizer:
 
   def __init__(
       self,
-      workload_matrix: jnp.array,
+      workload_matrix: jnp.ndarray,
       epochs: int = 1,
       equal_norm: bool = False,
   ):
@@ -163,7 +163,7 @@ class MatrixFactorizer:
     self._mask = orth_mask
 
   @functools.partial(jit, static_argnums=(0,))
-  def project_update(self, dX: jnp.array) -> jnp.array:
+  def project_update(self, dX: jnp.ndarray) -> jnp.ndarray:
     r"""Project dX so that X + alpha*dX satisfies constraints for any alpha.
 
     Note: this function assumes that X already satisfies the constraints.
@@ -203,7 +203,7 @@ class MatrixFactorizer:
     return dX
 
   @functools.partial(jit, static_argnums=(0,))
-  def loss_and_gradient(self, X: jnp.array) -> tuple[float, jnp.array]:
+  def loss_and_gradient(self, X: jnp.ndarray) -> tuple[float, jnp.ndarray]:
     r"""Computes the matrix mechanism loss and gradient.
 
     This function computes $\tr[A^T A X^{-1}]$ and the associated gradient
@@ -224,8 +224,8 @@ class MatrixFactorizer:
 
   @functools.partial(jit, static_argnums=(0,))
   def _lbfgs_direction(
-      self, X: jnp.array, dX: jnp.array, X1: jnp.array, dX1: jnp.array
-  ) -> jnp.array:
+      self, X: jnp.ndarray, dX: jnp.ndarray, X1: jnp.ndarray, dX1: jnp.ndarray
+  ) -> jnp.ndarray:
     """Computes the LBFGS search direction.
 
     Given the current/previous iterates (X and X1) and the current/previous
@@ -257,7 +257,7 @@ class MatrixFactorizer:
       metric_callback: Optional[Callable[[int, dict[str, float]], None]] = None,
       initial_X: Optional[jnp.ndarray] = None,
       termination_fn: TerminationFn = build_pg_tol_termination_fn(pg_tol=1e-3),
-  ) -> jnp.array:
+  ) -> jnp.ndarray:
     """Optimize the strategy matrix with an iterative gradient-based method.
 
     Args:
