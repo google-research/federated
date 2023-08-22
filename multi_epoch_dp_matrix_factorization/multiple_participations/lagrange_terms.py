@@ -130,7 +130,7 @@ def summarize(lt: LagrangeTerms) -> LagrangeTerms:
   u_multipliers = jnp.array([multiplier_sum])
   if lt.u_matrices is not None:
     assert lt.u_multipliers is not None
-    u_matrices = jnp.row_stack([lt.u_matrices, u_matrices])
+    u_matrices = jnp.vstack([lt.u_matrices, u_matrices])
     u_multipliers = jnp.concatenate([lt.u_multipliers, u_multipliers])
 
   return LagrangeTerms(
