@@ -26,7 +26,7 @@ import time
 
 from absl import app
 from absl import flags
-from jax.config import config
+from jax import config
 import jax.numpy as jnp
 
 from multi_epoch_dp_matrix_factorization import loops

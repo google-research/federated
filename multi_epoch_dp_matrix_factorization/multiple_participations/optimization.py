@@ -23,7 +23,7 @@ from typing import Any, Optional
 from absl import flags
 from absl import logging
 import jax
-from jax.config import config
+from jax import config
 from jax.experimental import host_callback
 import jax.numpy as jnp
 import optax

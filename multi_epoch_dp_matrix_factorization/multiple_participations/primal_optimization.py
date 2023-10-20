@@ -17,8 +17,8 @@ from collections.abc import Callable
 import functools
 from typing import Optional
 
+from jax import config
 from jax import jit
-from jax.config import config
 import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy as np

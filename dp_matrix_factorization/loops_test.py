@@ -14,8 +14,8 @@
 """Tests for loops."""
 
 from absl.testing import parameterized
+from jax import config
 from jax import numpy as jnp
-from jax.config import config
 import numpy as np
 import tensorflow as tf
 

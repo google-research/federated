@@ -13,8 +13,8 @@
 # limitations under the License.
 """Functions for computing lagrange multiplier settings for DP-MatFac."""
 import jax
+from jax import config
 from jax import numpy as jnp
-from jax.config import config
 
 # With large matrices, the extra precision afforded by performing all
 # computations in float64 is critical.
