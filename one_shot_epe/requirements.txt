@@ -1,0 +1,6 @@
+absl-py~=1.4.0
+numpy~=1.25.0
+scipy~=1.9.0
+tensorboard~=2.14.0
+tensorflow~=2.14.0
+tensorflow-federated==0.64.0
