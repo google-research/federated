@@ -1,4 +1,6 @@
 absl-py~=1.4.0
+dp-accounting ~= 0.4.3
+numba ~= 0.57.1
 numpy ~= 1.25.0
 pandas ~= 1.5.3
 scipy ~= 1.9.0
