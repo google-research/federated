@@ -35,6 +35,18 @@ py_test(
 )
 
 py_library(
+    name = "empirical_privacy_estimation_lib",
+    srcs = ["empirical_privacy_estimation_lib.py"],
+)
+
+py_test(
+    name = "empirical_privacy_estimation_test",
+    srcs = ["empirical_privacy_estimation_test.py"],
+    shard_count = 20,
+    deps = [":empirical_privacy_estimation_lib"],
+)
+
+py_library(
     name = "fed_avg_with_canaries",
     srcs = ["fed_avg_with_canaries.py"],
     srcs_version = "PY3",
