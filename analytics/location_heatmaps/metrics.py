@@ -1,4 +1,4 @@
-# Copyright 2020, Google LLC.
+# Copyright 2021, Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ the result to be comparable with the original image.
 """
 
 import dataclasses
+
 import numpy as np
 from scipy import stats
 from sklearn import metrics as mt
@@ -35,14 +36,38 @@ class Metrics:
     hotspots_count: count of the current hotspots.
     f1: f1 score on the discovered hot spots.
     mutual_info: mutual information metric.
+    mutual_info: Mutual Information Metric.
+    mape: Mean Absolute Percentage Error.
+    smape: Symmetric Mean Absolute Percentage Error.
+    maape: Mean Arctangent Absolute Percentage Error.
+    nmse: Normalized Mean Squared Error
   """
-  mse: float
-  l1_distance: float
-  l2_distance: float
-  wasserstein: float
-  hotspots_count: int
-  f1: float
-  mutual_info: float
+  mse: float = 0
+  l1_distance: float = 0
+  l2_distance: float = 0
+  wasserstein: float = 0
+  hotspots_count: int = 0
+  f1: float = 0
+  mutual_info: float = 0
+  mape: float = 0
+  smape: float = 0
+  maape: float = 0
+  nmse: float = 0
+
+
+# MAPE
+def mape(test_image, no_zeros_norm):
+  return float(np.mean(np.abs(no_zeros_norm - test_image) / no_zeros_norm))
+
+
+def smape(test_image, no_zeros_norm):
+  return float(2 * np.mean(
+    np.abs(no_zeros_norm - test_image) / (no_zeros_norm + test_image)))
+
+
+def maape(test_image, no_zeros_norm):
+  return float(
+    np.mean(np.arctan(np.abs(no_zeros_norm - test_image) / (no_zeros_norm))))
 
 
 def rescale_image(image: np.ndarray, total_size: int):
@@ -60,7 +85,8 @@ def rescale_image(image: np.ndarray, total_size: int):
      scaled image array of size total_size x total_size.
   """
   if total_size % image.shape[0] != 0:
-    raise ValueError('Provided scale size has to be divisible by image size.')
+    raise ValueError(
+      'Provided scale size has to be divisible by image size.')
   if image.shape[0] != image.shape[1]:
     raise ValueError('Provided image needs to have a squared size.')
   scale = int(total_size / image.shape[0])
@@ -119,6 +145,9 @@ def get_metrics(test_image, true_image, top_k, total_size):
   the provided TOP-K parameter, and an MSE error. For the correct comparison the
   images are scaled to the same size first,and then compared per coordinate.
 
+  Some metrics do not accept zero values, therefore we replace all zeros with
+  the next smallest value from the image.
+
 
   Args:
     test_image: obtained image to obtain the metrics
@@ -128,10 +157,11 @@ def get_metrics(test_image, true_image, top_k, total_size):
 
   Returns:
     l2 dist, hot spot counts, movers distance, f1-score, l1 dist, mutual info,
-    MSE.
+    MSE, mape, smape, maape.
   """
 
   # normalize the input images
+
   test_image = normalize(rescale_image(test_image, total_size))
   true_image = normalize(rescale_image(true_image, total_size))
 
@@ -144,13 +174,25 @@ def get_metrics(test_image, true_image, top_k, total_size):
   mse = mt.mean_squared_error(test_image, true_image)
   top_k_diff = len(top_k_true.intersection(top_k_test))
   wasserstein = stats.wasserstein_distance(
-      test_image.reshape(-1), true_image.reshape(-1))
+    test_image.reshape(-1), true_image.reshape(-1))
   f1 = mt.f1_score(top_k_true_arr.reshape(-1), top_k_test_arr.reshape(-1))
 
-  mutual = mt.mutual_info_score(true_image.reshape(-1), test_image.reshape(-1))
+  mutual = mt.mutual_info_score(true_image.reshape(-1),
+                                test_image.reshape(-1))
+
+  no_zeros_true_image = np.zeros_like(true_image)
+  next_min_element = np.min(true_image[np.nonzero(true_image)])
+  no_zeros_true_image.fill(next_min_element)
+  no_zeros_true_image[np.nonzero(true_image)] = true_image[
+    np.nonzero(true_image)]
+  no_zeros_norm = no_zeros_true_image / no_zeros_true_image.sum()
 
   metrics = Metrics(l1_distance=l1_distance, l2_distance=l2_distance,
                     mse=mse, f1=f1, wasserstein=wasserstein,
-                    hotspots_count=top_k_diff, mutual_info=mutual)
+                    hotspots_count=top_k_diff, mutual_info=mutual,
+                    mape=mape(test_image, no_zeros_norm),
+                    smape=smape(test_image, no_zeros_norm),
+                    maape=maape(test_image, no_zeros_norm)
+                    )
 
   return metrics
